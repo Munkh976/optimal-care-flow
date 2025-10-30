@@ -171,22 +171,26 @@ const Dashboard = () => {
         </Card>
 
         {/* Quick Actions */}
-        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/schedule")}>
             <Calendar className="h-6 w-6" />
             <span>View Schedule</span>
+          </Button>
+          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/live-operations")}>
+            <Activity className="h-6 w-6" />
+            <span>Live Operations</span>
           </Button>
           <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/caregivers")}>
             <Users className="h-6 w-6" />
             <span>Manage Caregivers</span>
           </Button>
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/clients")}>
-            <Activity className="h-6 w-6" />
-            <span>Manage Clients</span>
+          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/time-off")}>
+            <Calendar className="h-6 w-6" />
+            <span>Time Off</span>
           </Button>
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2">
-            <Sparkles className="h-6 w-6" />
-            <span>AI Auto-Schedule</span>
+          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/shift-trades")}>
+            <TrendingUp className="h-6 w-6" />
+            <span>Shift Trades</span>
           </Button>
         </div>
       </main>

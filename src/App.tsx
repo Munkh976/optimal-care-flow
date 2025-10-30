@@ -9,6 +9,9 @@ import Dashboard from "./pages/Dashboard";
 import Schedule from "./pages/Schedule";
 import Caregivers from "./pages/Caregivers";
 import Clients from "./pages/Clients";
+import TimeOffRequests from "./pages/TimeOffRequests";
+import LiveOperations from "./pages/LiveOperations";
+import ShiftTrades from "./pages/ShiftTrades";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +29,9 @@ const App = () => (
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/caregivers" element={<Caregivers />} />
           <Route path="/clients" element={<Clients />} />
+          <Route path="/time-off" element={<TimeOffRequests />} />
+          <Route path="/live-operations" element={<LiveOperations />} />
+          <Route path="/shift-trades" element={<ShiftTrades />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
