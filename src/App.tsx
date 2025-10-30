@@ -12,6 +12,9 @@ import Clients from "./pages/Clients";
 import TimeOffRequests from "./pages/TimeOffRequests";
 import LiveOperations from "./pages/LiveOperations";
 import ShiftTrades from "./pages/ShiftTrades";
+import UnassignedShifts from "./pages/UnassignedShifts";
+import QuickAssign from "./pages/QuickAssign";
+import CaregiverDashboard from "./pages/CaregiverDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +35,9 @@ const App = () => (
           <Route path="/time-off" element={<TimeOffRequests />} />
           <Route path="/live-operations" element={<LiveOperations />} />
           <Route path="/shift-trades" element={<ShiftTrades />} />
+          <Route path="/unassigned-shifts" element={<UnassignedShifts />} />
+          <Route path="/quick-assign" element={<QuickAssign />} />
+          <Route path="/caregiver-dashboard" element={<CaregiverDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

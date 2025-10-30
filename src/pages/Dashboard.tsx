@@ -171,26 +171,22 @@ const Dashboard = () => {
         </Card>
 
         {/* Quick Actions */}
-        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/schedule")}>
-            <Calendar className="h-6 w-6" />
-            <span>View Schedule</span>
-          </Button>
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/live-operations")}>
+        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/unassigned-shifts")}>
             <Activity className="h-6 w-6" />
-            <span>Live Operations</span>
+            <span>Unassigned Shifts</span>
+          </Button>
+          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/quick-assign")}>
+            <TrendingUp className="h-6 w-6" />
+            <span>Quick Assign</span>
+          </Button>
+          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/caregiver-dashboard")}>
+            <Users className="h-6 w-6" />
+            <span>Caregiver Portal</span>
           </Button>
           <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/caregivers")}>
             <Users className="h-6 w-6" />
-            <span>Manage Caregivers</span>
-          </Button>
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/time-off")}>
-            <Calendar className="h-6 w-6" />
-            <span>Time Off</span>
-          </Button>
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/shift-trades")}>
-            <TrendingUp className="h-6 w-6" />
-            <span>Shift Trades</span>
+            <span>Manage Staff</span>
           </Button>
         </div>
       </main>
