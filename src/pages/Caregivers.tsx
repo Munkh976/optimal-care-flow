@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award } from "lucide-react";
+import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award, Search, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Caregivers = () => {
   const navigate = useNavigate();
@@ -13,6 +15,9 @@ const Caregivers = () => {
   const [profile, setProfile] = useState<any>(null);
   const [caregivers, setCaregivers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterRole, setFilterRole] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("active");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -81,6 +86,22 @@ const Caregivers = () => {
     }
   };
 
+  // Filter caregivers
+  const filteredCaregivers = caregivers.filter(caregiver => {
+    const fullName = `${caregiver.first_name} ${caregiver.last_name}`.toLowerCase();
+    const matchesSearch = searchQuery === "" ||
+      fullName.includes(searchQuery.toLowerCase()) ||
+      caregiver.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      caregiver.skills?.some((skill: string) => skill.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesRole = filterRole === "all" || caregiver.employment_type === filterRole;
+    const matchesStatus = filterStatus === "all" || 
+      (filterStatus === "active" && caregiver.is_active) ||
+      (filterStatus === "inactive" && !caregiver.is_active);
+
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -119,7 +140,7 @@ const Caregivers = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
             <h2 className="text-3xl font-bold mb-2">Caregiver Management</h2>
             <p className="text-muted-foreground">Manage your caregiver roster</p>
@@ -130,6 +151,42 @@ const Caregivers = () => {
           </Button>
         </div>
 
+        {/* Search and Filters */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, email, or skills..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <Select value={filterRole} onValueChange={setFilterRole}>
+            <SelectTrigger className="w-full sm:w-[160px]">
+              <SelectValue placeholder="Employment" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="full_time">Full Time</SelectItem>
+              <SelectItem value="part_time">Part Time</SelectItem>
+              <SelectItem value="on_call">On Call</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Stats */}
         <div className="grid sm:grid-cols-3 gap-4 mb-6">
           <Card>
@@ -137,7 +194,8 @@ const Caregivers = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Caregivers</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{caregivers.length}</div>
+              <div className="text-3xl font-bold">{filteredCaregivers.length}</div>
+              <div className="text-xs text-muted-foreground">of {caregivers.length} total</div>
             </CardContent>
           </Card>
           <Card>
@@ -164,19 +222,35 @@ const Caregivers = () => {
 
         {/* Caregivers Grid */}
         <div className="grid md:grid-cols-2 gap-4">
-          {caregivers.length === 0 ? (
+          {filteredCaregivers.length === 0 ? (
             <Card className="md:col-span-2">
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Activity className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-center">No caregivers in your roster yet</p>
-                <Button className="mt-4" variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Caregiver
-                </Button>
+                <p className="text-muted-foreground text-center">
+                  {caregivers.length === 0 ? "No caregivers in your roster yet" : "No caregivers match your filters"}
+                </p>
+                {searchQuery || filterRole !== "all" || filterStatus !== "active" ? (
+                  <Button 
+                    className="mt-4" 
+                    variant="outline"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFilterRole("all");
+                      setFilterStatus("active");
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                ) : (
+                  <Button className="mt-4" variant="outline">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Caregiver
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
-            caregivers.map((caregiver) => (
+            filteredCaregivers.map((caregiver) => (
               <Card key={caregiver.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">

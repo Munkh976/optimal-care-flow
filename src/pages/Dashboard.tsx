@@ -171,7 +171,11 @@ const Dashboard = () => {
         </Card>
 
         {/* Quick Actions */}
-        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/schedule")}>
+            <Calendar className="h-6 w-6" />
+            <span>Everyone's Schedule</span>
+          </Button>
           <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/unassigned-shifts")}>
             <Activity className="h-6 w-6" />
             <span>Unassigned Shifts</span>

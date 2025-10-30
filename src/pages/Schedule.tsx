@@ -3,17 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Calendar, Clock, User, MapPin } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Activity, LogOut, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Schedule = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [shifts, setShifts] = useState<any[]>([]);
+  const [caregivers, setCaregivers] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -34,7 +39,7 @@ const Schedule = () => {
 
       if (profileData) {
         setProfile(profileData);
-        fetchShifts(session.user.id);
+        await fetchScheduleData(session.user.id);
       }
     };
 
@@ -51,24 +56,56 @@ const Schedule = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const fetchShifts = async (userId: string) => {
-    const { data, error } = await supabase
+  useEffect(() => {
+    if (user) {
+      fetchScheduleData(user.id);
+    }
+  }, [currentWeekStart, user]);
+
+  const fetchScheduleData = async (userId: string) => {
+    setLoading(true);
+    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+
+    // Fetch shifts with assignments
+    const { data: shiftsData, error: shiftsError } = await supabase
       .from("shifts")
       .select(`
         *,
-        clients (first_name, last_name, address, city),
-        caregivers (first_name, last_name, email, phone)
+        client:clients(first_name, last_name, care_requirements),
+        shift_assignments(
+          id,
+          caregiver:caregivers(first_name, last_name),
+          status
+        )
       `)
       .eq("agency_id", userId)
-      .order("shift_date", { ascending: true })
-      .order("start_time", { ascending: true });
+      .gte("shift_date", format(currentWeekStart, "yyyy-MM-dd"))
+      .lte("shift_date", format(weekEnd, "yyyy-MM-dd"))
+      .order("shift_date", { ascending: true });
 
-    if (error) {
-      console.error("Error fetching shifts:", error);
-      toast.error("Failed to load shifts");
+    if (shiftsError) {
+      console.error("Error fetching shifts:", shiftsError);
+      toast.error("Failed to load schedule");
     } else {
-      setShifts(data || []);
+      setShifts(shiftsData || []);
     }
+
+    // Fetch all caregivers
+    const { data: caregiversData } = await supabase
+      .from("caregivers")
+      .select("*")
+      .eq("agency_id", userId)
+      .eq("is_active", true);
+
+    setCaregivers(caregiversData || []);
+
+    // Fetch all clients
+    const { data: clientsData } = await supabase
+      .from("clients")
+      .select("*")
+      .eq("agency_id", userId);
+
+    setClients(clientsData || []);
     setLoading(false);
   };
 
@@ -78,28 +115,34 @@ const Schedule = () => {
     navigate("/auth");
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open": return "bg-warning/10 text-warning border-warning/20";
-      case "assigned": return "bg-primary/10 text-primary border-primary/20";
-      case "in_progress": return "bg-accent/10 text-accent border-accent/20";
-      case "completed": return "bg-success/10 text-success border-success/20";
-      case "cancelled": return "bg-destructive/10 text-destructive border-destructive/20";
-      default: return "bg-muted";
-    }
+  const goToPreviousWeek = () => {
+    setCurrentWeekStart(addDays(currentWeekStart, -7));
   };
 
-  const getCareTypeColor = (type: string) => {
-    switch (type) {
-      case "personal_care": return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-      case "companionship": return "bg-purple-500/10 text-purple-500 border-purple-500/20";
-      case "medication": return "bg-green-500/10 text-green-500 border-green-500/20";
-      case "mobility": return "bg-orange-500/10 text-orange-500 border-orange-500/20";
-      case "dementia_care": return "bg-pink-500/10 text-pink-500 border-pink-500/20";
-      case "hospice": return "bg-gray-500/10 text-gray-500 border-gray-500/20";
-      default: return "bg-muted";
-    }
+  const goToNextWeek = () => {
+    setCurrentWeekStart(addDays(currentWeekStart, 7));
   };
+
+  const goToCurrentWeek = () => {
+    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  };
+
+  const getShiftsForDay = (dayOffset: number) => {
+    const targetDate = format(addDays(currentWeekStart, dayOffset), "yyyy-MM-dd");
+    return shifts.filter(shift => shift.shift_date === targetDate);
+  };
+
+  const getCareTypeColor = (careType: string) => {
+    const colors: any = {
+      personal_care: "bg-primary/10 text-primary border-primary/20",
+      companion: "bg-accent/10 text-accent border-accent/20",
+      medical: "bg-destructive/10 text-destructive border-destructive/20",
+      respite: "bg-secondary/10 text-secondary border-secondary/20",
+    };
+    return colors[careType] || "bg-muted";
+  };
+
+  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   if (loading) {
     return (
@@ -115,7 +158,7 @@ const Schedule = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card">
+      <header className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/dashboard")}>
             <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
@@ -139,104 +182,151 @@ const Schedule = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
-            <h2 className="text-3xl font-bold mb-2">Schedule Management</h2>
-            <p className="text-muted-foreground">View and manage all shifts</p>
+            <h2 className="text-3xl font-bold mb-2">Everyone's Schedule</h2>
+            <p className="text-muted-foreground">Weekly view of all shifts and assignments</p>
           </div>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Create Shift
-          </Button>
+          <div className="flex items-center gap-2">
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="personal_care">Personal Care</SelectItem>
+                <SelectItem value="companion">Companion</SelectItem>
+                <SelectItem value="medical">Medical</SelectItem>
+                <SelectItem value="respite">Respite</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {/* Shifts Grid */}
-        <div className="grid gap-4">
-          {shifts.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-center">No shifts scheduled yet</p>
-                <Button className="mt-4" variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First Shift
+        {/* Week Navigation */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-3">
+                <CalendarIcon className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">
+                  Week of {format(currentWeekStart, "MMM dd, yyyy")}
+                </h3>
+                <Button variant="ghost" size="sm" onClick={goToCurrentWeek}>
+                  Today
                 </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            shifts.map((shift) => (
-              <Card key={shift.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-lg">
-                          {shift.clients?.first_name} {shift.clients?.last_name}
-                        </CardTitle>
-                        <Badge variant="outline" className={getStatusColor(shift.status)}>
-                          {shift.status.replace("_", " ")}
-                        </Badge>
-                        <Badge variant="outline" className={getCareTypeColor(shift.care_type)}>
-                          {shift.care_type.replace("_", " ")}
-                        </Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {format(new Date(shift.shift_date), "MMM dd, yyyy")}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {shift.start_time} - {shift.end_time} ({shift.duration_hours}h)
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {shift.clients?.city}
-                        </div>
-                      </div>
+              </div>
+              <Button variant="outline" size="sm" onClick={goToNextWeek}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Weekly Calendar Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
+          {weekDays.map((day, index) => {
+            const currentDate = addDays(currentWeekStart, index);
+            const dayShifts = getShiftsForDay(index).filter(
+              shift => selectedCategory === "all" || shift.care_type === selectedCategory
+            );
+
+            return (
+              <Card key={index} className="flex flex-col">
+                <CardContent className="p-4">
+                  <div className="mb-4 pb-2 border-b">
+                    <div className="font-semibold text-lg">{day}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {format(currentDate, "MMM dd")}
                     </div>
-                    {shift.ai_match_score && (
-                      <div className="flex flex-col items-center">
-                        <div className="text-2xl font-bold text-primary">{shift.ai_match_score}%</div>
-                        <div className="text-xs text-muted-foreground">AI Match</div>
-                      </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {dayShifts.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">No shifts</p>
+                    ) : (
+                      dayShifts.map((shift) => (
+                        <div
+                          key={shift.id}
+                          className="p-3 rounded-lg border bg-card hover:shadow-md transition-shadow cursor-pointer"
+                          onClick={() => navigate(`/unassigned-shifts`)}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="text-sm font-medium">
+                              {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
+                            </div>
+                            <Badge variant="outline" className={`text-xs ${getCareTypeColor(shift.care_type)}`}>
+                              {shift.care_type?.replace("_", " ")}
+                            </Badge>
+                          </div>
+                          
+                          <div className="text-sm mb-1">
+                            <span className="font-medium">
+                              {shift.client?.first_name} {shift.client?.last_name}
+                            </span>
+                          </div>
+
+                          {shift.shift_assignments && shift.shift_assignments.length > 0 ? (
+                            <div className="text-xs text-primary">
+                              {shift.shift_assignments[0].caregiver?.first_name}{" "}
+                              {shift.shift_assignments[0].caregiver?.last_name}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-destructive italic">Unassigned</div>
+                          )}
+
+                          {shift.client?.care_requirements && shift.client.care_requirements.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {shift.client.care_requirements.slice(0, 2).map((req: string, idx: number) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {req}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
                     )}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {shift.caregivers ? (
-                    <div className="flex items-center gap-2 mb-3 p-3 bg-accent/5 rounded-lg">
-                      <User className="h-4 w-4 text-accent" />
-                      <div>
-                        <p className="text-sm font-medium">
-                          {shift.caregivers.first_name} {shift.caregivers.last_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{shift.caregivers.phone}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mb-3 p-3 bg-warning/5 rounded-lg border border-warning/20">
-                      <p className="text-sm text-warning">No caregiver assigned</p>
-                    </div>
-                  )}
-                  {shift.special_instructions && (
-                    <p className="text-sm text-muted-foreground mb-3">
-                      <span className="font-medium">Instructions:</span> {shift.special_instructions}
-                    </p>
-                  )}
-                  {shift.required_skills && shift.required_skills.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {shift.required_skills.map((skill: string, idx: number) => (
-                        <Badge key={idx} variant="secondary" className="text-xs">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
-            ))
-          )}
+            );
+          })}
+        </div>
+
+        {/* Summary Stats */}
+        <div className="grid sm:grid-cols-4 gap-4 mt-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-sm text-muted-foreground">Total Shifts</div>
+              <div className="text-2xl font-bold">{shifts.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-sm text-muted-foreground">Assigned</div>
+              <div className="text-2xl font-bold text-primary">
+                {shifts.filter(s => s.shift_assignments && s.shift_assignments.length > 0).length}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-sm text-muted-foreground">Unassigned</div>
+              <div className="text-2xl font-bold text-destructive">
+                {shifts.filter(s => !s.shift_assignments || s.shift_assignments.length === 0).length}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-sm text-muted-foreground">Active Caregivers</div>
+              <div className="text-2xl font-bold text-accent">{caregivers.length}</div>
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>

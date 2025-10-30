@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Phone, MapPin, Heart, AlertCircle, User } from "lucide-react";
+import { Activity, LogOut, Plus, Phone, MapPin, Heart, AlertCircle, User, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Clients = () => {
   const navigate = useNavigate();
@@ -14,6 +16,9 @@ const Clients = () => {
   const [profile, setProfile] = useState<any>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterLocation, setFilterLocation] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("active");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -84,6 +89,30 @@ const Clients = () => {
     return age;
   };
 
+  // Filter clients
+  const filteredClients = clients.filter(client => {
+    const fullName = `${client.first_name} ${client.last_name}`.toLowerCase();
+    const matchesSearch = searchQuery === "" ||
+      fullName.includes(searchQuery.toLowerCase()) ||
+      client.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.medical_conditions?.some((condition: string) => 
+        condition.toLowerCase().includes(searchQuery.toLowerCase())
+      ) ||
+      client.care_requirements?.some((req: string) => 
+        req.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+    const matchesLocation = filterLocation === "all" || client.city === filterLocation;
+    const matchesStatus = filterStatus === "all" || 
+      (filterStatus === "active" && client.is_active) ||
+      (filterStatus === "inactive" && !client.is_active);
+
+    return matchesSearch && matchesLocation && matchesStatus;
+  });
+
+  // Get unique locations
+  const uniqueLocations = Array.from(new Set(clients.map(c => c.city).filter(Boolean)));
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -122,7 +151,7 @@ const Clients = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
             <h2 className="text-3xl font-bold mb-2">Client Management</h2>
             <p className="text-muted-foreground">Manage your client profiles</p>
@@ -133,6 +162,42 @@ const Clients = () => {
           </Button>
         </div>
 
+        {/* Search and Filters */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, location, or care needs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <Select value={filterLocation} onValueChange={setFilterLocation}>
+            <SelectTrigger className="w-full sm:w-[160px]">
+              <SelectValue placeholder="Location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {uniqueLocations.map(loc => (
+                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Stats */}
         <div className="grid sm:grid-cols-3 gap-4 mb-6">
           <Card>
@@ -140,7 +205,8 @@ const Clients = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Clients</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{clients.length}</div>
+              <div className="text-3xl font-bold">{filteredClients.length}</div>
+              <div className="text-xs text-muted-foreground">of {clients.length} total</div>
             </CardContent>
           </Card>
           <Card>
@@ -174,19 +240,35 @@ const Clients = () => {
 
         {/* Clients Grid */}
         <div className="grid md:grid-cols-2 gap-4">
-          {clients.length === 0 ? (
+          {filteredClients.length === 0 ? (
             <Card className="md:col-span-2">
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Heart className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-center">No clients in your system yet</p>
-                <Button className="mt-4" variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Client
-                </Button>
+                <p className="text-muted-foreground text-center">
+                  {clients.length === 0 ? "No clients in your system yet" : "No clients match your filters"}
+                </p>
+                {searchQuery || filterLocation !== "all" || filterStatus !== "active" ? (
+                  <Button 
+                    className="mt-4" 
+                    variant="outline"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFilterLocation("all");
+                      setFilterStatus("active");
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                ) : (
+                  <Button className="mt-4" variant="outline">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Client
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
-            clients.map((client) => (
+            filteredClients.map((client) => (
               <Card key={client.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
