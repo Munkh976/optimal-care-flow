@@ -21,6 +21,8 @@ const Auth = () => {
     const { data } = await supabase.rpc('get_user_role', { _user_id: userId });
     if (data === 'caregiver') {
       navigate('/caregiver-dashboard');
+    } else if (data === 'system_admin') {
+      navigate('/system-admin-dashboard');
     } else if (data) {
       navigate('/dashboard');
     } else {
@@ -160,15 +162,24 @@ const Auth = () => {
               <Sparkles className="h-4 w-4 text-accent" />
               <span>Powered by AI-driven scheduling optimization</span>
             </div>
-            <div className="pt-2 border-t">
-              <p className="mb-2 text-muted-foreground">Are you a caregiver looking to join?</p>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => navigate("/caregiver-registration")}
-              >
-                Register as Caregiver
-              </Button>
+            <div className="pt-2 border-t space-y-2">
+              <p className="mb-2 text-muted-foreground">New to CareMuch?</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/caregiver-registration")}
+                >
+                  Register as Caregiver
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/system-admin-registration")}
+                >
+                  Register as Admin
+                </Button>
+              </div>
             </div>
           </CardFooter>
         </Card>
