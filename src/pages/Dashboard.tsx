@@ -127,24 +127,26 @@ const Dashboard = () => {
       .gte("shifts.shift_date", new Date().toISOString().split('T')[0])
       .limit(50);
 
-    const events = (assignments || []).map((assignment: any) => {
-      const shift = assignment.shifts;
-      const caregiver = assignment.caregivers;
-      const client = shift?.clients;
-      
-      return {
-        id: assignment.id,
-        title: `${client?.first_name || 'Client'} ${client?.last_name || ''} - ${caregiver?.first_name || 'Caregiver'} ${caregiver?.last_name || ''}`,
-        start: `${shift.shift_date}T${shift.start_time}`,
-        end: `${shift.shift_date}T${shift.end_time}`,
-        backgroundColor: assignment.status === 'completed' ? '#7FBA00' : 
-                        assignment.status === 'in_progress' ? '#F39C12' : '#4A90E2',
-        extendedProps: {
-          assignmentId: assignment.id,
-          status: assignment.status
-        }
-      };
-    });
+    const events = (assignments || [])
+      .map((assignment: any) => {
+        const shift = assignment.shifts;
+        if (!shift) return null; // guard against missing shift relations
+        const caregiver = assignment.caregivers;
+        const client = shift?.clients;
+        
+        return {
+          id: assignment.id,
+          title: `${client?.first_name || 'Client'} ${client?.last_name || ''} - ${caregiver?.first_name || 'Caregiver'} ${caregiver?.last_name || ''}`,
+          start: `${shift.shift_date}T${shift.start_time}`,
+          end: `${shift.shift_date}T${shift.end_time}`,
+          backgroundColor: assignment.status === 'completed' ? '#7FBA00' : assignment.status === 'in_progress' ? '#F39C12' : '#4A90E2',
+          extendedProps: {
+            assignmentId: assignment.id,
+            status: assignment.status
+          }
+        };
+      })
+      .filter(Boolean) as any[];
 
     setCalendarEvents(events);
 
