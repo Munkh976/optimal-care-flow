@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award, Search, Upload, Eye, Trash2 } from "lucide-react";
+import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award, Search, Upload, Eye, Trash2, Edit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import ReactSelect from "react-select";
 
 const Caregivers = () => {
   const navigate = useNavigate();
@@ -24,15 +25,41 @@ const Caregivers = () => {
   const [filterStatus, setFilterStatus] = useState<string>("active");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteCaregiver, setDeleteCaregiver] = useState<any>(null);
-  const [viewCaregiver, setViewCaregiver] = useState<any>(null);
-  const [newCaregiver, setNewCaregiver] = useState({
+  const [editCaregiver, setEditCaregiver] = useState<any>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
     email: "",
     phone: "",
     hourly_rate: "",
     employment_type: "full_time",
+    skills: [] as string[],
+    certifications: [] as string[],
+    city: "",
+    state: "",
   });
+
+  const skillsOptions = [
+    { value: "Alzheimer's Care", label: "Alzheimer's Care" },
+    { value: "Dementia Care", label: "Dementia Care" },
+    { value: "Mobility Assistance", label: "Mobility Assistance" },
+    { value: "Medication Management", label: "Medication Management" },
+    { value: "Meal Preparation", label: "Meal Preparation" },
+    { value: "Personal Hygiene", label: "Personal Hygiene" },
+    { value: "Companionship", label: "Companionship" },
+    { value: "Light Housekeeping", label: "Light Housekeeping" },
+    { value: "Transportation", label: "Transportation" },
+    { value: "Fall Prevention", label: "Fall Prevention" },
+  ];
+
+  const certificationsOptions = [
+    { value: "CNA", label: "CNA" },
+    { value: "HHA", label: "HHA" },
+    { value: "CPR", label: "CPR" },
+    { value: "First Aid", label: "First Aid" },
+    { value: "Nursing Degree", label: "Nursing Degree" },
+  ];
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -92,37 +119,87 @@ const Caregivers = () => {
     navigate("/auth");
   };
 
-  const handleAddCaregiver = async () => {
-    if (!user || !newCaregiver.first_name || !newCaregiver.last_name || !newCaregiver.email || !newCaregiver.phone) {
+  const handleOpenAddDialog = () => {
+    setIsEditMode(false);
+    setEditCaregiver(null);
+    setFormData({
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      hourly_rate: "",
+      employment_type: "full_time",
+      skills: [],
+      certifications: [],
+      city: "",
+      state: "",
+    });
+    setIsAddDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (caregiver: any) => {
+    setIsEditMode(true);
+    setEditCaregiver(caregiver);
+    setFormData({
+      first_name: caregiver.first_name || "",
+      last_name: caregiver.last_name || "",
+      email: caregiver.email || "",
+      phone: caregiver.phone || "",
+      hourly_rate: caregiver.hourly_rate?.toString() || "",
+      employment_type: caregiver.employment_type || "full_time",
+      skills: caregiver.skills || [],
+      certifications: caregiver.certifications || [],
+      city: caregiver.city || "",
+      state: caregiver.state || "",
+    });
+    setIsAddDialogOpen(true);
+  };
+
+  const handleSaveCaregiver = async () => {
+    if (!user || !formData.first_name || !formData.last_name || !formData.email || !formData.phone) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    const { error } = await supabase.from("caregivers").insert({
-      agency_id: user.id,
-      first_name: newCaregiver.first_name,
-      last_name: newCaregiver.last_name,
-      email: newCaregiver.email,
-      phone: newCaregiver.phone,
-      hourly_rate: newCaregiver.hourly_rate ? parseFloat(newCaregiver.hourly_rate) : null,
-      employment_type: newCaregiver.employment_type,
-    });
+    const caregiverData = {
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      email: formData.email,
+      phone: formData.phone,
+      hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
+      employment_type: formData.employment_type,
+      skills: formData.skills,
+      certifications: formData.certifications,
+      city: formData.city,
+      state: formData.state,
+    };
 
-    if (error) {
-      console.error("Error adding caregiver:", error);
-      toast.error("Failed to add caregiver");
+    if (isEditMode && editCaregiver) {
+      const { error } = await supabase
+        .from("caregivers")
+        .update(caregiverData)
+        .eq("id", editCaregiver.id);
+
+      if (error) {
+        toast.error("Failed to update caregiver");
+      } else {
+        toast.success("Caregiver updated successfully");
+        setIsAddDialogOpen(false);
+        if (user) fetchCaregivers(user.id);
+      }
     } else {
-      toast.success("Caregiver added successfully");
-      setIsAddDialogOpen(false);
-      setNewCaregiver({
-        first_name: "",
-        last_name: "",
-        email: "",
-        phone: "",
-        hourly_rate: "",
-        employment_type: "full_time",
+      const { error } = await supabase.from("caregivers").insert({
+        ...caregiverData,
+        agency_id: user.id,
       });
-      if (user) fetchCaregivers(user.id);
+
+      if (error) {
+        toast.error("Failed to add caregiver");
+      } else {
+        toast.success("Caregiver added successfully");
+        setIsAddDialogOpen(false);
+        if (user) fetchCaregivers(user.id);
+      }
     }
   };
 
@@ -221,16 +298,14 @@ const Caregivers = () => {
               <Upload className="h-4 w-4" />
               Upload/Import Table
             </Button>
+            <Button className="gap-2" onClick={handleOpenAddDialog}>
+              <Plus className="h-4 w-4" />
+              Add Caregiver
+            </Button>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add Caregiver
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Add New Caregiver</DialogTitle>
+                  <DialogTitle>{isEditMode ? "Edit Caregiver" : "Add New Caregiver"}</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -238,16 +313,16 @@ const Caregivers = () => {
                       <Label htmlFor="first_name">First Name *</Label>
                       <Input
                         id="first_name"
-                        value={newCaregiver.first_name}
-                        onChange={(e) => setNewCaregiver({ ...newCaregiver, first_name: e.target.value })}
+                        value={formData.first_name}
+                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="last_name">Last Name *</Label>
                       <Input
                         id="last_name"
-                        value={newCaregiver.last_name}
-                        onChange={(e) => setNewCaregiver({ ...newCaregiver, last_name: e.target.value })}
+                        value={formData.last_name}
+                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                       />
                     </div>
                   </div>
@@ -256,8 +331,8 @@ const Caregivers = () => {
                     <Input
                       id="email"
                       type="email"
-                      value={newCaregiver.email}
-                      onChange={(e) => setNewCaregiver({ ...newCaregiver, email: e.target.value })}
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -265,9 +340,27 @@ const Caregivers = () => {
                     <Input
                       id="phone"
                       type="tel"
-                      value={newCaregiver.phone}
-                      onChange={(e) => setNewCaregiver({ ...newCaregiver, phone: e.target.value })}
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input
+                        id="state"
+                        value={formData.state}
+                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      />
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -276,15 +369,15 @@ const Caregivers = () => {
                         id="hourly_rate"
                         type="number"
                         step="0.01"
-                        value={newCaregiver.hourly_rate}
-                        onChange={(e) => setNewCaregiver({ ...newCaregiver, hourly_rate: e.target.value })}
+                        value={formData.hourly_rate}
+                        onChange={(e) => setFormData({ ...formData, hourly_rate: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="employment_type">Employment Type</Label>
                       <Select
-                        value={newCaregiver.employment_type}
-                        onValueChange={(value) => setNewCaregiver({ ...newCaregiver, employment_type: value })}
+                        value={formData.employment_type}
+                        onValueChange={(value) => setFormData({ ...formData, employment_type: value })}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -297,12 +390,88 @@ const Caregivers = () => {
                       </Select>
                     </div>
                   </div>
+                  <div className="space-y-2">
+                    <Label>Skills</Label>
+                    <ReactSelect
+                      isMulti
+                      options={skillsOptions}
+                      value={skillsOptions.filter(opt => formData.skills.includes(opt.value))}
+                      onChange={(selected) => setFormData({ ...formData, skills: selected.map(s => s.value) })}
+                      className="react-select-container"
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--background))',
+                          borderColor: 'hsl(var(--input))',
+                          minHeight: '40px',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--popover))',
+                          zIndex: 9999,
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isFocused ? 'hsl(var(--accent))' : 'transparent',
+                          color: 'hsl(var(--popover-foreground))',
+                        }),
+                        multiValue: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--secondary))',
+                        }),
+                        multiValueLabel: (base) => ({
+                          ...base,
+                          color: 'hsl(var(--secondary-foreground))',
+                        }),
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Certifications</Label>
+                    <ReactSelect
+                      isMulti
+                      options={certificationsOptions}
+                      value={certificationsOptions.filter(opt => formData.certifications.includes(opt.value))}
+                      onChange={(selected) => setFormData({ ...formData, certifications: selected.map(s => s.value) })}
+                      className="react-select-container"
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--background))',
+                          borderColor: 'hsl(var(--input))',
+                          minHeight: '40px',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--popover))',
+                          zIndex: 9999,
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isFocused ? 'hsl(var(--accent))' : 'transparent',
+                          color: 'hsl(var(--popover-foreground))',
+                        }),
+                        multiValue: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--secondary))',
+                        }),
+                        multiValueLabel: (base) => ({
+                          ...base,
+                          color: 'hsl(var(--secondary-foreground))',
+                        }),
+                      }}
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleAddCaregiver}>Add Caregiver</Button>
+                  <Button onClick={handleSaveCaregiver}>
+                    {isEditMode ? "Update" : "Add"} Caregiver
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -456,9 +625,9 @@ const Caregivers = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setViewCaregiver(caregiver)}
+                            onClick={() => handleOpenEditDialog(caregiver)}
                           >
-                            <Eye className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="outline"
@@ -478,78 +647,6 @@ const Caregivers = () => {
         </Card>
       </main>
 
-      {/* View Details Dialog */}
-      <Dialog open={!!viewCaregiver} onOpenChange={() => setViewCaregiver(null)}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Caregiver Details</DialogTitle>
-          </DialogHeader>
-          {viewCaregiver && (
-            <div className="space-y-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-2xl font-bold mb-1">
-                    {viewCaregiver.first_name} {viewCaregiver.last_name}
-                  </h3>
-                  <Badge variant="outline" className={getRoleColor(viewCaregiver.employment_type)}>
-                    {viewCaregiver.employment_type?.replace("_", " ")}
-                  </Badge>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-primary">${viewCaregiver.hourly_rate}</div>
-                  <div className="text-xs text-muted-foreground">per hour</div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{viewCaregiver.email}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{viewCaregiver.phone}</span>
-                </div>
-                {viewCaregiver.city && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>{viewCaregiver.city}, {viewCaregiver.state}</span>
-                  </div>
-                )}
-              </div>
-
-              {viewCaregiver.certifications && viewCaregiver.certifications.length > 0 && (
-                <div className="pt-3 border-t">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Award className="h-4 w-4 text-accent" />
-                    <span className="text-sm font-medium">Certifications</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {viewCaregiver.certifications.map((cert: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
-                        {cert}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {viewCaregiver.skills && viewCaregiver.skills.length > 0 && (
-                <div className="pt-3 border-t">
-                  <p className="text-sm font-medium mb-2">Skills</p>
-                  <div className="flex flex-wrap gap-2">
-                    {viewCaregiver.skills.map((skill: string, idx: number) => (
-                      <Badge key={idx} variant="outline" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteCaregiver} onOpenChange={() => setDeleteCaregiver(null)}>
