@@ -16,6 +16,7 @@ const CaregiverRegistration = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
+    password: "",
     phone: "",
     firstName: "",
     lastName: "",
@@ -72,7 +73,24 @@ const CaregiverRegistration = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.from("caregiver_registrations").insert({
+      // Create auth user first
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+          }
+        }
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("Failed to create user account");
+
+      // Create registration record
+      const { error: regError } = await supabase.from("caregiver_registrations").insert({
         email: formData.email,
         phone: formData.phone,
         first_name: formData.firstName,
@@ -89,9 +107,12 @@ const CaregiverRegistration = () => {
         status: "pending",
       });
 
-      if (error) throw error;
+      if (regError) throw regError;
 
-      toast.success("Registration submitted successfully! You'll be notified once reviewed.");
+      // Sign out the user immediately after registration
+      await supabase.auth.signOut();
+
+      toast.success("Registration submitted successfully! You can log in once your application is approved.");
       navigate("/auth");
     } catch (error: any) {
       toast.error(error.message || "Failed to submit registration");
@@ -162,15 +183,27 @@ const CaregiverRegistration = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone *</Label>
+                  <Label htmlFor="password">Password *</Label>
                   <Input
-                    id="phone"
-                    type="tel"
+                    id="password"
+                    type="password"
                     required
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    minLength={6}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone *</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  required
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
               </div>
 
               <div className="space-y-2">
