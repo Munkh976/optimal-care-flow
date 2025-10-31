@@ -164,22 +164,14 @@ const Auth = () => {
             </div>
             <div className="pt-2 border-t space-y-2">
               <p className="mb-2 text-muted-foreground">New to CareMuch?</p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate("/caregiver-registration")}
-                >
-                  Register as Caregiver
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate("/system-admin-registration")}
-                >
-                  Register as Admin
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => navigate("/caregiver-registration")}
+              >
+                Register as Caregiver
+              </Button>
             </div>
           </CardFooter>
         </Card>
