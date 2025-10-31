@@ -17,6 +17,8 @@ import ShiftTrades from "./pages/ShiftTrades";
 import CaregiverDashboard from "./pages/CaregiverDashboard";
 import CaregiverRegistration from "./pages/CaregiverRegistration";
 import CaregiverApprovals from "./pages/CaregiverApprovals";
+import Users from "./pages/Users";
+import AddUser from "./pages/AddUser";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +44,8 @@ const App = () => (
           <Route path="/caregiver-registration" element={<CaregiverRegistration />} />
           <Route path="/caregiver-approvals" element={<CaregiverApprovals />} />
           <Route path="/caregiver-dashboard" element={<CaregiverDashboard />} />
+          <Route path="/users" element={<Users />} />
+          <Route path="/users/add" element={<AddUser />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
