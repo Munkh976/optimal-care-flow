@@ -4,49 +4,62 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Users, Calendar, TrendingUp, Sparkles, LogOut } from "lucide-react";
-import DashboardStats from "@/components/dashboard/DashboardStats";
-import UpcomingShifts from "@/components/dashboard/UpcomingShifts";
-import CaregiverAvailability from "@/components/dashboard/CaregiverAvailability";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Activity, Users, Calendar, TrendingUp, Sparkles, LogOut, 
+  Menu, Bell, Download, Plus, Clock, AlertTriangle,
+  CalendarPlus, Shield, RefreshCw, ArrowRightLeft, Zap,
+  UserCheck, ClipboardList, BarChart3, Settings, Home
+} from "lucide-react";
+import FullCalendar from '@fullcalendar/react';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
+
+interface Stats {
+  activeClients: number;
+  availableCaregivers: number;
+  totalCaregivers: number;
+  pendingOrders: number;
+  unfilledShifts: number;
+}
+
+interface UrgentRequest {
+  id: string;
+  client_name: string;
+  care_type: string;
+  shift_date: string;
+  start_time: string;
+}
+
+interface Notification {
+  id: string;
+  type: 'warning' | 'success' | 'danger' | 'info';
+  title: string;
+  message: string;
+  time: string;
+  actionLabel?: string;
+}
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [stats, setStats] = useState<Stats>({
+    activeClients: 0,
+    availableCaregivers: 0,
+    totalCaregivers: 0,
+    pendingOrders: 0,
+    unfilledShifts: 0,
+  });
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [urgentRequests, setUrgentRequests] = useState<UrgentRequest[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
-    // Check authentication
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate("/auth");
-        return;
-      }
-
-      setUser(session.user);
-
-      // Fetch profile
-      const { data: profileData, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", session.user.id)
-        .single();
-
-      if (error) {
-        console.error("Error fetching profile:", error);
-        toast.error("Failed to load profile");
-      } else {
-        setProfile(profileData);
-      }
-
-      setLoading(false);
-    };
-
     checkAuth();
-
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
         navigate("/auth");
@@ -58,10 +71,154 @@ const Dashboard = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      navigate("/auth");
+      return;
+    }
+
+    setUser(session.user);
+
+    // Fetch profile
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .single();
+
+    if (profileData) {
+      setProfile(profileData);
+      await fetchDashboardData(session.user.id);
+    }
+
+    setLoading(false);
+  };
+
+  const fetchDashboardData = async (userId: string) => {
+    // Fetch stats
+    const [clientsRes, caregiversRes, shiftsRes] = await Promise.all([
+      supabase.from("clients").select("*", { count: 'exact' }).eq("agency_id", userId).eq("is_active", true),
+      supabase.from("caregivers").select("*", { count: 'exact' }).eq("agency_id", userId),
+      supabase.from("shifts").select("*, clients(first_name, last_name)").eq("agency_id", userId)
+    ]);
+
+    const activeCaregivers = caregiversRes.data?.filter(c => c.is_active).length || 0;
+    const openShifts = shiftsRes.data?.filter(s => s.status === 'open' && !s.caregiver_id).length || 0;
+    const unassignedShifts = shiftsRes.data?.filter(s => s.status === 'unassigned').length || 0;
+
+    setStats({
+      activeClients: clientsRes.count || 0,
+      availableCaregivers: activeCaregivers,
+      totalCaregivers: caregiversRes.count || 0,
+      pendingOrders: unassignedShifts,
+      unfilledShifts: openShifts,
+    });
+
+    // Fetch calendar events (assignments)
+    const { data: assignments } = await supabase
+      .from("shift_assignments")
+      .select(`
+        *,
+        shifts (*, clients(first_name, last_name)),
+        caregivers:caregiver_id (first_name, last_name)
+      `)
+      .gte("shifts.shift_date", new Date().toISOString().split('T')[0])
+      .limit(50);
+
+    const events = (assignments || []).map((assignment: any) => {
+      const shift = assignment.shifts;
+      const caregiver = assignment.caregivers;
+      const client = shift?.clients;
+      
+      return {
+        id: assignment.id,
+        title: `${client?.first_name || 'Client'} ${client?.last_name || ''} - ${caregiver?.first_name || 'Caregiver'} ${caregiver?.last_name || ''}`,
+        start: `${shift.shift_date}T${shift.start_time}`,
+        end: `${shift.shift_date}T${shift.end_time}`,
+        backgroundColor: assignment.status === 'completed' ? '#7FBA00' : 
+                        assignment.status === 'in_progress' ? '#F39C12' : '#4A90E2',
+        extendedProps: {
+          assignmentId: assignment.id,
+          status: assignment.status
+        }
+      };
+    });
+
+    setCalendarEvents(events);
+
+    // Fetch urgent requests (open shifts within next 48 hours)
+    const twoDaysFromNow = new Date();
+    twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
+    
+    const { data: urgentShifts } = await supabase
+      .from("shifts")
+      .select("*, clients(first_name, last_name)")
+      .eq("agency_id", userId)
+      .eq("status", "open")
+      .is("caregiver_id", null)
+      .lte("shift_date", twoDaysFromNow.toISOString().split('T')[0])
+      .order("shift_date", { ascending: true })
+      .limit(3);
+
+    setUrgentRequests((urgentShifts || []).map(shift => ({
+      id: shift.id,
+      client_name: `${shift.clients?.first_name || ''} ${shift.clients?.last_name || ''}`,
+      care_type: shift.care_type,
+      shift_date: shift.shift_date,
+      start_time: shift.start_time,
+    })));
+
+    // Create mock notifications (you can replace with real data)
+    setNotifications([
+      {
+        id: '1',
+        type: 'warning',
+        title: 'Shift Trade Request',
+        message: 'A caregiver has requested to trade a shift',
+        time: '5 minutes ago',
+        actionLabel: 'Review'
+      },
+      {
+        id: '2',
+        type: 'success',
+        title: 'Schedule Confirmed',
+        message: "Next week's schedule has been confirmed by all caregivers",
+        time: '1 hour ago'
+      },
+      {
+        id: '3',
+        type: 'danger',
+        title: 'Certification Expiring',
+        message: "A caregiver's certification expires in 7 days",
+        time: '2 hours ago',
+        actionLabel: 'Action Required'
+      }
+    ]);
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out successfully");
     navigate("/auth");
+  };
+
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case 'ai-matching':
+        navigate("/quick-assign");
+        break;
+      case 'shift-trades':
+        navigate("/shift-trades");
+        break;
+      case 'generate-schedule':
+        toast.info("Schedule generation coming soon!");
+        break;
+      case 'compliance':
+        toast.info("Compliance check coming soon!");
+        break;
+    }
   };
 
   if (loading) {
@@ -76,122 +233,308 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
-              <Activity className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">CareMuch</h1>
-              <p className="text-sm text-muted-foreground">{profile?.agency_name || "Care Agency"}</p>
-            </div>
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar */}
+      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-primary to-primary/90 text-primary-foreground transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="flex flex-col h-full">
+          <div className="p-6 flex items-center gap-3">
+            <Activity className="h-8 w-8" />
+            <h1 className="text-2xl font-bold">CareMuch</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              {profile?.full_name || user?.email}
-            </span>
-            <Button variant="outline" size="icon" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4" />
+
+          <nav className="flex-1 px-4 space-y-2">
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-primary-foreground hover:bg-white/20"
+              onClick={() => navigate("/dashboard")}
+            >
+              <Home className="mr-3 h-5 w-5" />
+              Dashboard
             </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
+              onClick={() => navigate("/schedule")}
+            >
+              <Calendar className="mr-3 h-5 w-5" />
+              Schedule
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
+              onClick={() => navigate("/caregivers")}
+            >
+              <Users className="mr-3 h-5 w-5" />
+              Caregivers
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
+              onClick={() => navigate("/clients")}
+            >
+              <UserCheck className="mr-3 h-5 w-5" />
+              Clients
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
+              onClick={() => navigate("/unassigned-shifts")}
+            >
+              <ClipboardList className="mr-3 h-5 w-5" />
+              Care Orders
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
+              onClick={() => navigate("/quick-assign")}
+            >
+              <Sparkles className="mr-3 h-5 w-5" />
+              AI Matching
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
+              onClick={() => navigate("/live-operations")}
+            >
+              <BarChart3 className="mr-3 h-5 w-5" />
+              Reports
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
+            >
+              <Settings className="mr-3 h-5 w-5" />
+              Settings
+            </Button>
+          </nav>
+
+          <div className="p-4 border-t border-white/20">
+            <div className="text-center text-sm">
+              <p className="font-medium">{profile?.full_name || user?.email}</p>
+              <p className="text-primary-foreground/60">{profile?.role || 'Manager'}</p>
+            </div>
           </div>
         </div>
-      </header>
+      </aside>
+
+      {/* Mobile menu button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="md:hidden fixed top-4 left-4 z-40"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        <Menu className="h-6 w-6" />
+      </Button>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">
-            Welcome back, {profile?.full_name?.split(" ")[0] || "there"}!
-          </h2>
-          <p className="text-muted-foreground">Here's what's happening with your care team today.</p>
-        </div>
-
-        {/* Stats */}
-        <DashboardStats />
-
-        {/* Main Dashboard Grid */}
-        <div className="grid md:grid-cols-2 gap-6 mt-8">
-          {/* Upcoming Shifts */}
-          <UpcomingShifts />
-
-          {/* Caregiver Availability */}
-          <CaregiverAvailability />
-        </div>
-
-        {/* AI Insights Card */}
-        <Card className="mt-6 border-accent/20 bg-gradient-to-br from-card to-accent/5">
-          <CardHeader>
+      <main className="flex-1 overflow-auto">
+        {/* Header */}
+        <header className="border-b bg-card sticky top-0 z-30">
+          <div className="px-6 py-4 flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Dashboard</h2>
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-accent" />
-              <CardTitle>AI Scheduling Insights</CardTitle>
+              <Button variant="outline" size="sm">
+                <Bell className="h-4 w-4 mr-2" />
+                <Badge variant="destructive" className="ml-1">5</Badge>
+              </Button>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <Button size="sm" onClick={() => navigate("/unassigned-shifts")}>
+                <Plus className="h-4 w-4 mr-2" />
+                New Care Order
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4" />
+              </Button>
             </div>
-            <CardDescription>Machine learning-powered recommendations for optimal scheduling</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-success/10">
-                  <TrendingUp className="h-4 w-4 text-success" />
-                </div>
-                <div>
-                  <p className="font-medium">Optimal Match Rate: 94%</p>
-                  <p className="text-sm text-muted-foreground">
-                    Your current scheduling achieves excellent caregiver-client matching
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-accent/10">
-                  <Calendar className="h-4 w-4 text-accent" />
-                </div>
-                <div>
-                  <p className="font-medium">5 shifts optimized this week</p>
-                  <p className="text-sm text-muted-foreground">
-                    AI adjusted schedules to reduce travel time by 23 minutes
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-warning/10">
-                  <Users className="h-4 w-4 text-warning" />
-                </div>
-                <div>
-                  <p className="font-medium">3 caregivers approaching overtime</p>
-                  <p className="text-sm text-muted-foreground">
-                    Consider redistributing hours to maintain work-life balance
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </header>
 
-        {/* Quick Actions */}
-        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/schedule")}>
-            <Calendar className="h-6 w-6" />
-            <span>Everyone's Schedule</span>
-          </Button>
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/unassigned-shifts")}>
-            <Activity className="h-6 w-6" />
-            <span>Unassigned Shifts</span>
-          </Button>
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/quick-assign")}>
-            <TrendingUp className="h-6 w-6" />
-            <span>Quick Assign</span>
-          </Button>
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/caregiver-dashboard")}>
-            <Users className="h-6 w-6" />
-            <span>Caregiver Portal</span>
-          </Button>
-          <Button variant="outline" className="h-auto py-6 flex-col gap-2" onClick={() => navigate("/caregivers")}>
-            <Users className="h-6 w-6" />
-            <span>Manage Staff</span>
-          </Button>
+        <div className="p-6 space-y-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Active Clients</p>
+                    <h3 className="text-3xl font-bold">{stats.activeClients}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">+3 this week</p>
+                  </div>
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Available Caregivers</p>
+                    <h3 className="text-3xl font-bold">{stats.availableCaregivers}/{stats.totalCaregivers}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {Math.round((stats.availableCaregivers / stats.totalCaregivers) * 100)}% availability
+                    </p>
+                  </div>
+                  <div className="p-3 bg-success/10 rounded-lg">
+                    <UserCheck className="h-6 w-6 text-success" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Pending Orders</p>
+                    <h3 className="text-3xl font-bold">{stats.pendingOrders}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Requires attention</p>
+                  </div>
+                  <div className="p-3 bg-warning/10 rounded-lg">
+                    <Clock className="h-6 w-6 text-warning" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Unfilled Shifts</p>
+                    <h3 className="text-3xl font-bold">{stats.unfilledShifts}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Next 48 hours</p>
+                  </div>
+                  <div className="p-3 bg-destructive/10 rounded-lg">
+                    <AlertTriangle className="h-6 w-6 text-destructive" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                <Button variant="outline" onClick={() => handleQuickAction('ai-matching')}>
+                  <Zap className="mr-2 h-4 w-4" />
+                  Run AI Matching
+                </Button>
+                <Button variant="outline" onClick={() => handleQuickAction('shift-trades')}>
+                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                  View Shift Trades
+                </Button>
+                <Button variant="outline" onClick={() => handleQuickAction('generate-schedule')}>
+                  <CalendarPlus className="mr-2 h-4 w-4" />
+                  Generate Schedule
+                </Button>
+                <Button variant="outline" onClick={() => handleQuickAction('compliance')}>
+                  <Shield className="mr-2 h-4 w-4" />
+                  Compliance Check
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Calendar and Urgent Requests */}
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Calendar */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Weekly Schedule</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FullCalendar
+                  plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
+                  initialView="timeGridWeek"
+                  headerToolbar={{
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                  }}
+                  events={calendarEvents}
+                  height="auto"
+                  eventClick={(info) => {
+                    toast.info(`Viewing: ${info.event.title}`);
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Urgent Requests */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Urgent Care Requests</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {urgentRequests.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No urgent requests</p>
+                ) : (
+                  urgentRequests.map((request) => (
+                    <div key={request.id} className="border-l-4 border-destructive bg-destructive/5 rounded-lg p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <h6 className="font-semibold">{request.client_name}</h6>
+                          <p className="text-sm text-muted-foreground">{request.care_type.replace('_', ' ')}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            <Clock className="inline h-3 w-3 mr-1" />
+                            {new Date(request.shift_date).toLocaleDateString()} at {request.start_time}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="destructive" onClick={() => navigate(`/quick-assign?shift=${request.id}`)}>
+                          Assign
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Notifications */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Notifications</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {notifications.map((notification) => (
+                <div key={notification.id} className="flex items-start gap-4 p-3 border-b last:border-b-0 hover:bg-accent/50 rounded transition-colors">
+                  <div className={`p-2 rounded-lg ${
+                    notification.type === 'warning' ? 'bg-warning/10' :
+                    notification.type === 'success' ? 'bg-success/10' :
+                    notification.type === 'danger' ? 'bg-destructive/10' :
+                    'bg-primary/10'
+                  }`}>
+                    {notification.type === 'warning' && <ArrowRightLeft className="h-4 w-4 text-warning" />}
+                    {notification.type === 'success' && <RefreshCw className="h-4 w-4 text-success" />}
+                    {notification.type === 'danger' && <AlertTriangle className="h-4 w-4 text-destructive" />}
+                    {notification.type === 'info' && <Bell className="h-4 w-4 text-primary" />}
+                  </div>
+                  <div className="flex-1">
+                    <h6 className="font-semibold text-sm">{notification.title}</h6>
+                    <p className="text-sm text-muted-foreground">{notification.message}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{notification.time}</p>
+                  </div>
+                  {notification.actionLabel && (
+                    <Button size="sm" variant="outline">
+                      {notification.actionLabel}
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>
