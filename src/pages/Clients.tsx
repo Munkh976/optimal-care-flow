@@ -251,7 +251,61 @@ const Clients = () => {
   };
 
   const handleBulkImport = () => {
-    toast.info("Bulk import feature coming soon! Please use CSV import.");
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = async (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const text = await file.text();
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        
+        const values = lines[i].split(',').map(v => v.trim());
+        const client: any = {};
+        
+        headers.forEach((header, index) => {
+          const value = values[index];
+          if (header === 'medical_conditions' || header === 'care_requirements') {
+            client[header] = value ? value.split(';').map(s => s.trim()) : [];
+          } else if (header === 'is_active') {
+            client[header] = value.toLowerCase() === 'true';
+          } else if (header === 'date_of_birth') {
+            client[header] = value || null;
+          } else {
+            client[header] = value;
+          }
+        });
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) continue;
+
+        const { error } = await supabase
+          .from('clients')
+          .insert({
+            ...client,
+            agency_id: user.id
+          });
+
+        if (error) {
+          console.error('Error importing client:', error);
+          errorCount++;
+        } else {
+          successCount++;
+        }
+      }
+
+      toast.success(`Imported ${successCount} clients${errorCount > 0 ? `, ${errorCount} failed` : ''}`);
+      if (user) fetchClients(user.id);
+    };
+    input.click();
   };
 
   // Filter clients

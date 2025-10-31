@@ -223,7 +223,61 @@ const Caregivers = () => {
   };
 
   const handleBulkImport = () => {
-    toast.info("Bulk import feature coming soon! Please use CSV import.");
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = async (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const text = await file.text();
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        
+        const values = lines[i].split(',').map(v => v.trim());
+        const caregiver: any = {};
+        
+        headers.forEach((header, index) => {
+          const value = values[index];
+          if (header === 'skills' || header === 'certifications') {
+            caregiver[header] = value ? value.split(';').map(s => s.trim()) : [];
+          } else if (header === 'hourly_rate') {
+            caregiver[header] = parseFloat(value) || 0;
+          } else if (header === 'is_active') {
+            caregiver[header] = value.toLowerCase() === 'true';
+          } else {
+            caregiver[header] = value;
+          }
+        });
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) continue;
+
+        const { error } = await supabase
+          .from('caregivers')
+          .insert({
+            ...caregiver,
+            agency_id: user.id
+          });
+
+        if (error) {
+          console.error('Error importing caregiver:', error);
+          errorCount++;
+        } else {
+          successCount++;
+        }
+      }
+
+      toast.success(`Imported ${successCount} caregivers${errorCount > 0 ? `, ${errorCount} failed` : ''}`);
+      if (user) fetchCaregivers(user.id);
+    };
+    input.click();
   };
 
   const getRoleColor = (role: string) => {
