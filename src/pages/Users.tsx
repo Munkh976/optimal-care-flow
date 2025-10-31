@@ -107,7 +107,8 @@ const Users = () => {
       user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       "";
     const matchesRole = roleFilter === "all" || user.role === roleFilter;
-    return matchesSearch && matchesRole;
+    const isNotCaregiver = user.role !== 'caregiver'; // Exclude caregivers - they're managed in Caregivers page
+    return matchesSearch && matchesRole && isNotCaregiver;
   });
 
   if (loading) {
