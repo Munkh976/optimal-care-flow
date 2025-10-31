@@ -11,10 +11,12 @@ import Caregivers from "./pages/Caregivers";
 import Clients from "./pages/Clients";
 import TimeOffRequests from "./pages/TimeOffRequests";
 import LiveOperations from "./pages/LiveOperations";
-import ShiftTrades from "./pages/ShiftTrades";
-import UnassignedShifts from "./pages/UnassignedShifts";
 import QuickAssign from "./pages/QuickAssign";
+import UnassignedShifts from "./pages/UnassignedShifts";
+import ShiftTrades from "./pages/ShiftTrades";
 import CaregiverDashboard from "./pages/CaregiverDashboard";
+import CaregiverRegistration from "./pages/CaregiverRegistration";
+import CaregiverApprovals from "./pages/CaregiverApprovals";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,9 +36,11 @@ const App = () => (
           <Route path="/clients" element={<Clients />} />
           <Route path="/time-off" element={<TimeOffRequests />} />
           <Route path="/live-operations" element={<LiveOperations />} />
-          <Route path="/shift-trades" element={<ShiftTrades />} />
           <Route path="/unassigned-shifts" element={<UnassignedShifts />} />
           <Route path="/quick-assign" element={<QuickAssign />} />
+          <Route path="/shift-trades" element={<ShiftTrades />} />
+          <Route path="/caregiver-registration" element={<CaregiverRegistration />} />
+          <Route path="/caregiver-approvals" element={<CaregiverApprovals />} />
           <Route path="/caregiver-dashboard" element={<CaregiverDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

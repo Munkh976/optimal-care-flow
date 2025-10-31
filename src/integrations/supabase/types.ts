@@ -102,6 +102,78 @@ export type Database = {
           },
         ]
       }
+      caregiver_registrations: {
+        Row: {
+          address: string | null
+          agency_id: string | null
+          availability: Json | null
+          certifications: string[] | null
+          city: string | null
+          created_at: string | null
+          email: string
+          employment_type: string | null
+          first_name: string
+          hourly_rate: number | null
+          id: string
+          last_name: string
+          phone: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          skills: string[] | null
+          state: string | null
+          status: string | null
+          updated_at: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          agency_id?: string | null
+          availability?: Json | null
+          certifications?: string[] | null
+          city?: string | null
+          created_at?: string | null
+          email: string
+          employment_type?: string | null
+          first_name: string
+          hourly_rate?: number | null
+          id?: string
+          last_name: string
+          phone: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          skills?: string[] | null
+          state?: string | null
+          status?: string | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          agency_id?: string | null
+          availability?: Json | null
+          certifications?: string[] | null
+          city?: string | null
+          created_at?: string | null
+          email?: string
+          employment_type?: string | null
+          first_name?: string
+          hourly_rate?: number | null
+          id?: string
+          last_name?: string
+          phone?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          skills?: string[] | null
+          state?: string | null
+          status?: string | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
       caregivers: {
         Row: {
           address: string | null

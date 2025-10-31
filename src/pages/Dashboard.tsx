@@ -325,6 +325,17 @@ const Dashboard = () => {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
+              onClick={() => {
+                navigate("/caregiver-approvals");
+                setSidebarOpen(false);
+              }}
+            >
+              <UserCheck className="mr-3 h-5 w-5" />
+              Caregiver Approvals
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
               onClick={() => setSidebarOpen(false)}
             >
               <Settings className="mr-3 h-5 w-5" />

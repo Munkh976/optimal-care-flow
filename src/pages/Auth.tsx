@@ -193,10 +193,20 @@ const Auth = () => {
               </TabsContent>
             </Tabs>
           </CardContent>
-          <CardFooter className="flex flex-col gap-2 text-center text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
+          <CardFooter className="flex flex-col gap-3 text-center text-sm text-muted-foreground">
+            <div className="flex items-center justify-center gap-2">
               <Sparkles className="h-4 w-4 text-accent" />
               <span>Powered by AI-driven scheduling optimization</span>
+            </div>
+            <div className="pt-2 border-t">
+              <p className="mb-2 text-muted-foreground">Are you a caregiver looking to join?</p>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate("/caregiver-registration")}
+              >
+                Register as Caregiver
+              </Button>
             </div>
           </CardFooter>
         </Card>

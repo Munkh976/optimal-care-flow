@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, Calendar, Clock, DollarSign } from "lucide-react";
+import { ArrowLeft, RefreshCw, Calendar, Clock, DollarSign, MapPin, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 
 interface ShiftTrade {
@@ -224,33 +224,75 @@ const ShiftTrades = () => {
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-foreground">Shift Trade Board</h1>
-              <p className="text-muted-foreground">Manage shift trades and coverage requests</p>
+              <p className="text-muted-foreground">Browse and claim available shift trades</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant={filter === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter('all')}
-            >
-              All
-            </Button>
-            <Button
-              variant={filter === 'pending' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter('pending')}
-            >
-              Pending
-            </Button>
-            <Button
-              variant={filter === 'completed' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter('completed')}
-            >
-              Completed
-            </Button>
-          </div>
         </div>
+
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-primary">{trades.filter(t => t.status === 'pending').length}</p>
+                <p className="text-sm text-muted-foreground mt-1">Available Shifts</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-warning">{trades.filter(t => t.surge_pay_amount > 0 && t.status === 'pending').length}</p>
+                <p className="text-sm text-muted-foreground mt-1">With Surge Pay</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-success">{trades.filter(t => t.status === 'accepted').length}</p>
+                <p className="text-sm text-muted-foreground mt-1">Accepted</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-muted-foreground">{trades.filter(t => t.status === 'declined').length}</p>
+                <p className="text-sm text-muted-foreground mt-1">Declined</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filter Section */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={filter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter('all')}
+              >
+                All Shifts
+              </Button>
+              <Button
+                variant={filter === 'pending' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter('pending')}
+              >
+                Available
+              </Button>
+              <Button
+                variant={filter === 'completed' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter('completed')}
+              >
+                Completed
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4">
           {filteredTrades.length === 0 ? (
@@ -262,29 +304,45 @@ const ShiftTrades = () => {
             </Card>
           ) : (
             filteredTrades.map((trade) => (
-              <Card key={trade.id}>
+              <Card 
+                key={trade.id} 
+                className={`transition-all hover:shadow-lg ${
+                  trade.surge_pay_amount > 0 && trade.status === 'pending'
+                    ? 'border-l-4 border-l-warning bg-gradient-to-r from-warning/5 to-transparent'
+                    : trade.status === 'pending'
+                    ? 'hover:border-primary/20'
+                    : ''
+                }`}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <CardTitle className="text-lg">
-                        Shift Trade Request
+                    <div className="space-y-2 flex-1">
+                      {trade.surge_pay_amount > 0 && trade.status === 'pending' && (
+                        <Badge className="bg-gradient-to-r from-warning to-warning/80 text-warning-foreground mb-2">
+                          <DollarSign className="h-3 w-3 mr-1" />
+                          +${trade.surge_pay_amount}/hr Surge Pay
+                        </Badge>
+                      )}
+                      <CardTitle className="text-xl">
+                        {format(new Date(trade.shift_assignments.shifts.shift_date), "EEEE, MMMM d")}
                       </CardTitle>
-                      <CardDescription className="space-y-1">
-                        <div className="flex items-center gap-4">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {format(new Date(trade.shift_assignments.shifts.shift_date), "MMM d, yyyy")}
-                          </span>
+                      <CardDescription className="space-y-2">
+                        <div className="flex items-center gap-4 flex-wrap">
                           <span className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
                             {trade.shift_assignments.shifts.start_time} - {trade.shift_assignments.shifts.end_time}
                           </span>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            {trade.shift_assignments.shifts.clients.city}
+                          </span>
                         </div>
-                        <p className="text-sm">
-                          Client: {trade.shift_assignments.shifts.clients.first_name} {trade.shift_assignments.shifts.clients.last_name}
-                          {" • "}
-                          {trade.shift_assignments.shifts.clients.city}
-                        </p>
+                        <div className="text-sm">
+                          <span className="font-medium">Client:</span> {trade.shift_assignments.shifts.clients.first_name} {trade.shift_assignments.shifts.clients.last_name}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Posted by: {trade.original_caregivers.first_name} {trade.original_caregivers.last_name}
+                        </div>
                       </CardDescription>
                     </div>
                     <div className="flex flex-col items-end gap-2">
@@ -294,54 +352,29 @@ const ShiftTrades = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="font-medium mb-1">Original Caregiver</p>
-                      <p className="text-muted-foreground">
-                        {trade.original_caregivers.first_name} {trade.original_caregivers.last_name}
-                      </p>
-                    </div>
-                    {trade.new_caregivers && (
-                      <div>
-                        <p className="font-medium mb-1">New Caregiver</p>
-                        <p className="text-muted-foreground">
-                          {trade.new_caregivers.first_name} {trade.new_caregivers.last_name}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
                   {trade.reason && (
-                    <div>
-                      <p className="font-medium text-sm mb-1">Reason</p>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="font-medium text-sm mb-1">Reason for Trade</p>
                       <p className="text-sm text-muted-foreground">{trade.reason}</p>
                     </div>
                   )}
 
-                  {trade.surge_pay_amount > 0 && (
+                  {trade.new_caregivers && (
                     <div className="flex items-center gap-2 text-sm">
-                      <DollarSign className="h-4 w-4 text-success" />
-                      <span className="font-medium">Surge Pay: ${trade.surge_pay_amount}</span>
+                      <Badge variant="secondary">
+                        Claimed by: {trade.new_caregivers.first_name} {trade.new_caregivers.last_name}
+                      </Badge>
                     </div>
                   )}
 
                   {trade.status === "pending" && (
                     <div className="flex gap-2 pt-2">
                       <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-success border-success/20 hover:bg-success/10"
+                        className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90"
                         onClick={() => handleAccept(trade.id)}
                       >
-                        Accept Trade
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-destructive border-destructive/20 hover:bg-destructive/10"
-                        onClick={() => handleDecline(trade.id)}
-                      >
-                        Decline
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Claim This Shift
                       </Button>
                     </div>
                   )}
