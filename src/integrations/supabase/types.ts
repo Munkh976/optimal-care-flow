@@ -706,6 +706,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_caregiver_role: {
+        Args: { caregiver_email: string }
+        Returns: undefined
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
