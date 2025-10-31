@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -11,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UserPlus, Loader2 } from "lucide-react";
+import { UserPlus, Loader2, Search, Edit, Key, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface User {
@@ -27,6 +35,8 @@ const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
 
   useEffect(() => {
     checkAuthAndFetchUsers();
@@ -91,6 +101,15 @@ const Users = () => {
     }
   };
 
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch =
+      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      "";
+    const matchesRole = roleFilter === "all" || user.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+
   if (loading) {
     return (
       <AppLayout>
@@ -106,43 +125,114 @@ const Users = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Users</h1>
+            <h1 className="text-3xl font-bold">User Management</h1>
             <p className="text-muted-foreground mt-1">Manage user accounts and roles</p>
           </div>
           <Button onClick={() => navigate("/users/add")}>
             <UserPlus className="mr-2 h-4 w-4" />
-            Add New User
+            Add User
           </Button>
+        </div>
+
+        <div className="flex gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search users..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All Roles" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="system_admin">System Admin</SelectItem>
+              <SelectItem value="agency_admin">Agency Admin</SelectItem>
+              <SelectItem value="manager">Manager</SelectItem>
+              <SelectItem value="scheduler">Scheduler</SelectItem>
+              <SelectItem value="hr_staff">HR Staff</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Full Name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Created At</TableHead>
+              <TableRow className="bg-primary hover:bg-primary">
+                <TableHead className="text-primary-foreground">Username</TableHead>
+                <TableHead className="text-primary-foreground">Email</TableHead>
+                <TableHead className="text-primary-foreground">Role</TableHead>
+                <TableHead className="text-primary-foreground">Password Status</TableHead>
+                <TableHead className="text-primary-foreground">Registered</TableHead>
+                <TableHead className="text-primary-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.length === 0 ? (
+              {filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     No users found
                   </TableCell>
                 </TableRow>
               ) : (
-                users.map((user) => (
+                filteredUsers.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.email}</TableCell>
-                    <TableCell>{user.full_name || "—"}</TableCell>
+                    <TableCell className="font-medium">
+                      {user.full_name || user.email.split("@")[0]}
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          user.role?.includes("admin")
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-primary/10 text-primary"
+                        }`}
+                      >
                         {user.role?.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
                       </span>
                     </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1 text-sm text-green-600">
+                        <span className="h-2 w-2 rounded-full bg-green-600" />
+                        Active
+                      </span>
+                    </TableCell>
                     <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-primary hover:text-primary"
+                          onClick={() => navigate(`/users/edit/${user.id}`)}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit Role
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-orange-600 hover:text-orange-600"
+                        >
+                          <Key className="h-4 w-4 mr-1" />
+                          Reset Password
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => toast.info("Delete functionality coming soon")}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -150,6 +240,7 @@ const Users = () => {
           </Table>
         </div>
       </div>
+
     </AppLayout>
   );
 };
