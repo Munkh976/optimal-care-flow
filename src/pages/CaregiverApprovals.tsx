@@ -84,6 +84,13 @@ const CaregiverApprovals = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Find the auth user ID for this caregiver
+      const { data: userData, error: userError } = await supabase.rpc('assign_caregiver_role', {
+        caregiver_email: registration.email
+      });
+
+      if (userError) throw userError;
+
       // Create caregiver in caregivers table
       const { error: caregiverError } = await supabase.from("caregivers").insert({
         email: registration.email,
