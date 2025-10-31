@@ -4,11 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Phone, MapPin, Heart, AlertCircle, User, Search } from "lucide-react";
+import { Activity, LogOut, Plus, Phone, MapPin, Heart, AlertCircle, User, Search, Upload, Eye, Trash2, Edit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import ReactSelect from "react-select";
+import { format } from "date-fns";
 
 const Clients = () => {
   const navigate = useNavigate();
@@ -19,6 +24,48 @@ const Clients = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterLocation, setFilterLocation] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("active");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [deleteClient, setDeleteClient] = useState<any>(null);
+  const [editClient, setEditClient] = useState<any>(null);
+  const [viewClient, setViewClient] = useState<any>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [formData, setFormData] = useState({
+    first_name: "",
+    last_name: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
+    zip_code: "",
+    date_of_birth: "",
+    medical_conditions: [] as string[],
+    care_requirements: [] as string[],
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
+    notes: "",
+  });
+
+  const medicalConditionsOptions = [
+    { value: "Diabetes", label: "Diabetes" },
+    { value: "Hypertension", label: "Hypertension" },
+    { value: "Alzheimer's", label: "Alzheimer's" },
+    { value: "Dementia", label: "Dementia" },
+    { value: "Heart Disease", label: "Heart Disease" },
+    { value: "Arthritis", label: "Arthritis" },
+    { value: "Parkinson's", label: "Parkinson's" },
+    { value: "COPD", label: "COPD" },
+  ];
+
+  const careRequirementsOptions = [
+    { value: "Medication Management", label: "Medication Management" },
+    { value: "Mobility Assistance", label: "Mobility Assistance" },
+    { value: "Personal Hygiene", label: "Personal Hygiene" },
+    { value: "Meal Preparation", label: "Meal Preparation" },
+    { value: "Companionship", label: "Companionship" },
+    { value: "Transportation", label: "Transportation" },
+    { value: "Light Housekeeping", label: "Light Housekeeping" },
+    { value: "Memory Care", label: "Memory Care" },
+  ];
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -35,7 +82,7 @@ const Clients = () => {
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
-        .single();
+        .maybeSingle();
 
       if (profileData) {
         setProfile(profileData);
@@ -87,6 +134,121 @@ const Clients = () => {
       age--;
     }
     return age;
+  };
+
+  const handleOpenAddDialog = () => {
+    setIsEditMode(false);
+    setEditClient(null);
+    setFormData({
+      first_name: "",
+      last_name: "",
+      phone: "",
+      address: "",
+      city: "",
+      state: "",
+      zip_code: "",
+      date_of_birth: "",
+      medical_conditions: [],
+      care_requirements: [],
+      emergency_contact_name: "",
+      emergency_contact_phone: "",
+      notes: "",
+    });
+    setIsAddDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (client: any) => {
+    setIsEditMode(true);
+    setEditClient(client);
+    setFormData({
+      first_name: client.first_name || "",
+      last_name: client.last_name || "",
+      phone: client.phone || "",
+      address: client.address || "",
+      city: client.city || "",
+      state: client.state || "",
+      zip_code: client.zip_code || "",
+      date_of_birth: client.date_of_birth || "",
+      medical_conditions: client.medical_conditions || [],
+      care_requirements: client.care_requirements || [],
+      emergency_contact_name: client.emergency_contact_name || "",
+      emergency_contact_phone: client.emergency_contact_phone || "",
+      notes: client.notes || "",
+    });
+    setIsAddDialogOpen(true);
+  };
+
+  const handleSaveClient = async () => {
+    if (!user || !formData.first_name || !formData.last_name || !formData.phone || !formData.address) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    const clientData = {
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      phone: formData.phone,
+      address: formData.address,
+      city: formData.city,
+      state: formData.state,
+      zip_code: formData.zip_code,
+      date_of_birth: formData.date_of_birth || null,
+      medical_conditions: formData.medical_conditions,
+      care_requirements: formData.care_requirements,
+      emergency_contact_name: formData.emergency_contact_name,
+      emergency_contact_phone: formData.emergency_contact_phone,
+      notes: formData.notes,
+    };
+
+    if (isEditMode && editClient) {
+      const { error } = await supabase
+        .from("clients")
+        .update(clientData)
+        .eq("id", editClient.id);
+
+      if (error) {
+        toast.error("Failed to update client");
+      } else {
+        toast.success("Client updated successfully");
+        setIsAddDialogOpen(false);
+        if (user) fetchClients(user.id);
+      }
+    } else {
+      const { error } = await supabase.from("clients").insert({
+        ...clientData,
+        agency_id: user.id,
+      });
+
+      if (error) {
+        toast.error("Failed to add client");
+      } else {
+        toast.success("Client added successfully");
+        setIsAddDialogOpen(false);
+        if (user) fetchClients(user.id);
+      }
+    }
+  };
+
+  const handleDeleteClient = async () => {
+    if (!deleteClient) return;
+
+    const { error } = await supabase
+      .from("clients")
+      .delete()
+      .eq("id", deleteClient.id);
+
+    if (error) {
+      console.error("Error deleting client:", error);
+      toast.error("Failed to delete client");
+    } else {
+      toast.success("Client deleted successfully");
+      setDeleteClient(null);
+      if (user) fetchClients(user.id);
+    }
+  };
+
+  const handleBulkImport = () => {
+    toast.info("Bulk import feature coming soon! Please use CSV import.");
   };
 
   // Filter clients
@@ -156,10 +318,204 @@ const Clients = () => {
             <h2 className="text-3xl font-bold mb-2">Client Management</h2>
             <p className="text-muted-foreground">Manage your client profiles</p>
           </div>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Client
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={handleBulkImport}>
+              <Upload className="h-4 w-4" />
+              Upload/Import Table
+            </Button>
+            <Button className="gap-2" onClick={handleOpenAddDialog}>
+              <Plus className="h-4 w-4" />
+              Add Client
+            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{isEditMode ? "Edit Client" : "Add New Client"}</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="first_name">First Name *</Label>
+                      <Input
+                        id="first_name"
+                        value={formData.first_name}
+                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="last_name">Last Name *</Label>
+                      <Input
+                        id="last_name"
+                        value={formData.last_name}
+                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone *</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Address *</Label>
+                    <Input
+                      id="address"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input
+                        id="state"
+                        value={formData.state}
+                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="zip_code">Zip Code</Label>
+                      <Input
+                        id="zip_code"
+                        value={formData.zip_code}
+                        onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="date_of_birth">Date of Birth</Label>
+                    <Input
+                      id="date_of_birth"
+                      type="date"
+                      value={formData.date_of_birth}
+                      onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Medical Conditions</Label>
+                    <ReactSelect
+                      isMulti
+                      options={medicalConditionsOptions}
+                      value={medicalConditionsOptions.filter(opt => formData.medical_conditions.includes(opt.value))}
+                      onChange={(selected) => setFormData({ ...formData, medical_conditions: selected.map(s => s.value) })}
+                      className="react-select-container"
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--background))',
+                          borderColor: 'hsl(var(--input))',
+                          minHeight: '40px',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--popover))',
+                          zIndex: 9999,
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isFocused ? 'hsl(var(--accent))' : 'transparent',
+                          color: 'hsl(var(--popover-foreground))',
+                        }),
+                        multiValue: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--secondary))',
+                        }),
+                        multiValueLabel: (base) => ({
+                          ...base,
+                          color: 'hsl(var(--secondary-foreground))',
+                        }),
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Care Requirements</Label>
+                    <ReactSelect
+                      isMulti
+                      options={careRequirementsOptions}
+                      value={careRequirementsOptions.filter(opt => formData.care_requirements.includes(opt.value))}
+                      onChange={(selected) => setFormData({ ...formData, care_requirements: selected.map(s => s.value) })}
+                      className="react-select-container"
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--background))',
+                          borderColor: 'hsl(var(--input))',
+                          minHeight: '40px',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--popover))',
+                          zIndex: 9999,
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isFocused ? 'hsl(var(--accent))' : 'transparent',
+                          color: 'hsl(var(--popover-foreground))',
+                        }),
+                        multiValue: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--secondary))',
+                        }),
+                        multiValueLabel: (base) => ({
+                          ...base,
+                          color: 'hsl(var(--secondary-foreground))',
+                        }),
+                      }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="emergency_contact_name">Emergency Contact Name</Label>
+                      <Input
+                        id="emergency_contact_name"
+                        value={formData.emergency_contact_name}
+                        onChange={(e) => setFormData({ ...formData, emergency_contact_name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="emergency_contact_phone">Emergency Contact Phone</Label>
+                      <Input
+                        id="emergency_contact_phone"
+                        type="tel"
+                        value={formData.emergency_contact_phone}
+                        onChange={(e) => setFormData({ ...formData, emergency_contact_phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Notes</Label>
+                    <Input
+                      id="notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveClient}>
+                    {isEditMode ? "Update" : "Add"} Client
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {/* Search and Filters */}
@@ -238,116 +594,239 @@ const Clients = () => {
           </Card>
         </div>
 
-        {/* Clients Grid */}
-        <div className="grid md:grid-cols-2 gap-4">
-          {filteredClients.length === 0 ? (
-            <Card className="md:col-span-2">
-              <CardContent className="flex flex-col items-center justify-center py-12">
+        {/* Clients Table */}
+        <Card>
+          <CardContent className="p-6">
+            {filteredClients.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
                 <Heart className="h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground text-center">
                   {clients.length === 0 ? "No clients in your system yet" : "No clients match your filters"}
                 </p>
-                {searchQuery || filterLocation !== "all" || filterStatus !== "active" ? (
-                  <Button 
-                    className="mt-4" 
-                    variant="outline"
-                    onClick={() => {
-                      setSearchQuery("");
-                      setFilterLocation("all");
-                      setFilterStatus("active");
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
-                ) : (
-                  <Button className="mt-4" variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Client
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            filteredClients.map((client) => (
-              <Card key={client.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-xl mb-2">
-                        {client.first_name} {client.last_name}
-                      </CardTitle>
-                      {client.date_of_birth && (
-                        <p className="text-sm text-muted-foreground">
-                          Age {calculateAge(client.date_of_birth)} • Born {format(new Date(client.date_of_birth), "MMM dd, yyyy")}
-                        </p>
-                      )}
-                    </div>
-                    <Badge variant={client.is_active ? "default" : "secondary"}>
-                      {client.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span>{client.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{client.address}, {client.city}, {client.state} {client.zip_code}</span>
-                    </div>
-
-                    {client.medical_conditions && client.medical_conditions.length > 0 && (
-                      <div className="pt-3 border-t">
-                        <div className="flex items-center gap-2 mb-2">
-                          <AlertCircle className="h-4 w-4 text-destructive" />
-                          <span className="text-sm font-medium">Medical Conditions</span>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name / Age</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Medical Conditions</TableHead>
+                    <TableHead>Care Needs</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredClients.map((client) => (
+                    <TableRow key={client.id}>
+                      <TableCell className="font-medium">
+                        <div>
+                          {client.first_name} {client.last_name}
+                          {client.date_of_birth && (
+                            <div className="text-xs text-muted-foreground">
+                              Age {calculateAge(client.date_of_birth)}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {client.medical_conditions.map((condition: string, idx: number) => (
-                            <Badge key={idx} variant="outline" className="text-xs bg-destructive/5 text-destructive border-destructive/20">
-                              {condition}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1 text-sm">
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3 text-muted-foreground" />
+                            {client.phone}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {client.city && (
+                            <span>{client.city}, {client.state}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {client.medical_conditions && client.medical_conditions.length > 0 ? (
+                            client.medical_conditions.slice(0, 2).map((condition: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs bg-destructive/5 text-destructive">
+                                {condition}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">None</span>
+                          )}
+                          {client.medical_conditions && client.medical_conditions.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{client.medical_conditions.length - 2}
                             </Badge>
-                          ))}
+                          )}
                         </div>
-                      </div>
-                    )}
-
-                    {client.care_requirements && client.care_requirements.length > 0 && (
-                      <div className="pt-3 border-t">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Heart className="h-4 w-4 text-primary" />
-                          <span className="text-sm font-medium">Care Requirements</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {client.care_requirements.map((req: string, idx: number) => (
-                            <Badge key={idx} variant="secondary" className="text-xs">
-                              {req}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {client.care_requirements && client.care_requirements.length > 0 ? (
+                            client.care_requirements.slice(0, 2).map((req: string, idx: number) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {req}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">None</span>
+                          )}
+                          {client.care_requirements && client.care_requirements.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{client.care_requirements.length - 2}
                             </Badge>
-                          ))}
+                          )}
                         </div>
-                      </div>
-                    )}
-
-                    {client.emergency_contact_name && (
-                      <div className="pt-3 border-t">
-                        <div className="flex items-center gap-2 mb-1">
-                          <User className="h-4 w-4 text-accent" />
-                          <span className="text-sm font-medium">Emergency Contact</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={client.is_active ? "default" : "secondary"}>
+                          {client.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setViewClient(client)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditDialog(client)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeleteClient(client)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {client.emergency_contact_name} • {client.emergency_contact_phone}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </main>
+
+      {/* View Details Dialog */}
+      <Dialog open={!!viewClient} onOpenChange={() => setViewClient(null)}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Client Details</DialogTitle>
+          </DialogHeader>
+          {viewClient && (
+            <div className="space-y-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold mb-1">
+                    {viewClient.first_name} {viewClient.last_name}
+                  </h3>
+                  {viewClient.date_of_birth && (
+                    <p className="text-sm text-muted-foreground">
+                      Age {calculateAge(viewClient.date_of_birth)} • Born {format(new Date(viewClient.date_of_birth), "MMM dd, yyyy")}
+                    </p>
+                  )}
+                </div>
+                <Badge variant={viewClient.is_active ? "default" : "secondary"}>
+                  {viewClient.is_active ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{viewClient.phone}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span>{viewClient.address}, {viewClient.city}, {viewClient.state} {viewClient.zip_code}</span>
+                </div>
+              </div>
+
+              {viewClient.medical_conditions && viewClient.medical_conditions.length > 0 && (
+                <div className="pt-3 border-t">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    <span className="text-sm font-medium">Medical Conditions</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {viewClient.medical_conditions.map((condition: string, idx: number) => (
+                      <Badge key={idx} variant="outline" className="text-xs bg-destructive/5 text-destructive border-destructive/20">
+                        {condition}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {viewClient.care_requirements && viewClient.care_requirements.length > 0 && (
+                <div className="pt-3 border-t">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Heart className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Care Requirements</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {viewClient.care_requirements.map((req: string, idx: number) => (
+                      <Badge key={idx} variant="secondary" className="text-xs">
+                        {req}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {viewClient.emergency_contact_name && (
+                <div className="pt-3 border-t">
+                  <div className="flex items-center gap-2 mb-1">
+                    <User className="h-4 w-4 text-accent" />
+                    <span className="text-sm font-medium">Emergency Contact</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {viewClient.emergency_contact_name} • {viewClient.emergency_contact_phone}
+                  </p>
+                </div>
+              )}
+
+              {viewClient.notes && (
+                <div className="pt-3 border-t">
+                  <p className="text-sm font-medium mb-1">Notes</p>
+                  <p className="text-sm text-muted-foreground">{viewClient.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteClient} onOpenChange={() => setDeleteClient(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Client</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {deleteClient?.first_name} {deleteClient?.last_name}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteClient} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

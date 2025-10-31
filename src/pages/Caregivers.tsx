@@ -26,6 +26,7 @@ const Caregivers = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteCaregiver, setDeleteCaregiver] = useState<any>(null);
   const [editCaregiver, setEditCaregiver] = useState<any>(null);
+  const [viewCaregiver, setViewCaregiver] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
@@ -625,6 +626,13 @@ const Caregivers = () => {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => setViewCaregiver(caregiver)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleOpenEditDialog(caregiver)}
                           >
                             <Edit className="h-4 w-4" />
@@ -647,6 +655,78 @@ const Caregivers = () => {
         </Card>
       </main>
 
+      {/* View Details Dialog */}
+      <Dialog open={!!viewCaregiver} onOpenChange={() => setViewCaregiver(null)}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Caregiver Details</DialogTitle>
+          </DialogHeader>
+          {viewCaregiver && (
+            <div className="space-y-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold mb-1">
+                    {viewCaregiver.first_name} {viewCaregiver.last_name}
+                  </h3>
+                  <Badge variant="outline" className={getRoleColor(viewCaregiver.employment_type)}>
+                    {viewCaregiver.employment_type?.replace("_", " ")}
+                  </Badge>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-primary">${viewCaregiver.hourly_rate}</div>
+                  <div className="text-xs text-muted-foreground">per hour</div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{viewCaregiver.email}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{viewCaregiver.phone}</span>
+                </div>
+                {viewCaregiver.city && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span>{viewCaregiver.city}, {viewCaregiver.state}</span>
+                  </div>
+                )}
+              </div>
+
+              {viewCaregiver.certifications && viewCaregiver.certifications.length > 0 && (
+                <div className="pt-3 border-t">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Award className="h-4 w-4 text-accent" />
+                    <span className="text-sm font-medium">Certifications</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {viewCaregiver.certifications.map((cert: string, idx: number) => (
+                      <Badge key={idx} variant="secondary" className="text-xs">
+                        {cert}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {viewCaregiver.skills && viewCaregiver.skills.length > 0 && (
+                <div className="pt-3 border-t">
+                  <p className="text-sm font-medium mb-2">Skills</p>
+                  <div className="flex flex-wrap gap-2">
+                    {viewCaregiver.skills.map((skill: string, idx: number) => (
+                      <Badge key={idx} variant="outline" className="text-xs">
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteCaregiver} onOpenChange={() => setDeleteCaregiver(null)}>
