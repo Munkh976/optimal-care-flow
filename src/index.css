@@ -137,3 +137,84 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* FullCalendar Customization */
+.fc {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+
+.fc .fc-button {
+  @apply bg-primary text-primary-foreground hover:bg-primary/90 border-0 rounded-md px-4 py-2;
+  font-weight: 500;
+}
+
+.fc .fc-button-primary:disabled {
+  @apply opacity-50;
+}
+
+.fc .fc-button-primary:not(:disabled):active,
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  @apply bg-primary/80;
+}
+
+.fc .fc-toolbar-title {
+  @apply text-lg font-semibold text-foreground;
+}
+
+.fc .fc-col-header-cell {
+  @apply bg-muted/50 py-2;
+}
+
+.fc .fc-col-header-cell-cushion {
+  @apply text-muted-foreground font-medium;
+}
+
+.fc .fc-daygrid-day {
+  @apply border-border;
+}
+
+.fc .fc-event {
+  @apply border-0 cursor-pointer rounded;
+  padding: 2px 4px;
+}
+
+.fc .fc-timegrid-slot {
+  @apply border-border;
+  height: 3em;
+}
+
+.fc .fc-timegrid-axis {
+  @apply border-border;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  @apply border-border;
+}
+
+.fc .fc-scrollgrid {
+  @apply border-border;
+}
+
+.fc .fc-timegrid-event {
+  @apply rounded;
+}
+
+.fc .fc-timegrid-event-harness {
+  margin-right: 2px;
+}
+
+.fc .fc-event-title {
+  @apply font-medium;
+}
+
+.fc .fc-daygrid-day-number {
+  @apply text-foreground p-2;
+}
+
+.fc .fc-day-today {
+  @apply bg-accent/10;
+}
+

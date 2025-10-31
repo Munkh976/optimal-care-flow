@@ -246,7 +246,10 @@ const Dashboard = () => {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground hover:bg-white/20"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => {
+                navigate("/dashboard");
+                setSidebarOpen(false);
+              }}
             >
               <Home className="mr-3 h-5 w-5" />
               Dashboard
@@ -254,7 +257,10 @@ const Dashboard = () => {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
-              onClick={() => navigate("/schedule")}
+              onClick={() => {
+                navigate("/schedule");
+                setSidebarOpen(false);
+              }}
             >
               <Calendar className="mr-3 h-5 w-5" />
               Schedule
@@ -262,7 +268,10 @@ const Dashboard = () => {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
-              onClick={() => navigate("/caregivers")}
+              onClick={() => {
+                navigate("/caregivers");
+                setSidebarOpen(false);
+              }}
             >
               <Users className="mr-3 h-5 w-5" />
               Caregivers
@@ -270,7 +279,10 @@ const Dashboard = () => {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
-              onClick={() => navigate("/clients")}
+              onClick={() => {
+                navigate("/clients");
+                setSidebarOpen(false);
+              }}
             >
               <UserCheck className="mr-3 h-5 w-5" />
               Clients
@@ -278,7 +290,10 @@ const Dashboard = () => {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
-              onClick={() => navigate("/unassigned-shifts")}
+              onClick={() => {
+                navigate("/unassigned-shifts");
+                setSidebarOpen(false);
+              }}
             >
               <ClipboardList className="mr-3 h-5 w-5" />
               Care Orders
@@ -286,7 +301,10 @@ const Dashboard = () => {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
-              onClick={() => navigate("/quick-assign")}
+              onClick={() => {
+                navigate("/quick-assign");
+                setSidebarOpen(false);
+              }}
             >
               <Sparkles className="mr-3 h-5 w-5" />
               AI Matching
@@ -294,7 +312,10 @@ const Dashboard = () => {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
-              onClick={() => navigate("/live-operations")}
+              onClick={() => {
+                navigate("/live-operations");
+                setSidebarOpen(false);
+              }}
             >
               <BarChart3 className="mr-3 h-5 w-5" />
               Reports
@@ -302,6 +323,7 @@ const Dashboard = () => {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground/80 hover:bg-white/20"
+              onClick={() => setSidebarOpen(false)}
             >
               <Settings className="mr-3 h-5 w-5" />
               Settings
@@ -317,11 +339,19 @@ const Dashboard = () => {
         </div>
       </aside>
 
+      {/* Overlay for mobile */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Mobile menu button */}
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden fixed top-4 left-4 z-40"
+        className="md:hidden fixed top-4 left-4 z-50"
         onClick={() => setSidebarOpen(!sidebarOpen)}
       >
         <Menu className="h-6 w-6" />
