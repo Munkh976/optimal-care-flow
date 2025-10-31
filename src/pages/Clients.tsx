@@ -22,6 +22,8 @@ const Clients = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchPhone, setSearchPhone] = useState("");
+  const [searchAge, setSearchAge] = useState("");
   const [filterLocation, setFilterLocation] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("active");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -125,7 +127,8 @@ const Clients = () => {
     navigate("/auth");
   };
 
-  const calculateAge = (dob: string) => {
+  const calculateAge = (dob: string | null) => {
+    if (!dob) return null;
     const birthDate = new Date(dob);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -264,12 +267,19 @@ const Clients = () => {
         req.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
+    const matchesPhone = searchPhone === "" || 
+      client.phone?.includes(searchPhone);
+
+    const clientAge = calculateAge(client.date_of_birth);
+    const matchesAge = searchAge === "" || 
+      (clientAge !== null && clientAge.toString() === searchAge);
+
     const matchesLocation = filterLocation === "all" || client.city === filterLocation;
     const matchesStatus = filterStatus === "all" || 
       (filterStatus === "active" && client.is_active) ||
       (filterStatus === "inactive" && !client.is_active);
 
-    return matchesSearch && matchesLocation && matchesStatus;
+    return matchesSearch && matchesPhone && matchesAge && matchesLocation && matchesStatus;
   });
 
   // Get unique locations
@@ -530,6 +540,27 @@ const Clients = () => {
             />
           </div>
           
+          <div className="relative w-full sm:w-[180px]">
+            <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Phone number..."
+              value={searchPhone}
+              onChange={(e) => setSearchPhone(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          <div className="relative w-full sm:w-[120px]">
+            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Age..."
+              type="number"
+              value={searchAge}
+              onChange={(e) => setSearchAge(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
           <Select value={filterLocation} onValueChange={setFilterLocation}>
             <SelectTrigger className="w-full sm:w-[160px]">
               <SelectValue placeholder="Location" />
