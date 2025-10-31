@@ -17,17 +17,29 @@ const Auth = () => {
   const [fullName, setFullName] = useState("");
   const [agencyName, setAgencyName] = useState("");
 
+  const routeByRole = async (userId: string) => {
+    const { data } = await supabase.rpc('get_user_role', { _user_id: userId });
+    if (data === 'caregiver') {
+      navigate('/caregiver-dashboard');
+    } else if (data) {
+      navigate('/dashboard');
+    } else {
+      toast.info('Your account is pending approval. Please wait for a manager to approve your registration.');
+      navigate('/auth');
+    }
+  };
+
   useEffect(() => {
     // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate("/dashboard");
+      if (session?.user) {
+        routeByRole(session.user.id);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate("/dashboard");
+      if (session?.user) {
+        routeByRole(session.user.id);
       }
     });
 
@@ -74,7 +86,10 @@ const Auth = () => {
       if (error) throw error;
 
       toast.success("Welcome back!");
-      navigate("/dashboard");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await routeByRole(session.user.id);
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to sign in");
     } finally {
@@ -100,13 +115,12 @@ const Auth = () => {
         <Card>
           <CardHeader>
             <CardTitle>Welcome</CardTitle>
-            <CardDescription>Sign in to your agency account or create a new one</CardDescription>
+            <CardDescription>Sign in to your account</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsList className="grid w-full grid-cols-1 mb-4">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
 
               <TabsContent value="signin">
@@ -139,58 +153,6 @@ const Auth = () => {
                 </form>
               </TabsContent>
 
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      placeholder="John Doe"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-agency">Agency Name</Label>
-                    <Input
-                      id="signup-agency"
-                      type="text"
-                      placeholder="Your Care Agency"
-                      value={agencyName}
-                      onChange={(e) => setAgencyName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="you@agency.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      minLength={6}
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Creating account..." : "Create Account"}
-                  </Button>
-                </form>
-              </TabsContent>
             </Tabs>
           </CardContent>
           <CardFooter className="flex flex-col gap-3 text-center text-sm text-muted-foreground">
