@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addWeeks, addMonths, addYears, subWeeks, subMonths, subYears } from "date-fns";
 
 type Order = {
   id: string;
@@ -51,7 +52,8 @@ const OrderManagement = () => {
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [periodFilter, setPeriodFilter] = useState("all");
+  const [view, setView] = useState<"week" | "month" | "year">("month");
+  const [currentDate, setCurrentDate] = useState(new Date());
   
   const [formData, setFormData] = useState({
     client_id: "",
@@ -447,39 +449,27 @@ const OrderManagement = () => {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
-    // Period filter
-    if (periodFilter !== "all") {
-      const now = new Date();
-      filtered = filtered.filter(order => {
-        const orderStart = new Date(order.start_date);
-        const orderEnd = new Date(order.end_date);
-        
-        switch (periodFilter) {
-          case "weekly":
-            // Current week
-            const weekStart = new Date(now);
-            weekStart.setDate(now.getDate() - now.getDay());
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekStart.getDate() + 6);
-            return (orderStart <= weekEnd && orderEnd >= weekStart);
-          case "monthly":
-            // Current month
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            return (orderStart <= monthEnd && orderEnd >= monthStart);
-          case "yearly":
-            // Current year
-            const yearStart = new Date(now.getFullYear(), 0, 1);
-            const yearEnd = new Date(now.getFullYear(), 11, 31);
-            return (orderStart <= yearEnd && orderEnd >= yearStart);
-          default:
-            return true;
-        }
-      });
-    }
+    // Period filter based on view and currentDate
+    const startDate = view === "week" 
+      ? startOfWeek(currentDate)
+      : view === "month"
+      ? startOfMonth(currentDate)
+      : startOfYear(currentDate);
+    
+    const endDate = view === "week"
+      ? endOfWeek(currentDate)
+      : view === "month"
+      ? endOfMonth(currentDate)
+      : endOfYear(currentDate);
+
+    filtered = filtered.filter(order => {
+      const orderStart = new Date(order.start_date);
+      const orderEnd = new Date(order.end_date);
+      return orderStart <= endDate && orderEnd >= startDate;
+    });
 
     setFilteredOrders(filtered);
-  }, [searchQuery, statusFilter, periodFilter, orders]);
+  }, [searchQuery, statusFilter, view, currentDate, orders]);
 
   const handleAddShift = () => {
     if (currentShift.selected_days.length === 0 || !currentShift.care_type) {
@@ -737,9 +727,11 @@ const OrderManagement = () => {
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <div>
             <h2 className="text-3xl font-bold">Order Management</h2>
-            <p className="text-muted-foreground mt-1">Manage client care orders and schedules</p>
+            <p className="text-muted-foreground mt-1">
+              {format(currentDate, view === "week" ? "'Week of' MMM d, yyyy" : view === "month" ? "MMMM yyyy" : "yyyy")}
+            </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={handleGenerateSampleData}>
               <Database className="mr-2 h-4 w-4" />
               Generate Sample Data
@@ -758,8 +750,8 @@ const OrderManagement = () => {
         {/* Search and Filters */}
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -785,19 +777,63 @@ const OrderManagement = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Select value={periodFilter} onValueChange={setPeriodFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by period" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Periods</SelectItem>
-                    <SelectItem value="weekly">This Week</SelectItem>
-                    <SelectItem value="monthly">This Month</SelectItem>
-                    <SelectItem value="yearly">This Year</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            </div>
+
+            {/* Period Navigation */}
+            <div className="flex items-center justify-center gap-2 pb-4 border-b flex-wrap">
+              <Button
+                variant={view === "week" ? "default" : "outline"}
+                onClick={() => setView("week")}
+              >
+                Week
+              </Button>
+              <Button
+                variant={view === "month" ? "default" : "outline"}
+                onClick={() => setView("month")}
+              >
+                Month
+              </Button>
+              <Button
+                variant={view === "year" ? "default" : "outline"}
+                onClick={() => setView("year")}
+              >
+                Year
+              </Button>
+              <div className="w-px h-6 bg-border mx-2" />
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (view === "week") {
+                    setCurrentDate(subWeeks(currentDate, 1));
+                  } else if (view === "month") {
+                    setCurrentDate(subMonths(currentDate, 1));
+                  } else {
+                    setCurrentDate(subYears(currentDate, 1));
+                  }
+                }}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentDate(new Date())}
+              >
+                Today
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (view === "week") {
+                    setCurrentDate(addWeeks(currentDate, 1));
+                  } else if (view === "month") {
+                    setCurrentDate(addMonths(currentDate, 1));
+                  } else {
+                    setCurrentDate(addYears(currentDate, 1));
+                  }
+                }}
+              >
+                Next
+              </Button>
             </div>
             
             {/* Summary Stats */}
