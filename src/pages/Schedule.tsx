@@ -24,6 +24,7 @@ const Schedule = () => {
   const [caregiverProfile, setCaregiverProfile] = useState<any>(null);
   const [selectedShift, setSelectedShift] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [careTypes, setCareTypes] = useState<any[]>([]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -87,6 +88,15 @@ const Schedule = () => {
   const fetchScheduleData = async (agencyId: string, caregiverId: string | null) => {
     setLoading(true);
     const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+
+    // Fetch care types for filter
+    const { data: careTypesData } = await supabase
+      .from("care_types")
+      .select("*")
+      .eq("is_active", true)
+      .order("name");
+    
+    setCareTypes(careTypesData || []);
 
     // Fetch shifts with assignments and trade info
     const { data: shiftsData, error: shiftsError } = await supabase
@@ -256,14 +266,15 @@ const Schedule = () => {
           <div className="flex items-center gap-2 flex-wrap">
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All Categories" />
+                <SelectValue placeholder="All Care Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="personal_care">Personal Care</SelectItem>
-                <SelectItem value="companion">Companion</SelectItem>
-                <SelectItem value="medical">Medical</SelectItem>
-                <SelectItem value="respite">Respite</SelectItem>
+                <SelectItem value="all">All Care Types</SelectItem>
+                {careTypes.map((type) => (
+                  <SelectItem key={type.code} value={type.code}>
+                    {type.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={assignmentFilter} onValueChange={setAssignmentFilter}>
@@ -345,13 +356,13 @@ const Schedule = () => {
                                 <div
                                   key={shift.id}
                                   className={`p-1.5 rounded text-xs cursor-pointer hover:shadow-sm transition-shadow ${getCareTypeColor(shift.care_type)}`}
-                                  onClick={() => {
+                                   onClick={() => {
                                     setSelectedShift(shift);
                                     setIsDetailsOpen(true);
                                   }}
                                 >
                                   <div className="font-medium truncate text-xs">
-                                    {formatCareType(shift.care_type)}
+                                    {shift.order_title}
                                   </div>
                                   <div className="text-[10px] opacity-80">
                                     {shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}
@@ -369,9 +380,24 @@ const Schedule = () => {
                                       )}
                                     </>
                                   ) : (
-                                    <div className="text-[10px] text-destructive italic mt-0.5">
-                                      Unassigned
-                                    </div>
+                                    <>
+                                      <div className="text-[10px] text-destructive italic mt-0.5">
+                                        Unassigned
+                                      </div>
+                                      {!caregiverProfile && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="text-[10px] h-5 px-1 mt-1 w-full"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(`/quick-assign?shift=${shift.id}`);
+                                          }}
+                                        >
+                                          Quick Assign
+                                        </Button>
+                                      )}
+                                    </>
                                   )}
                                 </div>
                               ))}

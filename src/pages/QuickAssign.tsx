@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Clock, Star, AlertCircle, TrendingUp } from "lucide-react";
+import { Clock, Star, AlertCircle, TrendingUp, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface OpenShift {
   id: string;
@@ -14,31 +15,40 @@ interface OpenShift {
   start_time: string;
   end_time: string;
   care_type: string;
+  order_title: string;
   clients: {
     first_name: string;
     last_name: string;
     city: string;
+    state: string;
+    address: string;
+    zip_code: string;
   };
 }
 
-interface Caregiver {
-  id: string;
-  first_name: string;
-  last_name: string;
-  performance_rating: number;
-  availability: any;
-  caregiver_skills?: Array<{
-    care_type_code: string;
-    care_types?: { name: string; category: string };
-  }>;
+interface MatchedCaregiver {
+  caregiverId: string;
+  matchScore: number;
+  reasoning: string;
+  caregiver?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    performance_rating: number;
+    email: string;
+  };
 }
 
 const QuickAssign = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const shiftIdParam = searchParams.get("shift");
+  
   const [openShifts, setOpenShifts] = useState<OpenShift[]>([]);
-  const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
-  const [draggedShift, setDraggedShift] = useState<OpenShift | null>(null);
+  const [selectedShift, setSelectedShift] = useState<OpenShift | null>(null);
+  const [matchedCaregivers, setMatchedCaregivers] = useState<MatchedCaregiver[]>([]);
   const [loading, setLoading] = useState(true);
+  const [matching, setMatching] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -57,37 +67,29 @@ const QuickAssign = () => {
     try {
       setLoading(true);
 
-      const [shiftsResult, caregiversResult] = await Promise.all([
-        supabase
-          .from("shifts")
-          .select(`
-            *,
-            clients (first_name, last_name, city)
-          `)
-          .eq("agency_id", userId)
-          .eq("status", "open")
-          .order("shift_date", { ascending: true })
-          .limit(10),
-        
-        supabase
-          .from("caregivers")
-          .select(`
-            *,
-            caregiver_skills (
-              care_type_code,
-              care_types (name, category)
-            )
-          `)
-          .eq("agency_id", userId)
-          .eq("is_active", true)
-          .order("performance_rating", { ascending: false })
-      ]);
+      const shiftsResult = await supabase
+        .from("shifts")
+        .select(`
+          *,
+          clients (first_name, last_name, city, address, state, zip_code)
+        `)
+        .eq("agency_id", userId)
+        .eq("status", "open")
+        .order("shift_date", { ascending: true })
+        .limit(50);
 
       if (shiftsResult.error) throw shiftsResult.error;
-      if (caregiversResult.error) throw caregiversResult.error;
 
       setOpenShifts(shiftsResult.data || []);
-      setCaregivers(caregiversResult.data || []);
+
+      // If shift ID provided, auto-select and fetch matches
+      if (shiftIdParam) {
+        const shift = shiftsResult.data?.find(s => s.id === shiftIdParam);
+        if (shift) {
+          setSelectedShift(shift);
+          await fetchMatchedCaregivers(shiftIdParam);
+        }
+      }
     } catch (error) {
       console.error("Error:", error);
       toast.error("Failed to load data");
@@ -96,22 +98,42 @@ const QuickAssign = () => {
     }
   };
 
-  const handleDragStart = (shift: OpenShift) => {
-    setDraggedShift(shift);
+  const fetchMatchedCaregivers = async (shiftId: string) => {
+    try {
+      setMatching(true);
+      
+      const { data, error } = await supabase.functions.invoke("match-caregiver", {
+        body: { shiftId }
+      });
+
+      if (error) throw error;
+
+      setMatchedCaregivers(data.matches || []);
+    } catch (error) {
+      console.error("Error fetching matches:", error);
+      toast.error("Failed to fetch caregiver matches");
+      setMatchedCaregivers([]);
+    } finally {
+      setMatching(false);
+    }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleShiftSelect = async (shiftId: string) => {
+    const shift = openShifts.find(s => s.id === shiftId);
+    if (shift) {
+      setSelectedShift(shift);
+      await fetchMatchedCaregivers(shiftId);
+    }
   };
 
-  const handleDrop = async (caregiverId: string) => {
-    if (!draggedShift) return;
+  const handleAssignCaregiver = async (caregiverId: string) => {
+    if (!selectedShift) return;
 
     try {
       const { error: assignError } = await supabase
         .from("shift_assignments")
         .insert({
-          shift_id: draggedShift.id,
+          shift_id: selectedShift.id,
           caregiver_id: caregiverId,
           status: "scheduled",
           assignment_method: "manual"
@@ -122,31 +144,30 @@ const QuickAssign = () => {
       const { error: updateError } = await supabase
         .from("shifts")
         .update({ status: "assigned" })
-        .eq("id", draggedShift.id);
+        .eq("id", selectedShift.id);
 
       if (updateError) throw updateError;
 
       toast.success("Shift assigned successfully!");
-      setDraggedShift(null);
       
+      // Refresh data
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) fetchData(user.id);
+      if (user) {
+        await fetchData(user.id);
+        setSelectedShift(null);
+        setMatchedCaregivers([]);
+      }
     } catch (error) {
       console.error("Error:", error);
       toast.error("Failed to assign shift");
     }
   };
 
-  const getCareTypeColor = (type: string) => {
-    const colors = {
-      personal_care: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-      companionship: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-      medication: "bg-green-500/10 text-green-600 border-green-500/20",
-      mobility: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-      dementia_care: "bg-pink-500/10 text-pink-600 border-pink-500/20",
-      hospice: "bg-gray-500/10 text-gray-600 border-gray-500/20"
-    };
-    return colors[type as keyof typeof colors] || "bg-muted";
+  const getMatchScoreColor = (score: number) => {
+    if (score >= 90) return "text-green-600 bg-green-50";
+    if (score >= 75) return "text-blue-600 bg-blue-50";
+    if (score >= 60) return "text-yellow-600 bg-yellow-50";
+    return "text-orange-600 bg-orange-50";
   };
 
   return (
@@ -170,144 +191,127 @@ const QuickAssign = () => {
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
-        <div className="container mx-auto px-4 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Open Shifts Column */}
-            <div>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-warning" />
-                    Open Shifts
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 max-h-[calc(100vh-250px)] overflow-y-auto">
+        <div className="container mx-auto px-4 py-6 space-y-6">
+          {/* Step 1: Select Shift */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-warning" />
+                Step 1: Select Shift to Assign
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select 
+                value={selectedShift?.id || ""} 
+                onValueChange={handleShiftSelect}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose an open shift..." />
+                </SelectTrigger>
+                <SelectContent>
                   {openShifts.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No open shifts</p>
+                    <SelectItem value="none" disabled>No open shifts available</SelectItem>
                   ) : (
                     openShifts.map((shift) => (
-                      <Card
-                        key={shift.id}
-                        draggable
-                        onDragStart={() => handleDragStart(shift)}
-                        className={`cursor-move hover:shadow-lg transition-all ${
-                          draggedShift?.id === shift.id ? "opacity-50" : ""
-                        }`}
-                      >
-                        <CardContent className="p-4 space-y-2">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="font-semibold">
-                                {shift.clients?.first_name} {shift.clients?.last_name}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {shift.clients?.city}
-                              </p>
+                      <SelectItem key={shift.id} value={shift.id}>
+                        {shift.clients?.first_name} {shift.clients?.last_name} - {" "}
+                        {format(new Date(shift.shift_date), "MMM d")} {" "}
+                        ({shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}) - {" "}
+                        {shift.care_type.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+
+              {selectedShift && (
+                <div className="mt-4 p-4 border rounded-lg bg-muted/30">
+                  <h4 className="font-semibold mb-2">Selected Shift Details</h4>
+                  <div className="space-y-1 text-sm">
+                    <p><span className="font-medium">Client:</span> {selectedShift.clients?.first_name} {selectedShift.clients?.last_name}</p>
+                    <p><span className="font-medium">Location:</span> {selectedShift.clients?.city}, {selectedShift.clients?.state}</p>
+                    <p><span className="font-medium">Date:</span> {format(new Date(selectedShift.shift_date), "MMM d, yyyy")}</p>
+                    <p><span className="font-medium">Time:</span> {selectedShift.start_time.slice(0, 5)} - {selectedShift.end_time.slice(0, 5)}</p>
+                    <p><span className="font-medium">Care Type:</span> {selectedShift.care_type.replace(/_/g, " ")}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Step 2: View Matched Caregivers */}
+          {selectedShift && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-success" />
+                  Step 2: Select Caregiver (AI Matched & Ranked)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {matching ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Finding best caregiver matches...</p>
+                  </div>
+                ) : matchedCaregivers.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No matching caregivers found</p>
+                ) : (
+                  <div className="space-y-3">
+                    {matchedCaregivers.map((match, index) => (
+                      <Card key={match.caregiverId} className="overflow-hidden">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-3">
+                                <Badge className="text-lg px-3 py-1">
+                                  #{index + 1}
+                                </Badge>
+                                <div>
+                                  <p className="font-semibold text-lg">
+                                    {match.caregiver?.first_name} {match.caregiver?.last_name}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    {[...Array(5)].map((_, i) => (
+                                      <Star
+                                        key={i}
+                                        className={`w-4 h-4 ${
+                                          i < Math.floor(match.caregiver?.performance_rating || 0)
+                                            ? "fill-yellow-400 text-yellow-400"
+                                            : "text-gray-300"
+                                        }`}
+                                      />
+                                    ))}
+                                    <span className="text-sm text-muted-foreground">
+                                      {match.caregiver?.performance_rating?.toFixed(1)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full font-semibold ${getMatchScoreColor(match.matchScore)}`}>
+                                <TrendingUp className="w-4 h-4" />
+                                <span>{match.matchScore}% Match</span>
+                              </div>
+
+                              <div className="bg-muted/50 p-3 rounded-lg">
+                                <p className="text-sm font-medium mb-1">AI Reasoning:</p>
+                                <p className="text-sm text-muted-foreground">{match.reasoning}</p>
+                              </div>
                             </div>
-                            <Badge className={getCareTypeColor(shift.care_type)}>
-                              {shift.care_type.replace(/_/g, " ")}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              <span>
-                                {format(new Date(shift.shift_date), "MMM d")} •{" "}
-                                {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
-                              </span>
-                            </div>
+
+                            <Button 
+                              onClick={() => handleAssignCaregiver(match.caregiverId)}
+                              className="shrink-0"
+                            >
+                              Assign
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Available Caregivers Column */}
-            <div>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-success" />
-                    Caregivers
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 max-h-[calc(100vh-250px)] overflow-y-auto">
-                  {caregivers.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No available caregivers</p>
-                  ) : (
-                    caregivers.map((caregiver) => (
-                      <div
-                        key={caregiver.id}
-                        onDragOver={handleDragOver}
-                        onDrop={() => handleDrop(caregiver.id)}
-                        className={`p-4 rounded-lg border transition-all ${
-                          draggedShift
-                            ? "border-primary/50 bg-primary/5 border-dashed border-2"
-                            : "border-border bg-card"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-semibold">
-                              {caregiver.first_name} {caregiver.last_name}
-                            </p>
-                            <div className="flex items-center gap-1 mt-1">
-                              {[...Array(5)].map((_, i) => (
-                                <Star
-                                  key={i}
-                                  className={`w-3 h-3 ${
-                                    i < Math.floor(caregiver.performance_rating)
-                                      ? "fill-yellow-400 text-yellow-400"
-                                      : "text-gray-300"
-                                  }`}
-                                />
-                              ))}
-                              <span className="text-sm text-muted-foreground ml-1">
-                                {caregiver.performance_rating.toFixed(1)}
-                              </span>
-                            </div>
-                            {caregiver.caregiver_skills && caregiver.caregiver_skills.length > 0 && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Skills: {caregiver.caregiver_skills.slice(0, 3).map(s => s.care_type_code).join(", ")}
-                              </p>
-                            )}
-                          </div>
-                          {draggedShift && (
-                            <div className="text-sm text-success font-medium">
-                              Drop here →
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* AI Suggestion Section */}
-          {openShifts.length > 0 && (
-            <Card className="mt-6 bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-primary" />
-                  <p className="text-sm font-medium">AI Suggestion:</p>
-                  <p className="text-sm text-muted-foreground">
-                    Try using Auto-Assign for optimal matches based on care types, location, and availability
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate("/unassigned-shifts")}
-                    className="ml-auto"
-                  >
-                    View Auto-Assign
-                  </Button>
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
