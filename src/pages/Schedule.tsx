@@ -8,6 +8,7 @@ import { Activity, LogOut, ChevronLeft, ChevronRight, Calendar as CalendarIcon }
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
 
 const Schedule = () => {
   const navigate = useNavigate();
@@ -21,6 +22,8 @@ const Schedule = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [assignmentFilter, setAssignmentFilter] = useState<string>("all");
   const [caregiverProfile, setCaregiverProfile] = useState<any>(null);
+  const [selectedShift, setSelectedShift] = useState<any>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -90,7 +93,7 @@ const Schedule = () => {
       .from("shifts")
       .select(`
         *,
-        client:clients(first_name, last_name, care_requirements),
+        client:clients(first_name, last_name, care_requirements, address, city, state, zip_code),
         shift_assignments(
           id,
           caregiver:caregivers(first_name, last_name),
@@ -332,10 +335,13 @@ const Schedule = () => {
                                 <div
                                   key={shift.id}
                                   className={`p-1.5 rounded text-xs cursor-pointer hover:shadow-sm transition-shadow ${getCareTypeColor(shift.care_type)}`}
-                                  onClick={() => navigate(`/unassigned-shifts`)}
+                                  onClick={() => {
+                                    setSelectedShift(shift);
+                                    setIsDetailsOpen(true);
+                                  }}
                                 >
                                   <div className="font-medium truncate text-xs">
-                                    {shift.client?.first_name} {shift.client?.last_name}
+                                    {shift.order_title || "Care Service Order"}
                                   </div>
                                   <div className="text-[10px] opacity-80">
                                     {shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}
@@ -403,6 +409,13 @@ const Schedule = () => {
           </Card>
         </div>
       </main>
+
+      {/* Shift Details Dialog */}
+      <ShiftDetailsDialog 
+        shift={selectedShift}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+      />
     </div>
   );
 };

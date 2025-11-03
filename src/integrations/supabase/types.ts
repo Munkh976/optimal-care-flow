@@ -540,6 +540,7 @@ export type Database = {
           end_time: string
           id: string
           is_recurring: boolean | null
+          order_title: string
           pay_rate: number | null
           recurrence_pattern: string | null
           required_skills: string[] | null
@@ -561,6 +562,7 @@ export type Database = {
           end_time: string
           id?: string
           is_recurring?: boolean | null
+          order_title?: string
           pay_rate?: number | null
           recurrence_pattern?: string | null
           required_skills?: string[] | null
@@ -582,6 +584,7 @@ export type Database = {
           end_time?: string
           id?: string
           is_recurring?: boolean | null
+          order_title?: string
           pay_rate?: number | null
           recurrence_pattern?: string | null
           required_skills?: string[] | null

@@ -1,0 +1,163 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Calendar, Clock, MapPin, User, Briefcase, FileText } from "lucide-react";
+
+interface ShiftDetailsDialogProps {
+  shift: any;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export const ShiftDetailsDialog = ({ shift, open, onOpenChange }: ShiftDetailsDialogProps) => {
+  if (!shift) return null;
+
+  const getCareTypeColor = (careType: string) => {
+    const colors: any = {
+      personal_care: "bg-primary/10 text-primary border-primary/20",
+      companion: "bg-accent/10 text-accent border-accent/20",
+      medical: "bg-destructive/10 text-destructive border-destructive/20",
+      respite: "bg-secondary/10 text-secondary border-secondary/20",
+    };
+    return colors[careType] || "bg-muted";
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="text-2xl">{shift.order_title || "Care Service Order"}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 mt-4">
+          {/* Client Information */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold">
+              <User className="h-4 w-4" />
+              Client
+            </div>
+            <div className="ml-6">
+              <p className="font-medium text-lg">
+                {shift.client?.first_name} {shift.client?.last_name}
+              </p>
+            </div>
+          </div>
+
+          {/* Location */}
+          {shift.client?.address && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold">
+                <MapPin className="h-4 w-4" />
+                Location
+              </div>
+              <div className="ml-6">
+                <p className="text-sm">
+                  {shift.client.address}
+                  {shift.client.city && `, ${shift.client.city}`}
+                  {shift.client.state && `, ${shift.client.state}`}
+                  {shift.client.zip_code && ` ${shift.client.zip_code}`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Date & Time */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold">
+                <Calendar className="h-4 w-4" />
+                Date
+              </div>
+              <div className="ml-6">
+                <p className="text-sm">{new Date(shift.shift_date).toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold">
+                <Clock className="h-4 w-4" />
+                Time
+              </div>
+              <div className="ml-6">
+                <p className="text-sm">
+                  {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
+                  <span className="text-muted-foreground ml-2">
+                    ({shift.duration_hours} hours)
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Care Type */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold">
+              <Briefcase className="h-4 w-4" />
+              Care Type
+            </div>
+            <div className="ml-6">
+              <Badge className={getCareTypeColor(shift.care_type)}>
+                {shift.care_type?.replace("_", " ").toUpperCase()}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Care Requirements / Needs */}
+          {shift.client?.care_requirements && shift.client.care_requirements.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold">
+                <FileText className="h-4 w-4" />
+                Care Needs
+              </div>
+              <div className="ml-6">
+                <div className="flex flex-wrap gap-2">
+                  {shift.client.care_requirements.map((req: string, idx: number) => (
+                    <Badge key={idx} variant="secondary">
+                      {req}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Special Instructions */}
+          {shift.special_instructions && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold">
+                <FileText className="h-4 w-4" />
+                Special Instructions
+              </div>
+              <div className="ml-6">
+                <p className="text-sm whitespace-pre-wrap">{shift.special_instructions}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Assigned Caregiver */}
+          {shift.shift_assignments && shift.shift_assignments.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold">
+                <User className="h-4 w-4" />
+                Assigned Caregiver
+              </div>
+              <div className="ml-6">
+                <p className="font-medium">
+                  {shift.shift_assignments[0].caregiver?.first_name}{" "}
+                  {shift.shift_assignments[0].caregiver?.last_name}
+                </p>
+                <Badge variant="outline" className="mt-2">
+                  {shift.shift_assignments[0].status}
+                </Badge>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
