@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Search, Edit, Trash2, Eye, Calendar as CalendarIcon, Table as TableIcon } from "lucide-react";
+import { Activity, LogOut, Plus, Search, Edit, Trash2, Eye, Calendar as CalendarIcon, Table as TableIcon, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,11 +13,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addDays, startOfWeek, endOfWeek } from "date-fns";
 
 const OrderManagement = () => {
   const navigate = useNavigate();
@@ -28,27 +29,24 @@ const OrderManagement = () => {
   const [careTypes, setCareTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterCareType, setFilterCareType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteOrder, setDeleteOrder] = useState<any>(null);
-  const [editOrder, setEditOrder] = useState<any>(null);
   const [viewOrder, setViewOrder] = useState<any>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "calendar">("table");
-  const [calendarView, setCalendarView] = useState<"dayGridMonth" | "timeGridWeek">("dayGridMonth");
+  const [calendarView, setCalendarView] = useState<"dayGridMonth" | "timeGridWeek">("timeGridWeek");
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState({
     client_id: "",
-    care_type: "",
-    shift_date: "",
-    start_time: "",
-    end_time: "",
-    duration_hours: "",
-    pay_rate: "",
-    special_instructions: "",
-    is_recurring: false,
-    recurrence_pattern: "",
+    start_date: "",
+    end_date: "",
+    frequency: "weekly",
+    days_of_week: [] as string[],
+    notes: "",
   });
+  const [selectedShifts, setSelectedShifts] = useState<any[]>([
+    { care_type: "", shift_date: "", start_time: "08:00", end_time: "12:00", duration_hours: 4 }
+  ]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -89,22 +87,44 @@ const OrderManagement = () => {
   }, [navigate]);
 
   const fetchOrders = async (userId: string) => {
-    const { data, error } = await supabase
-      .from("shifts")
+    const { data: ordersData, error: ordersError } = await supabase
+      .from("client_orders")
       .select(`
         *,
-        clients(first_name, last_name, address, city),
-        shift_assignments(caregiver_id, caregivers(first_name, last_name))
+        clients(first_name, last_name, address, city)
       `)
       .eq("agency_id", userId)
-      .order("shift_date", { ascending: false });
+      .order("start_date", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching orders:", error);
+    if (ordersError) {
+      console.error("Error fetching orders:", ordersError);
       toast.error("Failed to load orders");
-    } else {
-      setOrders(data || []);
+      setLoading(false);
+      return;
     }
+
+    // Fetch shifts for each order
+    const ordersWithShifts = await Promise.all(
+      (ordersData || []).map(async (order) => {
+        const { data: orderShifts } = await supabase
+          .from("order_shifts")
+          .select(`
+            shift_id,
+            shifts(
+              *,
+              shift_assignments(caregiver_id, caregivers(first_name, last_name))
+            )
+          `)
+          .eq("order_id", order.id);
+
+        return {
+          ...order,
+          shifts: orderShifts?.map(os => os.shifts) || []
+        };
+      })
+    );
+
+    setOrders(ordersWithShifts || []);
     setLoading(false);
   };
 
@@ -144,92 +164,137 @@ const OrderManagement = () => {
   };
 
   const handleOpenAddDialog = () => {
-    setIsEditMode(false);
-    setEditOrder(null);
+    const nextMonday = startOfWeek(addDays(new Date(), 7), { weekStartsOn: 1 });
+    const nextSunday = endOfWeek(nextMonday, { weekStartsOn: 1 });
+    
     setFormData({
       client_id: "",
-      care_type: "",
-      shift_date: "",
-      start_time: "",
-      end_time: "",
-      duration_hours: "",
-      pay_rate: "",
-      special_instructions: "",
-      is_recurring: false,
-      recurrence_pattern: "",
+      start_date: format(nextMonday, "yyyy-MM-dd"),
+      end_date: format(nextSunday, "yyyy-MM-dd"),
+      frequency: "weekly",
+      days_of_week: [],
+      notes: "",
     });
+    setSelectedShifts([
+      { care_type: "", shift_date: format(nextMonday, "yyyy-MM-dd"), start_time: "08:00", end_time: "12:00", duration_hours: 4 }
+    ]);
     setIsAddDialogOpen(true);
   };
 
-  const handleOpenEditDialog = (order: any) => {
-    setIsEditMode(true);
-    setEditOrder(order);
-    setFormData({
-      client_id: order.client_id || "",
-      care_type: order.care_type || "",
-      shift_date: order.shift_date || "",
-      start_time: order.start_time || "",
-      end_time: order.end_time || "",
-      duration_hours: order.duration_hours?.toString() || "",
-      pay_rate: order.pay_rate?.toString() || "",
-      special_instructions: order.special_instructions || "",
-      is_recurring: order.is_recurring || false,
-      recurrence_pattern: order.recurrence_pattern || "",
-    });
-    setIsAddDialogOpen(true);
+  const handleAddShift = () => {
+    setSelectedShifts([...selectedShifts, {
+      care_type: "",
+      shift_date: formData.start_date,
+      start_time: "08:00",
+      end_time: "12:00",
+      duration_hours: 4
+    }]);
+  };
+
+  const handleRemoveShift = (index: number) => {
+    setSelectedShifts(selectedShifts.filter((_, i) => i !== index));
+  };
+
+  const handleShiftChange = (index: number, field: string, value: any) => {
+    const updated = [...selectedShifts];
+    updated[index] = { ...updated[index], [field]: value };
+    
+    // Auto-calculate duration if start/end time changes
+    if (field === "start_time" || field === "end_time") {
+      const start = field === "start_time" ? value : updated[index].start_time;
+      const end = field === "end_time" ? value : updated[index].end_time;
+      if (start && end) {
+        const [startH, startM] = start.split(":").map(Number);
+        const [endH, endM] = end.split(":").map(Number);
+        const duration = (endH + endM / 60) - (startH + startM / 60);
+        updated[index].duration_hours = duration;
+      }
+    }
+    
+    setSelectedShifts(updated);
   };
 
   const handleSaveOrder = async () => {
-    if (!user || !formData.client_id || !formData.care_type || !formData.shift_date || !formData.start_time || !formData.end_time) {
-      toast.error("Please fill in all required fields");
+    if (!user || !formData.client_id || !formData.start_date || !formData.end_date || selectedShifts.length === 0) {
+      toast.error("Please fill in all required fields and add at least one shift");
       return;
     }
 
-    // Get care type name for order title
-    const selectedCareType = careTypes.find(ct => ct.code === formData.care_type);
-    const orderTitle = selectedCareType?.name || formData.care_type;
-
-    const orderData: any = {
-      order_title: orderTitle,
-      client_id: formData.client_id,
-      care_type: formData.care_type,
-      shift_date: formData.shift_date,
-      start_time: formData.start_time,
-      end_time: formData.end_time,
-      duration_hours: formData.duration_hours ? parseFloat(formData.duration_hours) : null,
-      pay_rate: formData.pay_rate ? parseFloat(formData.pay_rate) : null,
-      special_instructions: formData.special_instructions,
-      is_recurring: formData.is_recurring,
-      recurrence_pattern: formData.recurrence_pattern,
-      status: 'open',
-    };
-
-    if (isEditMode && editOrder) {
-      const { error } = await supabase
-        .from("shifts")
-        .update(orderData)
-        .eq("id", editOrder.id);
-
-      if (error) {
-        toast.error("Failed to update order");
+    // Validate shifts
+    for (const shift of selectedShifts) {
+      if (!shift.care_type || !shift.shift_date || !shift.start_time || !shift.end_time) {
+        toast.error("Please complete all shift details");
         return;
       }
-
-      toast.success("Order updated successfully");
-    } else {
-      const { error } = await supabase.from("shifts").insert({
-        ...orderData,
-        agency_id: user.id,
-      });
-
-      if (error) {
-        toast.error("Failed to add order");
-        return;
-      }
-
-      toast.success("Order added successfully");
     }
 
+    // Generate order number
+    const orderNumber = `ORD-${Date.now()}`;
+
+    // Create order
+    const { data: newOrder, error: orderError } = await supabase
+      .from("client_orders")
+      .insert({
+        agency_id: user.id,
+        client_id: formData.client_id,
+        order_number: orderNumber,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        frequency: formData.frequency,
+        days_of_week: formData.days_of_week.join(","),
+        status: "active",
+        notes: formData.notes,
+      })
+      .select()
+      .single();
+
+    if (orderError || !newOrder) {
+      toast.error("Failed to create order");
+      console.error(orderError);
+      return;
+    }
+
+    // Create shifts
+    const shiftInserts = selectedShifts.map(shift => ({
+      agency_id: user.id,
+      client_id: formData.client_id,
+      care_type: shift.care_type,
+      shift_date: shift.shift_date,
+      start_time: shift.start_time,
+      end_time: shift.end_time,
+      duration_hours: shift.duration_hours,
+      status: 'open' as any,
+      order_title: careTypes.find(ct => ct.code === shift.care_type)?.name || shift.care_type,
+    }));
+
+    const { data: newShifts, error: shiftsError } = await supabase
+      .from("shifts")
+      .insert(shiftInserts)
+      .select();
+
+    if (shiftsError || !newShifts) {
+      toast.error("Failed to create shifts");
+      console.error(shiftsError);
+      return;
+    }
+
+    // Link shifts to order
+    const orderShiftInserts = newShifts.map(shift => ({
+      order_id: newOrder.id,
+      shift_id: shift.id,
+    }));
+
+    const { error: linkError } = await supabase
+      .from("order_shifts")
+      .insert(orderShiftInserts);
+
+    if (linkError) {
+      toast.error("Failed to link shifts to order");
+      console.error(linkError);
+      return;
+    }
+
+    toast.success("Order created successfully");
     setIsAddDialogOpen(false);
     if (user) fetchOrders(user.id);
   };
@@ -237,8 +302,9 @@ const OrderManagement = () => {
   const handleDeleteOrder = async () => {
     if (!deleteOrder) return;
 
+    // Delete order (cascade will handle order_shifts and shifts)
     const { error } = await supabase
-      .from("shifts")
+      .from("client_orders")
       .delete()
       .eq("id", deleteOrder.id);
 
@@ -252,44 +318,56 @@ const OrderManagement = () => {
     }
   };
 
+  const toggleOrderExpansion = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+    }
+    setExpandedOrders(newExpanded);
+  };
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'open': return 'secondary';
-      case 'assigned': return 'default';
-      case 'completed': return 'outline';
+      case 'active': return 'default';
+      case 'completed': return 'secondary';
+      case 'cancelled': return 'outline';
       default: return 'secondary';
     }
   };
 
   const filteredOrders = orders.filter(order => {
     const clientName = order.clients ? `${order.clients.first_name} ${order.clients.last_name}` : "";
-    const careTypeName = careTypes.find(ct => ct.code === order.care_type)?.name || order.care_type;
     const matchesSearch = searchQuery === "" ||
-      careTypeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       clientName.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCareType = filterCareType === "all" || order.care_type === filterCareType;
     const matchesStatus = filterStatus === "all" || order.status === filterStatus;
 
-    return matchesSearch && matchesCareType && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
-  const calendarEvents = filteredOrders.map(order => {
-    const careTypeName = careTypes.find(ct => ct.code === order.care_type)?.name || order.care_type;
-    return {
-      id: order.id,
-      title: `${careTypeName} - ${order.clients?.first_name || 'Unknown'}`,
-      start: `${order.shift_date}T${order.start_time}`,
-      end: `${order.shift_date}T${order.end_time}`,
-      backgroundColor: order.status === 'open' ? '#3b82f6' : order.status === 'assigned' ? '#10b981' : '#6b7280',
-      borderColor: order.status === 'open' ? '#2563eb' : order.status === 'assigned' ? '#059669' : '#4b5563',
-      extendedProps: {
-        status: order.status,
-        careType: order.care_type,
-        clientName: order.clients ? `${order.clients.first_name} ${order.clients.last_name}` : 'Unknown',
-      }
-    };
-  });
+  // Generate calendar events from all shifts in all orders
+  const calendarEvents = filteredOrders.flatMap(order =>
+    order.shifts?.map((shift: any) => {
+      const careTypeName = careTypes.find(ct => ct.code === shift.care_type)?.name || shift.care_type;
+      return {
+        id: shift.id,
+        title: `${careTypeName} - ${order.clients?.first_name || 'Unknown'}`,
+        start: `${shift.shift_date}T${shift.start_time}`,
+        end: `${shift.shift_date}T${shift.end_time}`,
+        backgroundColor: shift.status === 'open' ? '#3b82f6' : shift.status === 'assigned' ? '#10b981' : '#6b7280',
+        borderColor: shift.status === 'open' ? '#2563eb' : shift.status === 'assigned' ? '#059669' : '#4b5563',
+        extendedProps: {
+          orderNumber: order.order_number,
+          status: shift.status,
+          careType: shift.care_type,
+          clientName: order.clients ? `${order.clients.first_name} ${order.clients.last_name}` : 'Unknown',
+        }
+      };
+    }) || []
+  );
 
   if (loading) {
     return (
@@ -330,7 +408,7 @@ const OrderManagement = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
             <h2 className="text-3xl font-bold mb-2">Order Management</h2>
-            <p className="text-muted-foreground">Manage your care service orders</p>
+            <p className="text-muted-foreground">Manage weekly care service orders (collections of shifts)</p>
           </div>
           <div className="flex gap-2">
             <Button
@@ -349,7 +427,7 @@ const OrderManagement = () => {
             </Button>
             <Button className="gap-2" onClick={handleOpenAddDialog}>
               <Plus className="h-4 w-4" />
-              Add Order
+              Create Order
             </Button>
           </div>
         </div>
@@ -361,32 +439,18 @@ const OrderManagement = () => {
                 <CardTitle>Search & Filters</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Search Orders</Label>
                     <div className="relative">
                       <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Search by order title or client..."
+                        placeholder="Search by order number or client..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-8"
                       />
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Care Type</Label>
-                    <Select value={filterCareType} onValueChange={setFilterCareType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Care Types</SelectItem>
-                        {careTypes.map(ct => (
-                          <SelectItem key={ct.code} value={ct.code}>{ct.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Status</Label>
@@ -396,9 +460,9 @@ const OrderManagement = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="open">Open</SelectItem>
-                        <SelectItem value="assigned">Assigned</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
                         <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -410,50 +474,49 @@ const OrderManagement = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Order Title</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead>Order #</TableHead>
                     <TableHead>Client</TableHead>
-                    <TableHead>Care Type</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
+                    <TableHead>Week</TableHead>
+                    <TableHead>Shifts</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Assigned To</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No orders found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredOrders.map((order) => {
-                      const careTypeName = careTypes.find(ct => ct.code === order.care_type)?.name || order.care_type;
-                      return (
-                        <TableRow key={order.id}>
-                          <TableCell className="font-medium">{careTypeName}</TableCell>
+                    filteredOrders.map((order) => (
+                      <>
+                        <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => toggleOrderExpansion(order.id)}>
+                          <TableCell>
+                            {expandedOrders.has(order.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">{order.order_number}</TableCell>
                           <TableCell>
                             {order.clients ? `${order.clients.first_name} ${order.clients.last_name}` : "Unknown"}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">
-                              {careTypeName}
-                            </Badge>
+                            {format(parseISO(order.start_date), "MMM dd")} - {format(parseISO(order.end_date), "MMM dd, yyyy")}
                           </TableCell>
-                          <TableCell>{format(parseISO(order.shift_date), "MMM dd, yyyy")}</TableCell>
-                          <TableCell>{order.start_time} - {order.end_time}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{order.shifts?.length || 0} shifts</Badge>
+                          </TableCell>
                           <TableCell>
                             <Badge variant={getStatusBadgeVariant(order.status)}>
                               {order.status}
                             </Badge>
                           </TableCell>
-                          <TableCell>
-                            {order.shift_assignments?.[0]?.caregivers 
-                              ? `${order.shift_assignments[0].caregivers.first_name} ${order.shift_assignments[0].caregivers.last_name}`
-                              : "Unassigned"}
-                          </TableCell>
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-2">
                               <Button
                                 variant="ghost"
@@ -465,13 +528,6 @@ const OrderManagement = () => {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleOpenEditDialog(order)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
                                 onClick={() => setDeleteOrder(order)}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -479,8 +535,59 @@ const OrderManagement = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      );
-                    })
+                        {expandedOrders.has(order.id) && (
+                          <TableRow>
+                            <TableCell colSpan={7} className="bg-muted/30">
+                              <div className="p-4 space-y-2">
+                                <h4 className="font-semibold mb-3">Shifts in this order:</h4>
+                                {order.shifts?.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">No shifts in this order</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {order.shifts?.map((shift: any) => {
+                                      const careTypeName = careTypes.find(ct => ct.code === shift.care_type)?.name || shift.care_type;
+                                      return (
+                                        <div key={shift.id} className="flex items-center justify-between bg-background p-3 rounded-lg border">
+                                          <div className="flex gap-4 flex-1">
+                                            <div>
+                                              <span className="text-sm font-medium">{careTypeName}</span>
+                                            </div>
+                                            <div>
+                                              <span className="text-sm text-muted-foreground">
+                                                {format(parseISO(shift.shift_date), "EEE, MMM dd")}
+                                              </span>
+                                            </div>
+                                            <div>
+                                              <span className="text-sm text-muted-foreground">
+                                                {shift.start_time} - {shift.end_time}
+                                              </span>
+                                            </div>
+                                            <div>
+                                              <Badge variant={shift.status === 'open' ? 'secondary' : 'default'}>
+                                                {shift.status}
+                                              </Badge>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            {shift.shift_assignments?.[0]?.caregivers ? (
+                                              <span className="text-sm">
+                                                {shift.shift_assignments[0].caregivers.first_name} {shift.shift_assignments[0].caregivers.last_name}
+                                              </span>
+                                            ) : (
+                                              <span className="text-sm text-muted-foreground">Unassigned</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    ))
                   )}
                 </TableBody>
               </Table>
@@ -488,15 +595,15 @@ const OrderManagement = () => {
           </>
         ) : (
           <Card>
-            <CardContent className="p-6">
-              <div className="flex justify-end mb-4">
-                <Tabs value={calendarView} onValueChange={(v) => setCalendarView(v as any)}>
-                  <TabsList>
-                    <TabsTrigger value="dayGridMonth">Monthly</TabsTrigger>
-                    <TabsTrigger value="timeGridWeek">Weekly</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
+            <CardHeader>
+              <Tabs value={calendarView} onValueChange={(v) => setCalendarView(v as any)}>
+                <TabsList>
+                  <TabsTrigger value="dayGridMonth">Month</TabsTrigger>
+                  <TabsTrigger value="timeGridWeek">Week</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </CardHeader>
+            <CardContent>
               <FullCalendar
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                 initialView={calendarView}
@@ -508,7 +615,8 @@ const OrderManagement = () => {
                 events={calendarEvents}
                 height="auto"
                 eventClick={(info) => {
-                  const order = orders.find(o => o.id === info.event.id);
+                  const orderId = info.event.extendedProps.orderNumber;
+                  const order = orders.find(o => o.order_number === orderId);
                   if (order) setViewOrder(order);
                 }}
               />
@@ -516,163 +624,259 @@ const OrderManagement = () => {
           </Card>
         )}
 
+        {/* Add Order Dialog */}
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{isEditMode ? "Edit Order" : "Add New Order"}</DialogTitle>
+              <DialogTitle>Create New Order</DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="client_id">Client *</Label>
-                <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map(client => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.first_name} {client.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="client">Client *</Label>
+                  <Select value={formData.client_id} onValueChange={(v) => setFormData({ ...formData, client_id: v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map(client => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.first_name} {client.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="frequency">Frequency</Label>
+                  <Select value={formData.frequency} onValueChange={(v) => setFormData({ ...formData, frequency: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="once">Once</SelectItem>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="care_type">Care Type *</Label>
-                <Select value={formData.care_type} onValueChange={(value) => setFormData({ ...formData, care_type: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select care type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {careTypes.map(ct => (
-                      <SelectItem key={ct.code} value={ct.code}>{ct.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="start_date">Start Date *</Label>
+                  <Input
+                    id="start_date"
+                    type="date"
+                    value={formData.start_date}
+                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end_date">End Date *</Label>
+                  <Input
+                    id="end_date"
+                    type="date"
+                    value={formData.end_date}
+                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                  />
+                </div>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="shift_date">Date *</Label>
+                <Label htmlFor="notes">Notes</Label>
                 <Input
-                  id="shift_date"
-                  type="date"
-                  value={formData.shift_date}
-                  onChange={(e) => setFormData({ ...formData, shift_date: e.target.value })}
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Additional notes for this order"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start_time">Start Time *</Label>
-                  <Input
-                    id="start_time"
-                    type="time"
-                    value={formData.start_time}
-                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                  />
+
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Shifts</h3>
+                  <Button onClick={handleAddShift} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Shift
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end_time">End Time *</Label>
-                  <Input
-                    id="end_time"
-                    type="time"
-                    value={formData.end_time}
-                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                  />
+                
+                <div className="space-y-4">
+                  {selectedShifts.map((shift, index) => (
+                    <Card key={index}>
+                      <CardContent className="pt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Care Type *</Label>
+                            <Select
+                              value={shift.care_type}
+                              onValueChange={(v) => handleShiftChange(index, "care_type", v)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select care type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {careTypes.map(ct => (
+                                  <SelectItem key={ct.code} value={ct.code}>{ct.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Date *</Label>
+                            <Input
+                              type="date"
+                              value={shift.shift_date}
+                              onChange={(e) => handleShiftChange(index, "shift_date", e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Start Time *</Label>
+                            <Input
+                              type="time"
+                              value={shift.start_time}
+                              onChange={(e) => handleShiftChange(index, "start_time", e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>End Time *</Label>
+                            <Input
+                              type="time"
+                              value={shift.end_time}
+                              onChange={(e) => handleShiftChange(index, "end_time", e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Duration (hours)</Label>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              value={shift.duration_hours}
+                              onChange={(e) => handleShiftChange(index, "duration_hours", parseFloat(e.target.value))}
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <Button
+                              variant="destructive"
+                              onClick={() => handleRemoveShift(index)}
+                              disabled={selectedShifts.length === 1}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="duration_hours">Duration (hours)</Label>
-                  <Input
-                    id="duration_hours"
-                    type="number"
-                    step="0.5"
-                    value={formData.duration_hours}
-                    onChange={(e) => setFormData({ ...formData, duration_hours: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pay_rate">Pay Rate</Label>
-                  <Input
-                    id="pay_rate"
-                    type="number"
-                    step="0.01"
-                    value={formData.pay_rate}
-                    onChange={(e) => setFormData({ ...formData, pay_rate: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="special_instructions">Special Instructions</Label>
-                <Input
-                  id="special_instructions"
-                  value={formData.special_instructions}
-                  onChange={(e) => setFormData({ ...formData, special_instructions: e.target.value })}
-                />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSaveOrder}>{isEditMode ? "Update" : "Add"} Order</Button>
+              <Button onClick={handleSaveOrder}>Create Order</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
+        {/* View Order Dialog */}
         <Dialog open={!!viewOrder} onOpenChange={() => setViewOrder(null)}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle>Order Details</DialogTitle>
             </DialogHeader>
             {viewOrder && (
               <div className="space-y-4">
-                <div>
-                  <Label className="text-muted-foreground">Care Type</Label>
-                  <p className="font-medium">
-                    {careTypes.find(ct => ct.code === viewOrder.care_type)?.name || viewOrder.care_type}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Client</Label>
-                  <p>{viewOrder.clients ? `${viewOrder.clients.first_name} ${viewOrder.clients.last_name}` : "Unknown"}</p>
-                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-muted-foreground">Date</Label>
-                    <p>{format(parseISO(viewOrder.shift_date), "MMM dd, yyyy")}</p>
+                    <Label className="text-muted-foreground">Order Number</Label>
+                    <p className="font-medium">{viewOrder.order_number}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Time</Label>
-                    <p>{viewOrder.start_time} - {viewOrder.end_time}</p>
+                    <Label className="text-muted-foreground">Status</Label>
+                    <div>
+                      <Badge variant={getStatusBadgeVariant(viewOrder.status)}>
+                        {viewOrder.status}
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Status</Label>
-                  <div className="mt-1">
-                    <Badge variant={getStatusBadgeVariant(viewOrder.status)}>{viewOrder.status}</Badge>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Assigned To</Label>
-                  <p>{viewOrder.shift_assignments?.[0]?.caregivers 
-                    ? `${viewOrder.shift_assignments[0].caregivers.first_name} ${viewOrder.shift_assignments[0].caregivers.last_name}`
-                    : "Unassigned"}</p>
-                </div>
-                {viewOrder.special_instructions && (
                   <div>
-                    <Label className="text-muted-foreground">Special Instructions</Label>
-                    <p>{viewOrder.special_instructions}</p>
+                    <Label className="text-muted-foreground">Client</Label>
+                    <p className="font-medium">
+                      {viewOrder.clients ? `${viewOrder.clients.first_name} ${viewOrder.clients.last_name}` : "Unknown"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Week</Label>
+                    <p className="font-medium">
+                      {format(parseISO(viewOrder.start_date), "MMM dd")} - {format(parseISO(viewOrder.end_date), "MMM dd, yyyy")}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Frequency</Label>
+                    <p className="font-medium capitalize">{viewOrder.frequency}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Total Shifts</Label>
+                    <p className="font-medium">{viewOrder.shifts?.length || 0}</p>
+                  </div>
+                </div>
+                {viewOrder.notes && (
+                  <div>
+                    <Label className="text-muted-foreground">Notes</Label>
+                    <p className="font-medium">{viewOrder.notes}</p>
                   </div>
                 )}
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold mb-3">Shifts</h4>
+                  <div className="space-y-2">
+                    {viewOrder.shifts?.map((shift: any) => {
+                      const careTypeName = careTypes.find(ct => ct.code === shift.care_type)?.name || shift.care_type;
+                      return (
+                        <div key={shift.id} className="flex items-center justify-between bg-muted p-3 rounded-lg">
+                          <div className="flex gap-4 flex-1">
+                            <span className="font-medium">{careTypeName}</span>
+                            <span className="text-muted-foreground">
+                              {format(parseISO(shift.shift_date), "EEE, MMM dd")}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {shift.start_time} - {shift.end_time}
+                            </span>
+                            <Badge variant={shift.status === 'open' ? 'secondary' : 'default'}>
+                              {shift.status}
+                            </Badge>
+                          </div>
+                          <div>
+                            {shift.shift_assignments?.[0]?.caregivers ? (
+                              <span className="text-sm">
+                                {shift.shift_assignments[0].caregivers.first_name} {shift.shift_assignments[0].caregivers.last_name}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Unassigned</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
+            <DialogFooter>
+              <Button onClick={() => setViewOrder(null)}>Close</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
+        {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!deleteOrder} onOpenChange={() => setDeleteOrder(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Order</AlertDialogTitle>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete this order? This action cannot be undone.
+                This will permanently delete order {deleteOrder?.order_number} and all its associated shifts. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

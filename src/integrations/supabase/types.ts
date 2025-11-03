@@ -419,6 +419,59 @@ export type Database = {
           },
         ]
       }
+      client_orders: {
+        Row: {
+          agency_id: string
+          client_id: string
+          created_at: string | null
+          days_of_week: string | null
+          end_date: string
+          frequency: string
+          id: string
+          notes: string | null
+          order_number: string
+          start_date: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          client_id: string
+          created_at?: string | null
+          days_of_week?: string | null
+          end_date: string
+          frequency?: string
+          id?: string
+          notes?: string | null
+          order_number: string
+          start_date: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          client_id?: string
+          created_at?: string | null
+          days_of_week?: string | null
+          end_date?: string
+          frequency?: string
+          id?: string
+          notes?: string | null
+          order_number?: string
+          start_date?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_orders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string
@@ -496,6 +549,39 @@ export type Database = {
             columns: ["preferred_caregiver_id"]
             isOneToOne: false
             referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_shifts: {
+        Row: {
+          created_at: string | null
+          order_id: string
+          shift_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          order_id: string
+          shift_id: string
+        }
+        Update: {
+          created_at?: string | null
+          order_id?: string
+          shift_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_shifts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "client_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_shifts_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
         ]
