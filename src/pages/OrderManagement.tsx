@@ -38,7 +38,6 @@ const OrderManagement = () => {
   const [viewMode, setViewMode] = useState<"table" | "calendar">("table");
   const [calendarView, setCalendarView] = useState<"dayGridMonth" | "timeGridWeek">("dayGridMonth");
   const [formData, setFormData] = useState({
-    order_title: "",
     client_id: "",
     care_type: "",
     shift_date: "",
@@ -148,7 +147,6 @@ const OrderManagement = () => {
     setIsEditMode(false);
     setEditOrder(null);
     setFormData({
-      order_title: "",
       client_id: "",
       care_type: "",
       shift_date: "",
@@ -167,7 +165,6 @@ const OrderManagement = () => {
     setIsEditMode(true);
     setEditOrder(order);
     setFormData({
-      order_title: order.order_title || "",
       client_id: order.client_id || "",
       care_type: order.care_type || "",
       shift_date: order.shift_date || "",
@@ -183,13 +180,17 @@ const OrderManagement = () => {
   };
 
   const handleSaveOrder = async () => {
-    if (!user || !formData.order_title || !formData.client_id || !formData.care_type || !formData.shift_date || !formData.start_time || !formData.end_time) {
+    if (!user || !formData.client_id || !formData.care_type || !formData.shift_date || !formData.start_time || !formData.end_time) {
       toast.error("Please fill in all required fields");
       return;
     }
 
+    // Get care type name for order title
+    const selectedCareType = careTypes.find(ct => ct.code === formData.care_type);
+    const orderTitle = selectedCareType?.name || formData.care_type;
+
     const orderData: any = {
-      order_title: formData.order_title,
+      order_title: orderTitle,
       client_id: formData.client_id,
       care_type: formData.care_type,
       shift_date: formData.shift_date,
@@ -262,8 +263,9 @@ const OrderManagement = () => {
 
   const filteredOrders = orders.filter(order => {
     const clientName = order.clients ? `${order.clients.first_name} ${order.clients.last_name}` : "";
+    const careTypeName = careTypes.find(ct => ct.code === order.care_type)?.name || order.care_type;
     const matchesSearch = searchQuery === "" ||
-      order.order_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      careTypeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       clientName.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCareType = filterCareType === "all" || order.care_type === filterCareType;
@@ -272,19 +274,22 @@ const OrderManagement = () => {
     return matchesSearch && matchesCareType && matchesStatus;
   });
 
-  const calendarEvents = filteredOrders.map(order => ({
-    id: order.id,
-    title: `${order.order_title} - ${order.clients?.first_name || 'Unknown'}`,
-    start: `${order.shift_date}T${order.start_time}`,
-    end: `${order.shift_date}T${order.end_time}`,
-    backgroundColor: order.status === 'open' ? '#3b82f6' : order.status === 'assigned' ? '#10b981' : '#6b7280',
-    borderColor: order.status === 'open' ? '#2563eb' : order.status === 'assigned' ? '#059669' : '#4b5563',
-    extendedProps: {
-      status: order.status,
-      careType: order.care_type,
-      clientName: order.clients ? `${order.clients.first_name} ${order.clients.last_name}` : 'Unknown',
-    }
-  }));
+  const calendarEvents = filteredOrders.map(order => {
+    const careTypeName = careTypes.find(ct => ct.code === order.care_type)?.name || order.care_type;
+    return {
+      id: order.id,
+      title: `${careTypeName} - ${order.clients?.first_name || 'Unknown'}`,
+      start: `${order.shift_date}T${order.start_time}`,
+      end: `${order.shift_date}T${order.end_time}`,
+      backgroundColor: order.status === 'open' ? '#3b82f6' : order.status === 'assigned' ? '#10b981' : '#6b7280',
+      borderColor: order.status === 'open' ? '#2563eb' : order.status === 'assigned' ? '#059669' : '#4b5563',
+      extendedProps: {
+        status: order.status,
+        careType: order.care_type,
+        clientName: order.clients ? `${order.clients.first_name} ${order.clients.last_name}` : 'Unknown',
+      }
+    };
+  });
 
   if (loading) {
     return (
@@ -423,56 +428,59 @@ const OrderManagement = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.order_title}</TableCell>
-                        <TableCell>
-                          {order.clients ? `${order.clients.first_name} ${order.clients.last_name}` : "Unknown"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {careTypes.find(ct => ct.code === order.care_type)?.name || order.care_type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{format(parseISO(order.shift_date), "MMM dd, yyyy")}</TableCell>
-                        <TableCell>{order.start_time} - {order.end_time}</TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusBadgeVariant(order.status)}>
-                            {order.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {order.shift_assignments?.[0]?.caregivers 
-                            ? `${order.shift_assignments[0].caregivers.first_name} ${order.shift_assignments[0].caregivers.last_name}`
-                            : "Unassigned"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setViewOrder(order)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenEditDialog(order)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeleteOrder(order)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    filteredOrders.map((order) => {
+                      const careTypeName = careTypes.find(ct => ct.code === order.care_type)?.name || order.care_type;
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell className="font-medium">{careTypeName}</TableCell>
+                          <TableCell>
+                            {order.clients ? `${order.clients.first_name} ${order.clients.last_name}` : "Unknown"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {careTypeName}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{format(parseISO(order.shift_date), "MMM dd, yyyy")}</TableCell>
+                          <TableCell>{order.start_time} - {order.end_time}</TableCell>
+                          <TableCell>
+                            <Badge variant={getStatusBadgeVariant(order.status)}>
+                              {order.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {order.shift_assignments?.[0]?.caregivers 
+                              ? `${order.shift_assignments[0].caregivers.first_name} ${order.shift_assignments[0].caregivers.last_name}`
+                              : "Unassigned"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setViewOrder(order)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenEditDialog(order)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeleteOrder(order)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -514,14 +522,6 @@ const OrderManagement = () => {
               <DialogTitle>{isEditMode ? "Edit Order" : "Add New Order"}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="order_title">Order Title *</Label>
-                <Input
-                  id="order_title"
-                  value={formData.order_title}
-                  onChange={(e) => setFormData({ ...formData, order_title: e.target.value })}
-                />
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="client_id">Client *</Label>
                 <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
@@ -625,16 +625,14 @@ const OrderManagement = () => {
             {viewOrder && (
               <div className="space-y-4">
                 <div>
-                  <Label className="text-muted-foreground">Order Title</Label>
-                  <p className="font-medium">{viewOrder.order_title}</p>
+                  <Label className="text-muted-foreground">Care Type</Label>
+                  <p className="font-medium">
+                    {careTypes.find(ct => ct.code === viewOrder.care_type)?.name || viewOrder.care_type}
+                  </p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Client</Label>
                   <p>{viewOrder.clients ? `${viewOrder.clients.first_name} ${viewOrder.clients.last_name}` : "Unknown"}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Care Type</Label>
-                  <p>{careTypes.find(ct => ct.code === viewOrder.care_type)?.name || viewOrder.care_type}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
