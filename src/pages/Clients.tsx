@@ -19,6 +19,7 @@ const Clients = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,6 +60,7 @@ const Clients = () => {
     { value: "COPD", label: "COPD" },
   ];
 
+  const canManageClients = userRole === 'system_admin' || userRole === 'agency_admin' || userRole === 'manager';
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -80,6 +82,23 @@ const Clients = () => {
       if (profileData) {
         setProfile(profileData);
         fetchClients(session.user.id);
+      }
+
+      // Fetch user role
+      const { data: roleData } = await supabase.rpc('get_user_role', {
+        _user_id: session.user.id
+      });
+
+      if (roleData) {
+        setUserRole(roleData);
+        
+        // Check if user has permission to view clients
+        const allowedRoles = ['system_admin', 'agency_admin', 'manager', 'scheduler', 'hr_staff'];
+        if (!allowedRoles.includes(roleData)) {
+          toast.error("You don't have permission to access client management");
+          navigate("/");
+          return;
+        }
       }
     };
 
@@ -154,6 +173,10 @@ const Clients = () => {
   };
 
   const handleOpenAddDialog = () => {
+    if (!canManageClients) {
+      toast.error("You don't have permission to add clients");
+      return;
+    }
     setIsEditMode(false);
     setEditClient(null);
     setFormData({
@@ -175,6 +198,10 @@ const Clients = () => {
   };
 
   const handleOpenEditDialog = (client: any) => {
+    if (!canManageClients) {
+      toast.error("You don't have permission to edit clients");
+      return;
+    }
     setIsEditMode(true);
     setEditClient(client);
     setFormData({
@@ -196,6 +223,11 @@ const Clients = () => {
   };
 
   const handleSaveClient = async () => {
+    if (!canManageClients) {
+      toast.error("You don't have permission to modify clients");
+      return;
+    }
+
     if (!user || !formData.first_name || !formData.last_name || !formData.phone || !formData.address) {
       toast.error("Please fill in all required fields");
       return;
@@ -275,6 +307,11 @@ const Clients = () => {
   };
 
   const handleDeleteClient = async () => {
+    if (!canManageClients) {
+      toast.error("You don't have permission to delete clients");
+      return;
+    }
+
     if (!deleteClient) return;
 
     const { error } = await supabase
@@ -293,6 +330,11 @@ const Clients = () => {
   };
 
   const handleBulkImport = () => {
+    if (!canManageClients) {
+      toast.error("You don't have permission to import clients");
+      return;
+    }
+
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.csv';
@@ -425,212 +467,18 @@ const Clients = () => {
             <p className="text-muted-foreground">Manage your client profiles</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2" onClick={handleBulkImport}>
-              <Upload className="h-4 w-4" />
-              Upload/Import Table
-            </Button>
-            <Button className="gap-2" onClick={handleOpenAddDialog}>
-              <Plus className="h-4 w-4" />
-              Add Client
-            </Button>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>{isEditMode ? "Edit Client" : "Add New Client"}</DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="first_name">First Name *</Label>
-                      <Input
-                        id="first_name"
-                        value={formData.first_name}
-                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="last_name">Last Name *</Label>
-                      <Input
-                        id="last_name"
-                        value={formData.last_name}
-                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone *</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Address *</Label>
-                    <Input
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="state">State</Label>
-                      <Input
-                        id="state"
-                        value={formData.state}
-                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="zip_code">Zip Code</Label>
-                      <Input
-                        id="zip_code"
-                        value={formData.zip_code}
-                        onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="date_of_birth">Date of Birth</Label>
-                    <Input
-                      id="date_of_birth"
-                      type="date"
-                      value={formData.date_of_birth}
-                      onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Medical Conditions</Label>
-                    <ReactSelect
-                      isMulti
-                      options={medicalConditionsOptions}
-                      value={medicalConditionsOptions.filter(opt => formData.medical_conditions.includes(opt.value))}
-                      onChange={(selected) => setFormData({ ...formData, medical_conditions: selected.map(s => s.value) })}
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--background))',
-                          borderColor: 'hsl(var(--input))',
-                          minHeight: '40px',
-                        }),
-                        menu: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--popover))',
-                          zIndex: 9999,
-                        }),
-                        option: (base, state) => ({
-                          ...base,
-                          backgroundColor: state.isFocused ? 'hsl(var(--accent))' : 'transparent',
-                          color: 'hsl(var(--popover-foreground))',
-                        }),
-                        multiValue: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--secondary))',
-                        }),
-                        multiValueLabel: (base) => ({
-                          ...base,
-                          color: 'hsl(var(--secondary-foreground))',
-                        }),
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Care Needs</Label>
-                    <ReactSelect
-                      isMulti
-                      options={careNeeds.map(cn => ({
-                        value: cn.code,
-                        label: `${cn.name} (${cn.category})`,
-                        category: cn.category
-                      }))}
-                      value={careNeeds
-                        .filter(cn => formData.care_need_codes.includes(cn.code))
-                        .map(cn => ({
-                          value: cn.code,
-                          label: `${cn.name} (${cn.category})`,
-                          category: cn.category
-                        }))}
-                      onChange={(selected) => setFormData({ ...formData, care_need_codes: selected.map(s => s.value) })}
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--background))',
-                          borderColor: 'hsl(var(--input))',
-                          minHeight: '40px',
-                        }),
-                        menu: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--popover))',
-                          zIndex: 9999,
-                        }),
-                        option: (base, state) => ({
-                          ...base,
-                          backgroundColor: state.isFocused ? 'hsl(var(--accent))' : 'transparent',
-                          color: 'hsl(var(--popover-foreground))',
-                        }),
-                        multiValue: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--secondary))',
-                        }),
-                        multiValueLabel: (base) => ({
-                          ...base,
-                          color: 'hsl(var(--secondary-foreground))',
-                        }),
-                      }}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="emergency_contact_name">Emergency Contact Name</Label>
-                      <Input
-                        id="emergency_contact_name"
-                        value={formData.emergency_contact_name}
-                        onChange={(e) => setFormData({ ...formData, emergency_contact_name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="emergency_contact_phone">Emergency Contact Phone</Label>
-                      <Input
-                        id="emergency_contact_phone"
-                        type="tel"
-                        value={formData.emergency_contact_phone}
-                        onChange={(e) => setFormData({ ...formData, emergency_contact_phone: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="notes">Notes</Label>
-                    <Input
-                      id="notes"
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSaveClient}>
-                    {isEditMode ? "Update" : "Add"} Client
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            {canManageClients && (
+              <>
+                <Button variant="outline" className="gap-2" onClick={handleBulkImport}>
+                  <Upload className="h-4 w-4" />
+                  Upload/Import Table
+                </Button>
+                <Button className="gap-2" onClick={handleOpenAddDialog}>
+                  <Plus className="h-4 w-4" />
+                  Add Client
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -668,13 +516,16 @@ const Clients = () => {
           </div>
 
           <Select value={filterLocation} onValueChange={setFilterLocation}>
-            <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <MapPin className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Location" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Locations</SelectItem>
-              {uniqueLocations.map(loc => (
-                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+              {uniqueLocations.map((location) => (
+                <SelectItem key={location} value={location}>
+                  {location}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -691,64 +542,79 @@ const Clients = () => {
           </Select>
         </div>
 
-        {/* Stats */}
-        <div className="grid sm:grid-cols-3 gap-4 mb-6">
+        {/* Summary Cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Clients</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+              <User className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{filteredClients.length}</div>
-              <div className="text-xs text-muted-foreground">of {clients.length} total</div>
+              <div className="text-2xl font-bold">{clients.length}</div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Clients</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">
+              <div className="text-2xl font-bold">
                 {clients.filter(c => c.is_active).length}
               </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Avg. Age</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">With Care Needs</CardTitle>
+              <Heart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-accent">
-                {clients.filter(c => c.date_of_birth).length > 0
-                  ? Math.round(
-                      clients
-                        .filter(c => c.date_of_birth)
-                        .reduce((sum, c) => sum + calculateAge(c.date_of_birth), 0) /
-                        clients.filter(c => c.date_of_birth).length
-                    )
-                  : 0}
+              <div className="text-2xl font-bold">
+                {clients.filter(c => c.client_care_needs && c.client_care_needs.length > 0).length}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Locations</CardTitle>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{uniqueLocations.length}</div>
             </CardContent>
           </Card>
         </div>
 
         {/* Clients Table */}
         <Card>
-          <CardContent className="p-6">
+          <CardHeader>
+            <CardTitle>
+              {filteredClients.length} Client{filteredClients.length !== 1 ? 's' : ''}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             {filteredClients.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Heart className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-center">
-                  {clients.length === 0 ? "No clients in your system yet" : "No clients match your filters"}
-                </p>
+              <div className="text-center py-12">
+                <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-2">No clients found</p>
+                {canManageClients && (
+                  <Button variant="outline" onClick={handleOpenAddDialog}>
+                    Add Your First Client
+                  </Button>
+                )}
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name / Age</TableHead>
+                    <TableHead>Name</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Location</TableHead>
-                    <TableHead>Medical Conditions</TableHead>
+                    <TableHead>Age</TableHead>
                     <TableHead>Care Needs</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -758,65 +624,38 @@ const Clients = () => {
                   {filteredClients.map((client) => (
                     <TableRow key={client.id}>
                       <TableCell className="font-medium">
-                        <div>
-                          {client.first_name} {client.last_name}
-                          {client.date_of_birth && (
-                            <div className="text-xs text-muted-foreground">
-                              Age {calculateAge(client.date_of_birth)}
-                            </div>
-                          )}
-                        </div>
+                        {client.first_name} {client.last_name}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1 text-sm">
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3 text-muted-foreground" />
-                            {client.phone}
-                          </span>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm">{client.phone}</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          {client.city && (
-                            <span>{client.city}, {client.state}</span>
-                          )}
+                          {client.city}, {client.state}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {client.medical_conditions && client.medical_conditions.length > 0 ? (
-                            client.medical_conditions.slice(0, 2).map((condition: string, idx: number) => (
-                              <Badge key={idx} variant="outline" className="text-xs bg-destructive/5 text-destructive">
-                                {condition}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-xs text-muted-foreground">None</span>
-                          )}
-                          {client.medical_conditions && client.medical_conditions.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{client.medical_conditions.length - 2}
-                            </Badge>
-                          )}
-                        </div>
+                        {client.date_of_birth ? calculateAge(client.date_of_birth) : "-"}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {client.client_care_needs && client.client_care_needs.length > 0 ? (
-                            client.client_care_needs.slice(0, 2).map((cn: any, idx: number) => (
-                              <Badge key={idx} variant="secondary" className="text-xs">
+                        {client.client_care_needs && client.client_care_needs.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {client.client_care_needs.slice(0, 2).map((cn: any, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
                                 {cn.care_needs?.name || cn.care_need_code}
                               </Badge>
-                            ))
-                          ) : (
-                            <span className="text-xs text-muted-foreground">None</span>
-                          )}
-                          {client.client_care_needs && client.client_care_needs.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{client.client_care_needs.length - 2}
-                            </Badge>
-                          )}
-                        </div>
+                            ))}
+                            {client.client_care_needs.length > 2 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +{client.client_care_needs.length - 2}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">None specified</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={client.is_active ? "default" : "secondary"}>
@@ -832,20 +671,24 @@ const Clients = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenEditDialog(client)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDeleteClient(client)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canManageClients && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenEditDialog(client)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setDeleteClient(client)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -856,6 +699,150 @@ const Clients = () => {
           </CardContent>
         </Card>
       </main>
+
+      {/* Add/Edit Client Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? "Edit Client" : "Add New Client"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="first_name">First Name *</Label>
+                <Input
+                  id="first_name"
+                  value={formData.first_name}
+                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="last_name">Last Name *</Label>
+                <Input
+                  id="last_name"
+                  value={formData.last_name}
+                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone *</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Address *</Label>
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State</Label>
+                <Input
+                  id="state"
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="zip_code">Zip Code</Label>
+                <Input
+                  id="zip_code"
+                  value={formData.zip_code}
+                  onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="date_of_birth">Date of Birth</Label>
+              <Input
+                id="date_of_birth"
+                type="date"
+                value={formData.date_of_birth}
+                onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Medical Conditions</Label>
+              <ReactSelect
+                isMulti
+                options={medicalConditionsOptions}
+                value={medicalConditionsOptions.filter(opt => formData.medical_conditions.includes(opt.value))}
+                onChange={(selected) => setFormData({ 
+                  ...formData, 
+                  medical_conditions: selected.map(s => s.value) 
+                })}
+                className="react-select-container"
+                classNamePrefix="react-select"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Care Needs</Label>
+              <ReactSelect
+                isMulti
+                options={careNeeds.map(cn => ({ value: cn.code, label: `${cn.name} (${cn.category})` }))}
+                value={careNeeds
+                  .filter(cn => formData.care_need_codes.includes(cn.code))
+                  .map(cn => ({ value: cn.code, label: `${cn.name} (${cn.category})` }))}
+                onChange={(selected) => setFormData({ 
+                  ...formData, 
+                  care_need_codes: selected.map(s => s.value) 
+                })}
+                className="react-select-container"
+                classNamePrefix="react-select"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="emergency_contact_name">Emergency Contact Name</Label>
+              <Input
+                id="emergency_contact_name"
+                value={formData.emergency_contact_name}
+                onChange={(e) => setFormData({ ...formData, emergency_contact_name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="emergency_contact_phone">Emergency Contact Phone</Label>
+              <Input
+                id="emergency_contact_phone"
+                type="tel"
+                value={formData.emergency_contact_phone}
+                onChange={(e) => setFormData({ ...formData, emergency_contact_phone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Input
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveClient}>
+              {isEditMode ? "Update" : "Add"} Client
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* View Details Dialog */}
       <Dialog open={!!viewClient} onOpenChange={() => setViewClient(null)}>
@@ -922,34 +909,34 @@ const Clients = () => {
                             {cn.care_needs?.name || cn.care_need_code}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {cn.care_needs?.category && (
-                              <Badge variant="outline" className="text-xs">
-                                {cn.care_needs.category}
-                              </Badge>
-                            )}
+                            {cn.care_needs?.category}
                           </div>
                         </div>
+                        <Badge variant="secondary" className="text-xs">
+                          Priority {cn.priority}
+                        </Badge>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {viewClient.emergency_contact_name && (
+              {(viewClient.emergency_contact_name || viewClient.emergency_contact_phone) && (
                 <div className="pt-3 border-t">
-                  <div className="flex items-center gap-2 mb-1">
-                    <User className="h-4 w-4 text-accent" />
+                  <div className="flex items-center gap-2 mb-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-medium">Emergency Contact</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {viewClient.emergency_contact_name} • {viewClient.emergency_contact_phone}
-                  </p>
+                  <div className="text-sm">
+                    <p className="font-medium">{viewClient.emergency_contact_name}</p>
+                    <p className="text-muted-foreground">{viewClient.emergency_contact_phone}</p>
+                  </div>
                 </div>
               )}
 
               {viewClient.notes && (
                 <div className="pt-3 border-t">
-                  <p className="text-sm font-medium mb-1">Notes</p>
+                  <div className="text-sm font-medium mb-1">Notes</div>
                   <p className="text-sm text-muted-foreground">{viewClient.notes}</p>
                 </div>
               )}
@@ -962,15 +949,15 @@ const Clients = () => {
       <AlertDialog open={!!deleteClient} onOpenChange={() => setDeleteClient(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Client</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {deleteClient?.first_name} {deleteClient?.last_name}? This action cannot be undone.
+              This will permanently delete {deleteClient?.first_name} {deleteClient?.last_name} from your client list. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteClient} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+              Delete Client
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
