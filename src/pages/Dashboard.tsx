@@ -8,13 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Activity, Users, Calendar, TrendingUp, Sparkles, LogOut, 
   Menu, Bell, Download, Plus, Clock, AlertTriangle,
-  CalendarPlus, Shield, RefreshCw, ArrowRightLeft, Zap,
+  Shield, RefreshCw, ArrowRightLeft,
   UserCheck, ClipboardList, BarChart3, Settings, Home
 } from "lucide-react";
-import FullCalendar from '@fullcalendar/react';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
 
 interface Stats {
   activeClients: number;
@@ -54,7 +50,6 @@ const Dashboard = () => {
     pendingOrders: 0,
     unfilledShifts: 0,
   });
-  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [urgentRequests, setUrgentRequests] = useState<UrgentRequest[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -116,40 +111,6 @@ const Dashboard = () => {
       unfilledShifts: openShifts,
     });
 
-    // Fetch calendar events (assignments)
-    const { data: assignments } = await supabase
-      .from("shift_assignments")
-      .select(`
-        *,
-        shifts (*, clients(first_name, last_name)),
-        caregivers:caregiver_id (first_name, last_name)
-      `)
-      .gte("shifts.shift_date", new Date().toISOString().split('T')[0])
-      .limit(50);
-
-    const events = (assignments || [])
-      .map((assignment: any) => {
-        const shift = assignment.shifts;
-        if (!shift) return null; // guard against missing shift relations
-        const caregiver = assignment.caregivers;
-        const client = shift?.clients;
-        
-        return {
-          id: assignment.id,
-          title: `${client?.first_name || 'Client'} ${client?.last_name || ''} - ${caregiver?.first_name || 'Caregiver'} ${caregiver?.last_name || ''}`,
-          start: `${shift.shift_date}T${shift.start_time}`,
-          end: `${shift.shift_date}T${shift.end_time}`,
-          backgroundColor: assignment.status === 'completed' ? '#7FBA00' : assignment.status === 'in_progress' ? '#F39C12' : '#4A90E2',
-          extendedProps: {
-            assignmentId: assignment.id,
-            status: assignment.status
-          }
-        };
-      })
-      .filter(Boolean) as any[];
-
-    setCalendarEvents(events);
-
     // Fetch urgent requests (open shifts within next 48 hours)
     const twoDaysFromNow = new Date();
     twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
@@ -208,14 +169,11 @@ const Dashboard = () => {
 
   const handleQuickAction = (action: string) => {
     switch (action) {
-      case 'ai-matching':
+      case 'quick-assign':
         navigate("/quick-assign");
         break;
       case 'shift-trades':
         navigate("/shift-trades");
-        break;
-      case 'generate-schedule':
-        toast.info("Schedule generation coming soon!");
         break;
       case 'compliance':
         toast.info("Compliance check coming soon!");
@@ -469,17 +427,13 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
-                <Button variant="outline" onClick={() => navigate("/auto-schedule")}>
-                  <Zap className="mr-2 h-4 w-4" />
-                  Auto Schedule
+                <Button variant="outline" onClick={() => handleQuickAction('quick-assign')}>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Quick Assign
                 </Button>
                 <Button variant="outline" onClick={() => handleQuickAction('shift-trades')}>
                   <ArrowRightLeft className="mr-2 h-4 w-4" />
                   View Shift Trades
-                </Button>
-                <Button variant="outline" onClick={() => handleQuickAction('generate-schedule')}>
-                  <CalendarPlus className="mr-2 h-4 w-4" />
-                  Generate Schedule
                 </Button>
                 <Button variant="outline" onClick={() => handleQuickAction('compliance')}>
                   <Shield className="mr-2 h-4 w-4" />
@@ -489,32 +443,8 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Calendar and Urgent Requests */}
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Calendar */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Weekly Schedule</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FullCalendar
-                  plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
-                  initialView="timeGridWeek"
-                  headerToolbar={{
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                  }}
-                  events={calendarEvents}
-                  height="auto"
-                  eventClick={(info) => {
-                    toast.info(`Viewing: ${info.event.title}`);
-                  }}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Urgent Requests */}
+          {/* Urgent Requests */}
+          <div className="grid lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Urgent Care Requests</CardTitle>

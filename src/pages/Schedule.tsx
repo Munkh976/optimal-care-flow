@@ -291,25 +291,40 @@ const Schedule = () => {
           </div>
         </div>
 
-        {/* Week Navigation */}
+        {/* Week Navigation and AI Match */}
         <Card className="mb-6">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-3">
-                <CalendarIcon className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-semibold">
-                  Week of {format(currentWeekStart, "MMM dd, yyyy")}
-                </h3>
-                <Button variant="ghost" size="sm" onClick={goToCurrentWeek}>
-                  Today
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center gap-3">
+                  <CalendarIcon className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-semibold">
+                    Week of {format(currentWeekStart, "MMM dd, yyyy")}
+                  </h3>
+                  <Button variant="ghost" size="sm" onClick={goToCurrentWeek}>
+                    Today
+                  </Button>
+                </div>
+                <Button variant="outline" size="sm" onClick={goToNextWeek}>
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              <Button variant="outline" size="sm" onClick={goToNextWeek}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              {!caregiverProfile && (
+                <Button 
+                  variant="default"
+                  onClick={() => {
+                    const weekStart = format(currentWeekStart, "yyyy-MM-dd");
+                    const weekEnd = format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), "yyyy-MM-dd");
+                    navigate(`/auto-schedule?weekStart=${weekStart}&weekEnd=${weekEnd}`);
+                  }}
+                >
+                  <Activity className="h-4 w-4 mr-2" />
+                  AI Match This Week
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
