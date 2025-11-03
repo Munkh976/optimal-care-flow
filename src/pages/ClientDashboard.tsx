@@ -18,6 +18,7 @@ interface ClientProfile {
   id: string;
   first_name: string;
   last_name: string;
+  agency_id: string;
 }
 
 interface CareNeed {
@@ -87,12 +88,16 @@ const ClientDashboard = () => {
   };
 
   const fetchClientData = async (userId: string) => {
-    // Fetch client profile
-    const { data: clientData } = await supabase
+    // Fetch client profile - user could be linked via email or we create one
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const { data: clientData, error: clientError } = await supabase
       .from("clients")
-      .select("id, first_name, last_name")
+      .select("id, first_name, last_name, agency_id")
       .eq("agency_id", userId)
-      .single();
+      .maybeSingle();
+
+    console.log("Client data fetch:", { clientData, clientError, userId, userEmail: user?.email });
 
     if (clientData) {
       setClientProfile(clientData);
@@ -102,7 +107,7 @@ const ClientDashboard = () => {
       const weekStart = new Date(today.setDate(today.getDate() - today.getDay()));
       const weekStartStr = weekStart.toISOString().split('T')[0];
       
-      const { data: orderData } = await supabase
+      const { data: orderData, error: orderError } = await supabase
         .from("client_orders")
         .select("*")
         .eq("client_id", clientData.id)
@@ -110,18 +115,23 @@ const ClientDashboard = () => {
         .in("status", ["draft", "submitted"])
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
+      console.log("Order data fetch:", { orderData, orderError });
       setCurrentOrder(orderData || null);
       
       // Fetch client's care needs
-      const { data: careNeedsData } = await supabase
+      const { data: careNeedsData, error: careNeedsError } = await supabase
         .from("client_care_needs")
         .select("*, care_needs(*)")
         .eq("client_id", clientData.id)
         .order("priority", { ascending: false });
 
+      console.log("Care needs fetch:", { careNeedsData, careNeedsError });
       setAvailableCareNeeds(careNeedsData || []);
+    } else {
+      console.error("No client profile found for user:", userId);
+      toast.error("Client profile not found. Please contact your agency.");
     }
   };
 
@@ -141,7 +151,12 @@ const ClientDashboard = () => {
   };
 
   const handleSaveOrder = async (status: 'draft' | 'submitted') => {
-    if (!clientProfile) return;
+    console.log("handleSaveOrder called:", { status, step, clientProfile, startDate, durationWeeks });
+    
+    if (!clientProfile) {
+      toast.error("Client profile not found");
+      return;
+    }
     
     if (step === 1) {
       // Validate step 1
@@ -155,10 +170,13 @@ const ClientDashboard = () => {
       const end = new Date(start);
       end.setDate(start.getDate() + (durationWeeks * 7) - 1);
       
+      console.log("Calculated dates:", { startDate, endDate: end.toISOString().split('T')[0] });
+      
       try {
         if (currentOrder) {
           // Update existing order
-          const { error } = await supabase
+          console.log("Updating existing order:", currentOrder.id);
+          const { data, error } = await supabase
             .from("client_orders")
             .update({
               start_date: startDate,
@@ -167,36 +185,57 @@ const ClientDashboard = () => {
               status: status,
               updated_at: new Date().toISOString()
             })
-            .eq("id", currentOrder.id);
+            .eq("id", currentOrder.id)
+            .select()
+            .single();
 
-          if (error) throw error;
+          if (error) {
+            console.error("Update error:", error);
+            throw error;
+          }
           
+          console.log("Order updated successfully:", data);
+          setCurrentOrder(data);
           toast.success(status === 'draft' ? "Order saved as draft" : "Moving to care needs...");
+          
           if (status === 'submitted') {
+            console.log("Setting step to 2");
             setStep(2);
           }
         } else {
           // Create new order
           const orderNumber = `ORD-${Date.now()}`;
+          console.log("Creating new order:", orderNumber);
+          
+          const insertData = {
+            client_id: clientProfile.id,
+            agency_id: clientProfile.agency_id,
+            order_number: orderNumber,
+            start_date: startDate,
+            end_date: end.toISOString().split('T')[0],
+            frequency: "weekly",
+            status: status
+          };
+          
+          console.log("Insert data:", insertData);
+          
           const { data: newOrder, error } = await supabase
             .from("client_orders")
-            .insert({
-              client_id: clientProfile.id,
-              agency_id: user.id,
-              order_number: orderNumber,
-              start_date: startDate,
-              end_date: end.toISOString().split('T')[0],
-              frequency: "weekly",
-              status: status
-            })
+            .insert(insertData)
             .select()
             .single();
 
-          if (error) throw error;
+          if (error) {
+            console.error("Insert error:", error);
+            throw error;
+          }
           
+          console.log("Order created successfully:", newOrder);
           setCurrentOrder(newOrder);
           toast.success(status === 'draft' ? "Order saved as draft" : "Moving to care needs...");
+          
           if (status === 'submitted') {
+            console.log("Setting step to 2");
             setStep(2);
           }
         }
