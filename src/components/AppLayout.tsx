@@ -18,6 +18,7 @@ import {
   X,
   Tag,
   List,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -115,6 +116,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       label: "Shift Trades",
       icon: Repeat,
       path: "/shift-trades",
+      roles: ["agency_admin", "manager", "scheduler"],
+    },
+    {
+      label: "Order Management",
+      icon: FileText,
+      path: "/order-management",
       roles: ["agency_admin", "manager", "scheduler"],
     },
     {

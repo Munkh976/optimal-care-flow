@@ -22,6 +22,7 @@ import AddUser from "./pages/AddUser";
 import SystemAdminDashboard from "./pages/SystemAdminDashboard";
 import CareTypes from "./pages/CareTypes";
 import CareNeeds from "./pages/CareNeeds";
+import OrderManagement from "./pages/OrderManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
           <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
           <Route path="/care-types" element={<CareTypes />} />
           <Route path="/care-needs" element={<CareNeeds />} />
+          <Route path="/order-management" element={<OrderManagement />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
