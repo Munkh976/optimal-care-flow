@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package, Database, Zap } from "lucide-react";
+import { Activity, LogOut, Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -583,110 +583,6 @@ const OrderManagement = () => {
     }));
   };
 
-  const handleGenerateSampleData = async () => {
-    if (!user || clients.length === 0 || careTypes.length === 0) {
-      toast.error("Please ensure you have clients and care types before generating sample data");
-      return;
-    }
-
-    const confirmGenerate = confirm("This will create 5-10 sample orders with shifts. Continue?");
-    if (!confirmGenerate) return;
-
-    toast.info("Generating sample orders...");
-
-    try {
-      const numberOfOrders = Math.floor(Math.random() * 6) + 5; // 5-10 orders
-      const sampleOrders = [];
-
-      for (let i = 0; i < numberOfOrders; i++) {
-        const randomClient = clients[Math.floor(Math.random() * clients.length)];
-        const randomCareType = careTypes[Math.floor(Math.random() * careTypes.length)];
-        
-        // Random date in the past 3 months or future 2 months
-        const daysOffset = Math.floor(Math.random() * 150) - 90;
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() + daysOffset);
-        
-        const duration = Math.floor(Math.random() * 8) + 1; // 1-8 weeks
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + (duration * 7));
-
-        const statuses = ['draft', 'active', 'completed', 'submitted'];
-        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-
-        const orderNumber = `ORD-${Date.now()}-${i}`;
-
-        // Create order
-        const { data: orderData, error: orderError } = await supabase
-          .from("client_orders")
-          .insert({
-            agency_id: user.id,
-            client_id: randomClient.id,
-            order_number: orderNumber,
-            start_date: startDate.toISOString().split("T")[0],
-            end_date: endDate.toISOString().split("T")[0],
-            frequency: "weekly",
-            days_of_week: "Mon,Wed,Fri",
-            notes: `Sample order for ${randomClient.first_name} ${randomClient.last_name}`,
-            status: randomStatus,
-          })
-          .select()
-          .single();
-
-        if (orderError || !orderData) {
-          console.error("Error creating sample order:", orderError);
-          continue;
-        }
-
-        // Generate 3-7 shifts for this order
-        const numberOfShifts = Math.floor(Math.random() * 5) + 3;
-        const shiftInserts = [];
-
-        for (let j = 0; j < numberOfShifts; j++) {
-          const shiftDate = new Date(startDate);
-          shiftDate.setDate(shiftDate.getDate() + (j * 2)); // Every 2 days
-
-          const startHour = Math.floor(Math.random() * 12) + 8; // 8am-8pm
-          const durationHours = [2, 4, 6, 8][Math.floor(Math.random() * 4)];
-          const endHour = startHour + durationHours;
-
-          shiftInserts.push({
-            agency_id: user.id,
-            client_id: randomClient.id,
-            shift_date: shiftDate.toISOString().split("T")[0],
-            start_time: `${String(startHour).padStart(2, "0")}:00`,
-            end_time: `${String(endHour).padStart(2, "0")}:00`,
-            care_type: randomCareType.code,
-            duration_hours: durationHours,
-            status: randomStatus === 'draft' ? 'open' : randomStatus === 'active' ? 'open' : 'filled',
-            order_title: randomCareType.name,
-            special_notes: `Sample shift ${j + 1}`,
-          });
-        }
-
-        const { data: shiftData, error: shiftError } = await supabase
-          .from("shifts")
-          .insert(shiftInserts)
-          .select();
-
-        if (!shiftError && shiftData) {
-          // Link shifts to order
-          const orderShiftInserts = shiftData.map((shift) => ({
-            order_id: orderData.id,
-            shift_id: shift.id,
-          }));
-
-          await supabase.from("order_shifts").insert(orderShiftInserts);
-        }
-      }
-
-      toast.success(`Successfully generated ${numberOfOrders} sample orders!`);
-      if (user) fetchOrders(user.id);
-    } catch (error) {
-      console.error("Error generating sample data:", error);
-      toast.error("Failed to generate sample data");
-    }
-  };
 
   if (loading) {
     return (
@@ -732,14 +628,6 @@ const OrderManagement = () => {
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={handleGenerateSampleData}>
-              <Database className="mr-2 h-4 w-4" />
-              Generate Sample Data
-            </Button>
-            <Button variant="secondary" onClick={() => navigate("/auto-schedule")}>
-              <Zap className="mr-2 h-4 w-4" />
-              Auto Schedule
-            </Button>
             <Button onClick={() => setIsAddDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Create Order

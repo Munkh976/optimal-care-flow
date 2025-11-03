@@ -469,9 +469,9 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
-                <Button variant="outline" onClick={() => handleQuickAction('ai-matching')}>
+                <Button variant="outline" onClick={() => navigate("/auto-schedule")}>
                   <Zap className="mr-2 h-4 w-4" />
-                  Run AI Matching
+                  Auto Schedule
                 </Button>
                 <Button variant="outline" onClick={() => handleQuickAction('shift-trades')}>
                   <ArrowRightLeft className="mr-2 h-4 w-4" />
