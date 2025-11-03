@@ -59,7 +59,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       label: "Schedule",
       icon: Calendar,
       path: "/schedule",
-      roles: ["agency_admin", "manager", "scheduler"],
+      roles: ["agency_admin", "manager", "scheduler", "caregiver"],
     },
     {
       label: "Caregivers",

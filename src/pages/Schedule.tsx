@@ -19,6 +19,8 @@ const Schedule = () => {
   const [caregivers, setCaregivers] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [assignmentFilter, setAssignmentFilter] = useState<string>("all");
+  const [caregiverProfile, setCaregiverProfile] = useState<any>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -39,7 +41,20 @@ const Schedule = () => {
 
       if (profileData) {
         setProfile(profileData);
-        await fetchScheduleData(session.user.id);
+      }
+
+      // Check if user is a caregiver
+      const { data: caregiverData } = await supabase
+        .from("caregivers")
+        .select("*")
+        .eq("email", session.user.email)
+        .maybeSingle();
+
+      if (caregiverData) {
+        setCaregiverProfile(caregiverData);
+        await fetchScheduleData(caregiverData.agency_id, caregiverData.id);
+      } else if (profileData) {
+        await fetchScheduleData(session.user.id, null);
       }
     };
 
@@ -58,15 +73,19 @@ const Schedule = () => {
 
   useEffect(() => {
     if (user) {
-      fetchScheduleData(user.id);
+      if (caregiverProfile) {
+        fetchScheduleData(caregiverProfile.agency_id, caregiverProfile.id);
+      } else {
+        fetchScheduleData(user.id, null);
+      }
     }
-  }, [currentWeekStart, user]);
+  }, [currentWeekStart, user, caregiverProfile]);
 
-  const fetchScheduleData = async (userId: string) => {
+  const fetchScheduleData = async (agencyId: string, caregiverId: string | null) => {
     setLoading(true);
     const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
 
-    // Fetch shifts with assignments
+    // Fetch shifts with assignments and trade info
     const { data: shiftsData, error: shiftsError } = await supabase
       .from("shifts")
       .select(`
@@ -75,10 +94,11 @@ const Schedule = () => {
         shift_assignments(
           id,
           caregiver:caregivers(first_name, last_name),
-          status
+          status,
+          shift_trades:shift_trades(id, status, trade_type)
         )
       `)
-      .eq("agency_id", userId)
+      .eq("agency_id", agencyId)
       .gte("shift_date", format(currentWeekStart, "yyyy-MM-dd"))
       .lte("shift_date", format(weekEnd, "yyyy-MM-dd"))
       .order("shift_date", { ascending: true });
@@ -94,7 +114,7 @@ const Schedule = () => {
     const { data: caregiversData } = await supabase
       .from("caregivers")
       .select("*")
-      .eq("agency_id", userId)
+      .eq("agency_id", agencyId)
       .eq("is_active", true);
 
     setCaregivers(caregiversData || []);
@@ -103,7 +123,7 @@ const Schedule = () => {
     const { data: clientsData } = await supabase
       .from("clients")
       .select("*")
-      .eq("agency_id", userId);
+      .eq("agency_id", agencyId);
 
     setClients(clientsData || []);
     setLoading(false);
@@ -162,6 +182,16 @@ const Schedule = () => {
       if (shift.shift_date !== targetDate) return false;
       if (selectedCategory !== "all" && shift.care_type !== selectedCategory) return false;
       
+      // Apply assignment filter
+      const hasAssignment = shift.shift_assignments && shift.shift_assignments.length > 0;
+      const hasActiveTrade = hasAssignment && shift.shift_assignments.some((assignment: any) => 
+        assignment.shift_trades && assignment.shift_trades.some((trade: any) => trade.status === 'pending')
+      );
+
+      if (assignmentFilter === "unassigned" && hasAssignment) return false;
+      if (assignmentFilter === "assigned" && !hasAssignment) return false;
+      if (assignmentFilter === "in_trade" && !hasActiveTrade) return false;
+      
       const [startHour] = shift.start_time.split(':').map(Number);
       return startHour === slotHour;
     });
@@ -210,7 +240,7 @@ const Schedule = () => {
             <h2 className="text-3xl font-bold mb-2">Everyone's Schedule</h2>
             <p className="text-muted-foreground">Weekly view of all shifts and assignments</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Categories" />
@@ -221,6 +251,17 @@ const Schedule = () => {
                 <SelectItem value="companion">Companion</SelectItem>
                 <SelectItem value="medical">Medical</SelectItem>
                 <SelectItem value="respite">Respite</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={assignmentFilter} onValueChange={setAssignmentFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Shifts" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Shifts</SelectItem>
+                <SelectItem value="assigned">Assigned</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                <SelectItem value="in_trade">In Trade</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -300,9 +341,17 @@ const Schedule = () => {
                                     {shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}
                                   </div>
                                   {shift.shift_assignments && shift.shift_assignments.length > 0 ? (
-                                    <div className="text-[10px] font-medium mt-0.5 truncate">
-                                      {shift.shift_assignments[0].caregiver?.first_name} {shift.shift_assignments[0].caregiver?.last_name}
-                                    </div>
+                                    <>
+                                      <div className="text-[10px] font-medium mt-0.5 truncate">
+                                        {shift.shift_assignments[0].caregiver?.first_name} {shift.shift_assignments[0].caregiver?.last_name}
+                                      </div>
+                                      {shift.shift_assignments[0].shift_trades && 
+                                       shift.shift_assignments[0].shift_trades.some((trade: any) => trade.status === 'pending') && (
+                                        <div className="text-[10px] text-amber-600 italic mt-0.5">
+                                          In Trade
+                                        </div>
+                                      )}
+                                    </>
                                   ) : (
                                     <div className="text-[10px] text-destructive italic mt-0.5">
                                       Unassigned
