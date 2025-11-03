@@ -267,7 +267,7 @@ const Dashboard = () => {
               }}
             >
               <Sparkles className="mr-3 h-5 w-5" />
-              AI Matching
+              Quick Assign
             </Button>
             <Button 
               variant="ghost" 
