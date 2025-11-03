@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Edit, Send, Calendar as CalendarIcon, Clock, User } from "lucide-react";
+import { Activity, LogOut, Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type Order = {
   id: string;
@@ -37,11 +39,20 @@ const OrderManagement = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [careTypes, setCareTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [orderShifts, setOrderShifts] = useState<{[key: string]: any[]}>({});
+  
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
+  
   const [formData, setFormData] = useState({
     client_id: "",
     duration_weeks: "1",
@@ -130,6 +141,7 @@ const OrderManagement = () => {
     );
 
     setOrders(ordersWithCounts as Order[]);
+    setFilteredOrders(ordersWithCounts as Order[]);
     setLoading(false);
   };
 
@@ -348,6 +360,116 @@ const OrderManagement = () => {
     });
   };
 
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm("Are you sure you want to delete this order? This will also delete all associated shifts.")) {
+      return;
+    }
+
+    // Get order shifts first
+    const { data: orderShifts } = await supabase
+      .from("order_shifts")
+      .select("shift_id")
+      .eq("order_id", orderId);
+
+    if (orderShifts && orderShifts.length > 0) {
+      const shiftIds = orderShifts.map(os => os.shift_id);
+      
+      // Delete order_shifts first
+      await supabase.from("order_shifts").delete().eq("order_id", orderId);
+      
+      // Delete shifts
+      await supabase.from("shifts").delete().in("id", shiftIds);
+    }
+
+    // Delete order
+    const { error } = await supabase
+      .from("client_orders")
+      .delete()
+      .eq("id", orderId);
+
+    if (error) {
+      toast.error("Failed to delete order");
+      console.error(error);
+    } else {
+      toast.success("Order deleted successfully");
+      if (user) fetchOrders(user.id);
+    }
+  };
+
+  const toggleOrderExpand = async (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+      // Fetch shifts for this order if not already loaded
+      if (!orderShifts[orderId]) {
+        await fetchOrderShifts(orderId);
+      }
+    }
+    setExpandedOrders(newExpanded);
+  };
+
+  const fetchOrderShifts = async (orderId: string) => {
+    const { data: orderShiftData } = await supabase
+      .from("order_shifts")
+      .select("shift_id")
+      .eq("order_id", orderId);
+
+    if (orderShiftData && orderShiftData.length > 0) {
+      const shiftIds = orderShiftData.map(os => os.shift_id);
+      const { data: shifts } = await supabase
+        .from("shifts")
+        .select("*")
+        .in("id", shiftIds)
+        .order("shift_date");
+
+      if (shifts) {
+        setOrderShifts(prev => ({ ...prev, [orderId]: shifts }));
+      }
+    }
+  };
+
+  // Search and filter effect
+  useEffect(() => {
+    let filtered = [...orders];
+
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(order => 
+        order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        `${order.clients?.first_name} ${order.clients?.last_name}`.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+
+    // Date filter
+    if (dateFilter !== "all") {
+      const now = new Date();
+      filtered = filtered.filter(order => {
+        const orderDate = new Date(order.created_at);
+        switch (dateFilter) {
+          case "today":
+            return orderDate.toDateString() === now.toDateString();
+          case "week":
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return orderDate >= weekAgo;
+          case "month":
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            return orderDate >= monthAgo;
+          default:
+            return true;
+        }
+      });
+    }
+
+    setFilteredOrders(filtered);
+  }, [searchQuery, statusFilter, dateFilter, orders]);
+
   const handleAddShift = () => {
     if (currentShift.selected_days.length === 0 || !currentShift.care_type) {
       toast.error("Please select days and care type for the shift");
@@ -499,7 +621,7 @@ const OrderManagement = () => {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-3xl font-bold">Order Management</h2>
-            <p className="text-muted-foreground mt-1">Manage weekly client orders</p>
+            <p className="text-muted-foreground mt-1">Manage client care orders</p>
           </div>
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -507,67 +629,241 @@ const OrderManagement = () => {
           </Button>
         </div>
 
-        <div className="grid gap-4">
-          {orders.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                No orders found. Create your first order to get started.
-              </CardContent>
-            </Card>
-          ) : (
-            orders.map((order) => (
-              <Card key={order.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        {order.order_number}
-                      </CardTitle>
-                      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                        <User className="h-4 w-4" />
-                        {order.clients?.first_name} {order.clients?.last_name}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Badge variant={order.status === "submitted" ? "default" : "secondary"}>
-                        {order.status}
-                      </Badge>
-                      {order.status === "draft" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenEditDialog(order)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+        {/* Search and Filters */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by order # or client name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="submitted">Submitted</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select value={dateFilter} onValueChange={setDateFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">Last 7 Days</SelectItem>
+                    <SelectItem value="month">Last 30 Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">{orders.length}</div>
+                <div className="text-sm text-muted-foreground">Total Orders</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{orders.filter(o => o.status === 'active').length}</div>
+                <div className="text-sm text-muted-foreground">Active</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-yellow-600">{orders.filter(o => o.status === 'draft').length}</div>
+                <div className="text-sm text-muted-foreground">Drafts</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{orders.reduce((sum, o) => sum + (o.shift_count || 0), 0)}</div>
+                <div className="text-sm text-muted-foreground">Total Shifts</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Orders Table */}
+        <Card>
+          <CardContent className="p-0">
+            {filteredOrders.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                {orders.length === 0 ? "No orders found. Create your first order to get started." : "No orders match your filters."}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead>Order #</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map((order) => (
+                    <>
+                      <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50">
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleOrderExpand(order.id)}
+                          >
+                            {expandedOrders.has(order.id) ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="font-medium">{order.order_number}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            {order.clients?.first_name} {order.clients?.last_name}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {new Date(order.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(order.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Package className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{order.shift_count || 0}</span> shifts
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            order.status === "submitted" || order.status === "active" ? "default" : 
+                            order.status === "draft" ? "secondary" : 
+                            order.status === "completed" ? "outline" : "destructive"
+                          }>
+                            {order.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(order.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleOrderExpand(order.id);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {order.status === "draft" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditDialog(order);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteOrder(order.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {expandedOrders.has(order.id) && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="bg-muted/30">
+                            <div className="p-4">
+                              <h4 className="font-semibold mb-3 flex items-center gap-2">
+                                <Package className="h-4 w-4" />
+                                Order Items (Shifts)
+                              </h4>
+                              {orderShifts[order.id] && orderShifts[order.id].length > 0 ? (
+                                <div className="space-y-2">
+                                  {orderShifts[order.id].map((shift, idx) => {
+                                    const careTypeName = careTypes.find(ct => ct.code === shift.care_type)?.name || shift.care_type;
+                                    return (
+                                      <div key={idx} className="flex items-center justify-between p-3 bg-background rounded-lg border">
+                                        <div className="flex-1 grid grid-cols-5 gap-4">
+                                          <div>
+                                            <div className="text-sm text-muted-foreground">Date</div>
+                                            <div className="font-medium">{new Date(shift.shift_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                                          </div>
+                                          <div>
+                                            <div className="text-sm text-muted-foreground">Care Type</div>
+                                            <div className="font-medium">{careTypeName}</div>
+                                          </div>
+                                          <div>
+                                            <div className="text-sm text-muted-foreground">Time</div>
+                                            <div className="font-medium">{shift.start_time} - {shift.end_time}</div>
+                                          </div>
+                                          <div>
+                                            <div className="text-sm text-muted-foreground">Duration</div>
+                                            <div className="font-medium">{shift.duration_hours}h</div>
+                                          </div>
+                                          <div>
+                                            <div className="text-sm text-muted-foreground">Status</div>
+                                            <Badge variant={shift.status === 'open' ? 'secondary' : 'default'} className="w-fit">
+                                              {shift.status}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                        {shift.special_notes && (
+                                          <div className="ml-4 text-sm text-muted-foreground max-w-xs">
+                                            {shift.special_notes}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="text-center py-4 text-muted-foreground">
+                                  Loading shifts...
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                      <span>
-                        {new Date(order.start_date).toLocaleDateString()} - {new Date(order.end_date).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span>{order.days_of_week}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="font-medium">{order.shift_count || 0}</span> shifts scheduled
-                    </div>
-                    {order.notes && (
-                      <div className="col-span-2 text-muted-foreground">{order.notes}</div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+                    </>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
 
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogContent className="max-w-2xl">
