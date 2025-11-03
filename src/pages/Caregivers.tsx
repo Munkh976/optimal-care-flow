@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award, Search, Upload, Eye, Trash2, Edit } from "lucide-react";
+import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award, Search, Upload, Eye, Trash2, Edit, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import ReactSelect from "react-select";
+import { AvailabilityDialog } from "@/components/caregivers/AvailabilityDialog";
 
 
 const Caregivers = () => {
@@ -30,6 +31,7 @@ const Caregivers = () => {
   const [viewCaregiver, setViewCaregiver] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [careTypes, setCareTypes] = useState<any[]>([]);
+  const [availabilityCaregiver, setAvailabilityCaregiver] = useState<any>(null);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -692,6 +694,14 @@ const Caregivers = () => {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => setAvailabilityCaregiver(caregiver)}
+                            title="Manage Availability"
+                          >
+                            <Clock className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => setDeleteCaregiver(caregiver)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -786,6 +796,15 @@ const Caregivers = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Availability Dialog */}
+      {availabilityCaregiver && (
+        <AvailabilityDialog
+          caregiver={availabilityCaregiver}
+          isOpen={!!availabilityCaregiver}
+          onClose={() => setAvailabilityCaregiver(null)}
+        />
+      )}
     </div>
   );
 };
