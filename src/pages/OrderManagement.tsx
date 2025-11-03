@@ -45,6 +45,16 @@ const OrderManagement = () => {
   const [formData, setFormData] = useState({
     client_id: "",
     duration_weeks: "1",
+    shifts: [] as Array<{
+      selected_days: string[];
+      time_slot: string;
+      start_time: string;
+      care_type: string;
+      notes: string;
+    }>,
+  });
+
+  const [currentShift, setCurrentShift] = useState({
     selected_days: [] as string[],
     time_slot: "2",
     start_time: "09:00",
@@ -159,10 +169,10 @@ const OrderManagement = () => {
   };
 
   const handleSaveOrder = async (status: "draft" | "submitted") => {
-    const { selected_days, duration_weeks, time_slot, start_time, care_type, client_id, notes } = formData;
+    const { client_id, duration_weeks, shifts } = formData;
 
-    if (!client_id || selected_days.length === 0 || !care_type) {
-      toast.error("Please fill all required fields");
+    if (!client_id || shifts.length === 0) {
+      toast.error("Please select a client and add at least one shift");
       return;
     }
 
@@ -177,7 +187,11 @@ const OrderManagement = () => {
     endDate.setDate(endDate.getDate() + (parseInt(duration_weeks) * 7) - 1);
 
     const orderNumber = selectedOrder?.order_number || `ORD-${Date.now()}`;
-    const daysOfWeek = selected_days.join(",");
+    
+    // Collect all unique days across all shifts
+    const allDays = new Set<string>();
+    shifts.forEach(shift => shift.selected_days.forEach(day => allDays.add(day)));
+    const daysOfWeek = Array.from(allDays).join(",");
 
     // Create or update order
     let orderId = selectedOrder?.id;
@@ -190,7 +204,7 @@ const OrderManagement = () => {
           end_date: endDate.toISOString().split("T")[0],
           frequency: "weekly",
           days_of_week: daysOfWeek,
-          notes,
+          notes: `${shifts.length} shift configurations`,
           status,
         })
         .eq("id", selectedOrder.id);
@@ -223,7 +237,7 @@ const OrderManagement = () => {
           end_date: endDate.toISOString().split("T")[0],
           frequency: "weekly",
           days_of_week: daysOfWeek,
-          notes,
+          notes: `${shifts.length} shift configurations`,
           status,
         })
         .select()
@@ -237,47 +251,53 @@ const OrderManagement = () => {
       orderId = orderData.id;
     }
 
-    // Generate shifts for each week and selected days
-    const shifts = [];
+    // Generate shifts for each shift configuration, for each week
+    const generatedShifts = [];
     const dayMap: { [key: string]: number } = {
       Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0,
     };
 
-    for (let week = 0; week < parseInt(duration_weeks); week++) {
-      for (const day of selected_days) {
-        const shiftDate = new Date(startDate);
-        const targetDay = dayMap[day];
-        const currentDay = shiftDate.getDay();
-        const daysToAdd = (targetDay - currentDay + 7) % 7;
-        shiftDate.setDate(shiftDate.getDate() + daysToAdd + (week * 7));
+    for (const shiftConfig of shifts) {
+      for (let week = 0; week < parseInt(duration_weeks); week++) {
+        for (const day of shiftConfig.selected_days) {
+          const shiftDate = new Date(startDate);
+          const targetDay = dayMap[day];
+          const currentDay = shiftDate.getDay();
+          const daysToAdd = (targetDay - currentDay + 7) % 7;
+          shiftDate.setDate(shiftDate.getDate() + daysToAdd + (week * 7));
 
-        const [hours, minutes] = start_time.split(":");
-        const endTimeObj = new Date();
-        endTimeObj.setHours(parseInt(hours) + parseInt(time_slot), parseInt(minutes), 0);
+          const [hours, minutes] = shiftConfig.start_time.split(":");
+          const endTimeObj = new Date();
+          endTimeObj.setHours(parseInt(hours) + parseInt(shiftConfig.time_slot), parseInt(minutes), 0);
 
-        shifts.push({
-          shift_date: shiftDate.toISOString().split("T")[0],
-          start_time: start_time,
-          end_time: `${String(endTimeObj.getHours()).padStart(2, "0")}:${String(endTimeObj.getMinutes()).padStart(2, "0")}`,
-          care_type,
-          duration_hours: parseInt(time_slot),
-        });
+          generatedShifts.push({
+            shift_date: shiftDate.toISOString().split("T")[0],
+            start_time: shiftConfig.start_time,
+            end_time: `${String(endTimeObj.getHours()).padStart(2, "0")}:${String(endTimeObj.getMinutes()).padStart(2, "0")}`,
+            care_type: shiftConfig.care_type,
+            duration_hours: parseInt(shiftConfig.time_slot),
+            notes: shiftConfig.notes,
+          });
+        }
       }
     }
 
     // Create shifts
-    const careTypeName = careTypes.find(ct => ct.code === care_type)?.name || care_type;
-    const shiftInserts = shifts.map((shift) => ({
-      agency_id: user.id,
-      client_id,
-      shift_date: shift.shift_date,
-      start_time: shift.start_time,
-      end_time: shift.end_time,
-      care_type: shift.care_type as any,
-      duration_hours: shift.duration_hours,
-      status: "open" as any,
-      order_title: careTypeName,
-    }));
+    const shiftInserts = generatedShifts.map((shift) => {
+      const careTypeName = careTypes.find(ct => ct.code === shift.care_type)?.name || shift.care_type;
+      return {
+        agency_id: user.id,
+        client_id,
+        shift_date: shift.shift_date,
+        start_time: shift.start_time,
+        end_time: shift.end_time,
+        care_type: shift.care_type as any,
+        duration_hours: shift.duration_hours,
+        status: "open" as any,
+        order_title: careTypeName,
+        special_notes: shift.notes,
+      };
+    });
 
     const { data: shiftData, error: shiftError } = await supabase
       .from("shifts")
@@ -317,12 +337,44 @@ const OrderManagement = () => {
     setFormData({
       client_id: "",
       duration_weeks: "1",
+      shifts: [],
+    });
+    setCurrentShift({
       selected_days: [],
       time_slot: "2",
       start_time: "09:00",
       care_type: "",
       notes: "",
     });
+  };
+
+  const handleAddShift = () => {
+    if (currentShift.selected_days.length === 0 || !currentShift.care_type) {
+      toast.error("Please select days and care type for the shift");
+      return;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      shifts: [...prev.shifts, { ...currentShift }],
+    }));
+    
+    setCurrentShift({
+      selected_days: [],
+      time_slot: "2",
+      start_time: "09:00",
+      care_type: "",
+      notes: "",
+    });
+    
+    toast.success("Shift added to order");
+  };
+
+  const handleRemoveShift = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      shifts: prev.shifts.filter((_, i) => i !== index),
+    }));
   };
 
   const handleOpenEditDialog = async (order: Order) => {
@@ -334,39 +386,65 @@ const OrderManagement = () => {
     const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     const weeks = Math.ceil(diffDays / 7);
 
-    // Get first shift to populate form
+    // Get all shifts to reconstruct shift configurations
     const { data: orderShifts } = await supabase
       .from("order_shifts")
       .select("shift_id")
-      .eq("order_id", order.id)
-      .limit(1);
+      .eq("order_id", order.id);
 
-    let timeSlot = "2";
-    let startTime = "09:00";
-    let careType = "";
+    const reconstructedShifts: Array<{
+      selected_days: string[];
+      time_slot: string;
+      start_time: string;
+      care_type: string;
+      notes: string;
+    }> = [];
 
     if (orderShifts && orderShifts.length > 0) {
-      const { data: shift } = await supabase
+      const shiftIds = orderShifts.map(os => os.shift_id);
+      const { data: shifts } = await supabase
         .from("shifts")
         .select("*")
-        .eq("id", orderShifts[0].shift_id)
-        .single();
+        .in("id", shiftIds)
+        .order("shift_date");
 
-      if (shift) {
-        timeSlot = shift.duration_hours?.toString() || "2";
-        startTime = shift.start_time;
-        careType = shift.care_type;
+      if (shifts && shifts.length > 0) {
+        // Group shifts by their configuration (time, care_type, duration)
+        const configMap = new Map<string, Set<string>>();
+        
+        shifts.forEach(shift => {
+          const key = `${shift.start_time}-${shift.care_type}-${shift.duration_hours}`;
+          if (!configMap.has(key)) {
+            configMap.set(key, new Set());
+          }
+          const shiftDate = new Date(shift.shift_date);
+          const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+          configMap.get(key)!.add(dayNames[shiftDate.getDay()]);
+        });
+
+        configMap.forEach((days, key) => {
+          const [start_time, care_type, duration] = key.split("-");
+          const firstShift = shifts.find(s => 
+            s.start_time === start_time && 
+            s.care_type === care_type && 
+            s.duration_hours?.toString() === duration
+          );
+          
+          reconstructedShifts.push({
+            selected_days: Array.from(days),
+            time_slot: duration,
+            start_time,
+            care_type,
+            notes: firstShift?.special_notes || "",
+          });
+        });
       }
     }
 
     setFormData({
       client_id: order.client_id,
       duration_weeks: weeks.toString(),
-      selected_days: order.days_of_week?.split(",") || [],
-      time_slot: timeSlot,
-      start_time: startTime,
-      care_type: careType,
-      notes: order.notes || "",
+      shifts: reconstructedShifts,
     });
     setIsAddDialogOpen(true);
   };
@@ -374,7 +452,7 @@ const OrderManagement = () => {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   const toggleDay = (day: string) => {
-    setFormData((prev) => ({
+    setCurrentShift((prev) => ({
       ...prev,
       selected_days: prev.selected_days.includes(day)
         ? prev.selected_days.filter((d) => d !== day)
@@ -520,95 +598,132 @@ const OrderManagement = () => {
 
                 <div>
                   <Label>Duration (Weeks) *</Label>
-                  <Select
+                  <Input
+                    type="number"
+                    min="1"
+                    max="52"
                     value={formData.duration_weeks}
-                    onValueChange={(value) => setFormData({ ...formData, duration_weeks: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 8, 12].map((weeks) => (
-                        <SelectItem key={weeks} value={weeks.toString()}>
-                          {weeks} {weeks === 1 ? "week" : "weeks"}
-                        </SelectItem>
+                    onChange={(e) => setFormData({ ...formData, duration_weeks: e.target.value })}
+                    placeholder="Enter number of weeks (1-52)"
+                  />
+                </div>
+
+                {/* Added Shifts Display */}
+                {formData.shifts.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Added Shifts ({formData.shifts.length})</Label>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {formData.shifts.map((shift, index) => {
+                        const careTypeName = careTypes.find(ct => ct.code === shift.care_type)?.name || shift.care_type;
+                        return (
+                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md text-sm">
+                            <div className="flex-1">
+                              <div className="font-medium">{careTypeName}</div>
+                              <div className="text-muted-foreground">
+                                {shift.selected_days.join(", ")} • {shift.start_time} • {shift.time_slot}h
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveShift(index)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Current Shift Builder */}
+                <div className="border-t pt-4 space-y-4">
+                  <Label className="text-base font-semibold">Add New Shift</Label>
+                  
+                  <div>
+                    <Label>Select Days *</Label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {dayOptions.map((day) => (
+                        <div key={day} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`current-${day}`}
+                            checked={currentShift.selected_days.includes(day)}
+                            onCheckedChange={() => toggleDay(day)}
+                          />
+                          <label htmlFor={`current-${day}`} className="text-sm cursor-pointer">
+                            {day}
+                          </label>
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Select Days *</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {dayOptions.map((day) => (
-                      <div key={day} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={day}
-                          checked={formData.selected_days.includes(day)}
-                          onCheckedChange={() => toggleDay(day)}
-                        />
-                        <label htmlFor={day} className="text-sm cursor-pointer">
-                          {day}
-                        </label>
-                      </div>
-                    ))}
+                    </div>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Start Time *</Label>
-                    <Input
-                      type="time"
-                      value={formData.start_time}
-                      onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Start Time *</Label>
+                      <Input
+                        type="time"
+                        value={currentShift.start_time}
+                        onChange={(e) => setCurrentShift({ ...currentShift, start_time: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Duration *</Label>
+                      <Select
+                        value={currentShift.time_slot}
+                        onValueChange={(value) => setCurrentShift({ ...currentShift, time_slot: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="2">2 hours</SelectItem>
+                          <SelectItem value="3">3 hours</SelectItem>
+                          <SelectItem value="4">4 hours</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+
                   <div>
-                    <Label>Duration *</Label>
+                    <Label>Care Type *</Label>
                     <Select
-                      value={formData.time_slot}
-                      onValueChange={(value) => setFormData({ ...formData, time_slot: value })}
+                      value={currentShift.care_type}
+                      onValueChange={(value) => setCurrentShift({ ...currentShift, care_type: value })}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select care type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="2">2 hours</SelectItem>
-                        <SelectItem value="3">3 hours</SelectItem>
-                        <SelectItem value="4">4 hours</SelectItem>
+                        {careTypes?.map((type) => (
+                          <SelectItem key={type.id} value={type.code}>
+                            {type.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
-                <div>
-                  <Label>Care Type *</Label>
-                  <Select
-                    value={formData.care_type}
-                    onValueChange={(value) => setFormData({ ...formData, care_type: value })}
+                  <div>
+                    <Label>Notes</Label>
+                    <Textarea
+                      value={currentShift.notes}
+                      onChange={(e) => setCurrentShift({ ...currentShift, notes: e.target.value })}
+                      placeholder="Add any special instructions..."
+                      rows={2}
+                    />
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAddShift}
+                    className="w-full"
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select care type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {careTypes?.map((type) => (
-                        <SelectItem key={type.id} value={type.code}>
-                          {type.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Notes</Label>
-                  <Textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Add any special instructions..."
-                    rows={3}
-                  />
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Shift to Order
+                  </Button>
                 </div>
               </div>
 
