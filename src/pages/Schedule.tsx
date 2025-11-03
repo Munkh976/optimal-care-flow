@@ -142,7 +142,30 @@ const Schedule = () => {
     return colors[careType] || "bg-muted";
   };
 
+  // Generate time slots from 6 AM to 10 PM (hourly)
+  const generateTimeSlots = () => {
+    const slots = [];
+    for (let hour = 6; hour <= 22; hour++) {
+      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+    }
+    return slots;
+  };
+
+  const timeSlots = generateTimeSlots();
   const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  const getShiftsForDayAndTime = (dayOffset: number, timeSlot: string) => {
+    const targetDate = format(addDays(currentWeekStart, dayOffset), "yyyy-MM-dd");
+    const [slotHour] = timeSlot.split(':').map(Number);
+    
+    return shifts.filter(shift => {
+      if (shift.shift_date !== targetDate) return false;
+      if (selectedCategory !== "all" && shift.care_type !== selectedCategory) return false;
+      
+      const [startHour] = shift.start_time.split(':').map(Number);
+      return startHour === slotHour;
+    });
+  };
 
   if (loading) {
     return (
@@ -226,82 +249,78 @@ const Schedule = () => {
           </CardContent>
         </Card>
 
-        {/* Weekly Calendar Grid - Days as Rows */}
-        <div className="space-y-4">
-          {weekDays.map((day, index) => {
-            const currentDate = addDays(currentWeekStart, index);
-            const dayShifts = getShiftsForDay(index).filter(
-              shift => selectedCategory === "all" || shift.care_type === selectedCategory
-            );
-
-            return (
-              <Card key={index}>
-                <CardContent className="p-4">
-                  <div className="flex flex-col lg:flex-row gap-4">
-                    {/* Day Header */}
-                    <div className="lg:w-32 flex-shrink-0">
-                      <div className="font-semibold text-lg">{day}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(currentDate, "MMM dd")}
-                      </div>
-                    </div>
-
-                    {/* Shifts Row */}
-                    <div className="flex-1 overflow-x-auto">
-                      {dayShifts.length === 0 ? (
-                        <p className="text-sm text-muted-foreground italic py-2">No shifts</p>
-                      ) : (
-                        <div className="flex gap-3 pb-2">
-                          {dayShifts.map((shift) => (
-                            <div
-                              key={shift.id}
-                              className="flex-shrink-0 w-64 p-3 rounded-lg border bg-card hover:shadow-md transition-shadow cursor-pointer"
-                              onClick={() => navigate(`/unassigned-shifts`)}
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <div className="text-sm font-medium">
-                                  {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
-                                </div>
-                                <Badge variant="outline" className={`text-xs ${getCareTypeColor(shift.care_type)}`}>
-                                  {shift.care_type?.replace("_", " ")}
-                                </Badge>
-                              </div>
-                              
-                              <div className="text-sm mb-1">
-                                <span className="font-medium">
-                                  {shift.client?.first_name} {shift.client?.last_name}
-                                </span>
-                              </div>
-
-                              {shift.shift_assignments && shift.shift_assignments.length > 0 ? (
-                                <div className="text-xs text-primary">
-                                  {shift.shift_assignments[0].caregiver?.first_name}{" "}
-                                  {shift.shift_assignments[0].caregiver?.last_name}
-                                </div>
-                              ) : (
-                                <div className="text-xs text-destructive italic">Unassigned</div>
-                              )}
-
-                              {shift.client?.care_requirements && shift.client.care_requirements.length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-1">
-                                  {shift.client.care_requirements.slice(0, 2).map((req: string, idx: number) => (
-                                    <Badge key={idx} variant="secondary" className="text-xs">
-                                      {req}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+        {/* Calendar Grid View - Days as Rows, Time Slots as Columns */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="overflow-x-auto">
+              <div className="min-w-max">
+                {/* Header Row - Time Slots */}
+                <div className="flex border-b">
+                  <div className="w-24 flex-shrink-0 p-2 font-semibold border-r bg-muted/50">
+                    Day
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  {timeSlots.map((slot) => (
+                    <div key={slot} className="w-32 flex-shrink-0 p-2 text-center text-xs font-medium border-r bg-muted/50">
+                      {slot}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Day Rows */}
+                {weekDays.map((day, dayIndex) => {
+                  const currentDate = addDays(currentWeekStart, dayIndex);
+                  
+                  return (
+                    <div key={dayIndex} className="flex border-b hover:bg-muted/20 transition-colors">
+                      {/* Day Label */}
+                      <div className="w-24 flex-shrink-0 p-2 border-r bg-card">
+                        <div className="font-semibold text-sm">{day}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(currentDate, "MMM dd")}
+                        </div>
+                      </div>
+
+                      {/* Time Slot Cells */}
+                      {timeSlots.map((slot) => {
+                        const shiftsInSlot = getShiftsForDayAndTime(dayIndex, slot);
+                        
+                        return (
+                          <div key={slot} className="w-32 flex-shrink-0 p-1 border-r min-h-[80px] bg-card">
+                            <div className="space-y-1">
+                              {shiftsInSlot.map((shift) => (
+                                <div
+                                  key={shift.id}
+                                  className={`p-1.5 rounded text-xs cursor-pointer hover:shadow-sm transition-shadow ${getCareTypeColor(shift.care_type)}`}
+                                  onClick={() => navigate(`/unassigned-shifts`)}
+                                >
+                                  <div className="font-medium truncate text-xs">
+                                    {shift.client?.first_name} {shift.client?.last_name}
+                                  </div>
+                                  <div className="text-[10px] opacity-80">
+                                    {shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}
+                                  </div>
+                                  {shift.shift_assignments && shift.shift_assignments.length > 0 ? (
+                                    <div className="text-[10px] font-medium mt-0.5 truncate">
+                                      {shift.shift_assignments[0].caregiver?.first_name} {shift.shift_assignments[0].caregiver?.last_name}
+                                    </div>
+                                  ) : (
+                                    <div className="text-[10px] text-destructive italic mt-0.5">
+                                      Unassigned
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Summary Stats */}
         <div className="grid sm:grid-cols-4 gap-4 mt-6">
