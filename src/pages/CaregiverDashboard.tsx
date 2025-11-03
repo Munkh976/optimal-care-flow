@@ -51,7 +51,6 @@ interface CaregiverProfile {
   performance_rating: number;
   reliability_score: number;
   hourly_rate: number;
-  skills: string[];
 }
 
 const CaregiverDashboard = () => {

@@ -26,47 +26,8 @@ const CaregiverRegistration = () => {
     zipCode: "",
     employmentType: "full_time",
     hourlyRate: "",
-    certifications: [] as string[],
-    skills: [] as string[],
     agencyId: "",
   });
-
-  const availableSkills = [
-    "Medication Management",
-    "Wound Care",
-    "Physical Therapy",
-    "Alzheimer's Care",
-    "Dementia Care",
-    "Post-Surgical Care",
-    "Hospice Care",
-    "Personal Care",
-  ];
-
-  const availableCertifications = [
-    "CNA - Certified Nursing Assistant",
-    "HHA - Home Health Aide",
-    "PCA - Personal Care Assistant",
-    "CPR/First Aid",
-    "Medication Administration",
-  ];
-
-  const handleSkillToggle = (skill: string) => {
-    setFormData(prev => ({
-      ...prev,
-      skills: prev.skills.includes(skill)
-        ? prev.skills.filter(s => s !== skill)
-        : [...prev.skills, skill]
-    }));
-  };
-
-  const handleCertificationToggle = (cert: string) => {
-    setFormData(prev => ({
-      ...prev,
-      certifications: prev.certifications.includes(cert)
-        ? prev.certifications.filter(c => c !== cert)
-        : [...prev.certifications, cert]
-    }));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,20 +53,18 @@ const CaregiverRegistration = () => {
       // Create registration record
       const { error: regError } = await supabase.from("caregiver_registrations").insert({
         email: formData.email,
-        phone: formData.phone,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        zip_code: formData.zipCode,
-        employment_type: formData.employmentType,
-        hourly_rate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
-        certifications: formData.certifications,
-        skills: formData.skills,
-        agency_id: formData.agencyId || null,
-        status: "pending",
-      });
+    phone: formData.phone,
+    first_name: formData.firstName,
+    last_name: formData.lastName,
+    address: formData.address,
+    city: formData.city,
+    state: formData.state,
+    zip_code: formData.zipCode,
+    employment_type: formData.employmentType,
+    hourly_rate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+    agency_id: formData.agencyId || null,
+    status: "pending",
+  });
 
       if (regError) throw regError;
 
@@ -279,42 +238,9 @@ const CaregiverRegistration = () => {
                   value={formData.agencyId}
                   onChange={(e) => setFormData({ ...formData, agencyId: e.target.value })}
                 />
-              </div>
-
-              <div className="space-y-3">
-                <Label>Certifications</Label>
-                <div className="space-y-2">
-                  {availableCertifications.map((cert) => (
-                    <div key={cert} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={cert}
-                        checked={formData.certifications.includes(cert)}
-                        onCheckedChange={() => handleCertificationToggle(cert)}
-                      />
-                      <Label htmlFor={cert} className="font-normal cursor-pointer">
-                        {cert}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label>Skills</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {availableSkills.map((skill) => (
-                    <div key={skill} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={skill}
-                        checked={formData.skills.includes(skill)}
-                        onCheckedChange={() => handleSkillToggle(skill)}
-                      />
-                      <Label htmlFor={skill} className="font-normal cursor-pointer">
-                        {skill}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  Skills and certifications can be added after your registration is approved.
+                </p>
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>

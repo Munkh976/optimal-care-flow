@@ -179,7 +179,6 @@ export type Database = {
           address: string | null
           agency_id: string | null
           availability: Json | null
-          certifications: string[] | null
           city: string | null
           created_at: string | null
           email: string
@@ -192,7 +191,6 @@ export type Database = {
           rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
-          skills: string[] | null
           state: string | null
           status: string | null
           updated_at: string | null
@@ -202,7 +200,6 @@ export type Database = {
           address?: string | null
           agency_id?: string | null
           availability?: Json | null
-          certifications?: string[] | null
           city?: string | null
           created_at?: string | null
           email: string
@@ -215,7 +212,6 @@ export type Database = {
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
-          skills?: string[] | null
           state?: string | null
           status?: string | null
           updated_at?: string | null
@@ -225,7 +221,6 @@ export type Database = {
           address?: string | null
           agency_id?: string | null
           availability?: Json | null
-          certifications?: string[] | null
           city?: string | null
           created_at?: string | null
           email?: string
@@ -238,7 +233,6 @@ export type Database = {
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
-          skills?: string[] | null
           state?: string | null
           status?: string | null
           updated_at?: string | null
@@ -246,12 +240,59 @@ export type Database = {
         }
         Relationships: []
       }
+      caregiver_skills: {
+        Row: {
+          care_type_code: string
+          caregiver_id: string
+          created_at: string | null
+          id: string
+          is_certified: boolean | null
+          proficiency_level: string | null
+          updated_at: string | null
+          years_experience: number | null
+        }
+        Insert: {
+          care_type_code: string
+          caregiver_id: string
+          created_at?: string | null
+          id?: string
+          is_certified?: boolean | null
+          proficiency_level?: string | null
+          updated_at?: string | null
+          years_experience?: number | null
+        }
+        Update: {
+          care_type_code?: string
+          caregiver_id?: string
+          created_at?: string | null
+          id?: string
+          is_certified?: boolean | null
+          proficiency_level?: string | null
+          updated_at?: string | null
+          years_experience?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "caregiver_skills_care_type_code_fkey"
+            columns: ["care_type_code"]
+            isOneToOne: false
+            referencedRelation: "care_types"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "caregiver_skills_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       caregivers: {
         Row: {
           address: string | null
           agency_id: string
           availability: Json | null
-          certifications: string[] | null
           city: string | null
           created_at: string | null
           custom_min_hours: number | null
@@ -269,7 +310,6 @@ export type Database = {
           phone: string
           reliability_score: number | null
           role: Database["public"]["Enums"]["caregiver_role"]
-          skills: string[] | null
           state: string | null
           updated_at: string | null
           zip_code: string | null
@@ -278,7 +318,6 @@ export type Database = {
           address?: string | null
           agency_id: string
           availability?: Json | null
-          certifications?: string[] | null
           city?: string | null
           created_at?: string | null
           custom_min_hours?: number | null
@@ -296,7 +335,6 @@ export type Database = {
           phone: string
           reliability_score?: number | null
           role?: Database["public"]["Enums"]["caregiver_role"]
-          skills?: string[] | null
           state?: string | null
           updated_at?: string | null
           zip_code?: string | null
@@ -305,7 +343,6 @@ export type Database = {
           address?: string | null
           agency_id?: string
           availability?: Json | null
-          certifications?: string[] | null
           city?: string | null
           created_at?: string | null
           custom_min_hours?: number | null
@@ -323,7 +360,6 @@ export type Database = {
           phone?: string
           reliability_score?: number | null
           role?: Database["public"]["Enums"]["caregiver_role"]
-          skills?: string[] | null
           state?: string | null
           updated_at?: string | null
           zip_code?: string | null

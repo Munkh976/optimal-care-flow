@@ -20,8 +20,6 @@ interface CaregiverRegistration {
   city: string | null;
   state: string | null;
   zip_code: string | null;
-  certifications: string[] | null;
-  skills: string[] | null;
   employment_type: string;
   hourly_rate: number | null;
   status: 'pending' | 'approved' | 'rejected';
@@ -101,8 +99,6 @@ const CaregiverApprovals = () => {
         city: registration.city,
         state: registration.state,
         zip_code: registration.zip_code,
-        certifications: registration.certifications,
-        skills: registration.skills,
         employment_type: registration.employment_type,
         hourly_rate: registration.hourly_rate,
         agency_id: user.id,
@@ -286,28 +282,6 @@ const CaregiverApprovals = () => {
                       <p className="text-muted-foreground">${registration.hourly_rate}/hr</p>
                     </div>
                   </div>
-
-                  {registration.certifications?.length > 0 && (
-                    <div>
-                      <p className="font-medium text-sm mb-2">Certifications</p>
-                      <div className="flex flex-wrap gap-2">
-                        {registration.certifications.map((cert) => (
-                          <Badge key={cert} variant="secondary">{cert}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {registration.skills?.length > 0 && (
-                    <div>
-                      <p className="font-medium text-sm mb-2">Skills</p>
-                      <div className="flex flex-wrap gap-2">
-                        {registration.skills.map((skill) => (
-                          <Badge key={skill} variant="outline">{skill}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {registration.rejection_reason && (
                     <div className="bg-destructive/10 p-3 rounded-lg">

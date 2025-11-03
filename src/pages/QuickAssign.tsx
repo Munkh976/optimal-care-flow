@@ -27,7 +27,10 @@ interface Caregiver {
   last_name: string;
   performance_rating: number;
   availability: any;
-  skills: string[];
+  caregiver_skills?: Array<{
+    care_type_code: string;
+    care_types?: { name: string; category: string };
+  }>;
 }
 
 const QuickAssign = () => {
@@ -68,7 +71,13 @@ const QuickAssign = () => {
         
         supabase
           .from("caregivers")
-          .select("*")
+          .select(`
+            *,
+            caregiver_skills (
+              care_type_code,
+              care_types (name, category)
+            )
+          `)
           .eq("agency_id", userId)
           .eq("is_active", true)
           .order("performance_rating", { ascending: false })
@@ -260,9 +269,9 @@ const QuickAssign = () => {
                                 {caregiver.performance_rating.toFixed(1)}
                               </span>
                             </div>
-                            {caregiver.skills && caregiver.skills.length > 0 && (
+                            {caregiver.caregiver_skills && caregiver.caregiver_skills.length > 0 && (
                               <p className="text-xs text-muted-foreground mt-1">
-                                Available: {caregiver.skills.slice(0, 3).join(", ")}
+                                Skills: {caregiver.caregiver_skills.slice(0, 3).map(s => s.care_type_code).join(", ")}
                               </p>
                             )}
                           </div>
@@ -288,7 +297,7 @@ const QuickAssign = () => {
                   <TrendingUp className="w-4 h-4 text-primary" />
                   <p className="text-sm font-medium">AI Suggestion:</p>
                   <p className="text-sm text-muted-foreground">
-                    Try using Auto-Assign for optimal matches based on skills, location, and availability
+                    Try using Auto-Assign for optimal matches based on care types, location, and availability
                   </p>
                   <Button
                     variant="outline"

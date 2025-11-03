@@ -17,7 +17,6 @@ interface UnassignedShift {
   end_time: string;
   duration_hours: number;
   care_type: string;
-  required_skills: string[];
   status: string;
   clients: {
     first_name: string;
@@ -41,8 +40,10 @@ interface CaregiverMatch {
     performance_rating: number;
     reliability_score: number;
     hourly_rate: number;
-    skills: string[];
     city: string;
+    caregiver_skills?: Array<{
+      care_type_code: string;
+    }>;
   };
 }
 

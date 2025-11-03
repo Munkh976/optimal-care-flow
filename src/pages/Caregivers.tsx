@@ -35,32 +35,9 @@ const Caregivers = () => {
     phone: "",
     hourly_rate: "",
     employment_type: "full_time",
-    skills: [] as string[],
-    certifications: [] as string[],
     city: "",
     state: "",
   });
-
-  const skillsOptions = [
-    { value: "Alzheimer's Care", label: "Alzheimer's Care" },
-    { value: "Dementia Care", label: "Dementia Care" },
-    { value: "Mobility Assistance", label: "Mobility Assistance" },
-    { value: "Medication Management", label: "Medication Management" },
-    { value: "Meal Preparation", label: "Meal Preparation" },
-    { value: "Personal Hygiene", label: "Personal Hygiene" },
-    { value: "Companionship", label: "Companionship" },
-    { value: "Light Housekeeping", label: "Light Housekeeping" },
-    { value: "Transportation", label: "Transportation" },
-    { value: "Fall Prevention", label: "Fall Prevention" },
-  ];
-
-  const certificationsOptions = [
-    { value: "CNA", label: "CNA" },
-    { value: "HHA", label: "HHA" },
-    { value: "CPR", label: "CPR" },
-    { value: "First Aid", label: "First Aid" },
-    { value: "Nursing Degree", label: "Nursing Degree" },
-  ];
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -130,8 +107,6 @@ const Caregivers = () => {
       phone: "",
       hourly_rate: "",
       employment_type: "full_time",
-      skills: [],
-      certifications: [],
       city: "",
       state: "",
     });
@@ -148,8 +123,6 @@ const Caregivers = () => {
       phone: caregiver.phone || "",
       hourly_rate: caregiver.hourly_rate?.toString() || "",
       employment_type: caregiver.employment_type || "full_time",
-      skills: caregiver.skills || [],
-      certifications: caregiver.certifications || [],
       city: caregiver.city || "",
       state: caregiver.state || "",
     });
@@ -169,8 +142,6 @@ const Caregivers = () => {
       phone: formData.phone,
       hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
       employment_type: formData.employment_type,
-      skills: formData.skills,
-      certifications: formData.certifications,
       city: formData.city,
       state: formData.state,
     };
@@ -245,9 +216,7 @@ const Caregivers = () => {
         
         headers.forEach((header, index) => {
           const value = values[index];
-          if (header === 'skills' || header === 'certifications') {
-            caregiver[header] = value ? value.split(';').map(s => s.trim()) : [];
-          } else if (header === 'hourly_rate') {
+          if (header === 'hourly_rate') {
             caregiver[header] = parseFloat(value) || 0;
           } else if (header === 'is_active') {
             caregiver[header] = value.toLowerCase() === 'true';
@@ -445,79 +414,8 @@ const Caregivers = () => {
                       </Select>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Skills</Label>
-                    <ReactSelect
-                      isMulti
-                      options={skillsOptions}
-                      value={skillsOptions.filter(opt => formData.skills.includes(opt.value))}
-                      onChange={(selected) => setFormData({ ...formData, skills: selected.map(s => s.value) })}
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--background))',
-                          borderColor: 'hsl(var(--input))',
-                          minHeight: '40px',
-                        }),
-                        menu: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--popover))',
-                          zIndex: 9999,
-                        }),
-                        option: (base, state) => ({
-                          ...base,
-                          backgroundColor: state.isFocused ? 'hsl(var(--accent))' : 'transparent',
-                          color: 'hsl(var(--popover-foreground))',
-                        }),
-                        multiValue: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--secondary))',
-                        }),
-                        multiValueLabel: (base) => ({
-                          ...base,
-                          color: 'hsl(var(--secondary-foreground))',
-                        }),
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Certifications</Label>
-                    <ReactSelect
-                      isMulti
-                      options={certificationsOptions}
-                      value={certificationsOptions.filter(opt => formData.certifications.includes(opt.value))}
-                      onChange={(selected) => setFormData({ ...formData, certifications: selected.map(s => s.value) })}
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--background))',
-                          borderColor: 'hsl(var(--input))',
-                          minHeight: '40px',
-                        }),
-                        menu: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--popover))',
-                          zIndex: 9999,
-                        }),
-                        option: (base, state) => ({
-                          ...base,
-                          backgroundColor: state.isFocused ? 'hsl(var(--accent))' : 'transparent',
-                          color: 'hsl(var(--popover-foreground))',
-                        }),
-                        multiValue: (base) => ({
-                          ...base,
-                          backgroundColor: 'hsl(var(--secondary))',
-                        }),
-                        multiValueLabel: (base) => ({
-                          ...base,
-                          color: 'hsl(var(--secondary-foreground))',
-                        }),
-                      }}
-                    />
+                  <div className="bg-muted p-3 rounded text-sm text-muted-foreground">
+                    Note: Caregiver skills can be managed through Care Types assignments after saving.
                   </div>
                 </div>
                 <DialogFooter>
@@ -538,7 +436,7 @@ const Caregivers = () => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, email, or skills..."
+              placeholder="Search by name or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -656,24 +554,6 @@ const Caregivers = () => {
                         <Badge variant={caregiver.is_active ? "default" : "secondary"}>
                           {caregiver.is_active ? "Active" : "Inactive"}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {caregiver.skills && caregiver.skills.length > 0 ? (
-                            caregiver.skills.slice(0, 2).map((skill: string, idx: number) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
-                                {skill}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-xs text-muted-foreground">No skills</span>
-                          )}
-                          {caregiver.skills && caregiver.skills.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{caregiver.skills.length - 2}
-                            </Badge>
-                          )}
-                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
