@@ -16,77 +16,83 @@ export type Database = {
     Tables: {
       care_needs: {
         Row: {
-          agency_id: string
-          care_type_id: string
+          care_type_code: string | null
+          category: string | null
+          code: string
           created_at: string | null
           description: string | null
           id: string
           is_active: boolean | null
           name: string
-          requires_certification: boolean | null
+          nhats_reference: string | null
           updated_at: string | null
         }
         Insert: {
-          agency_id: string
-          care_type_id: string
+          care_type_code?: string | null
+          category?: string | null
+          code: string
           created_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           name: string
-          requires_certification?: boolean | null
+          nhats_reference?: string | null
           updated_at?: string | null
         }
         Update: {
-          agency_id?: string
-          care_type_id?: string
+          care_type_code?: string | null
+          category?: string | null
+          code?: string
           created_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
-          requires_certification?: boolean | null
+          nhats_reference?: string | null
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "care_needs_care_type_id_fkey"
-            columns: ["care_type_id"]
+            foreignKeyName: "care_needs_care_type_code_fkey"
+            columns: ["care_type_code"]
             isOneToOne: false
             referencedRelation: "care_types"
-            referencedColumns: ["id"]
+            referencedColumns: ["code"]
           },
         ]
       }
       care_types: {
         Row: {
-          agency_id: string
-          color: string | null
+          care_level: string | null
+          code: string
           created_at: string | null
           description: string | null
           id: string
           is_active: boolean | null
           name: string
+          typical_caregiver_role: string | null
           updated_at: string | null
         }
         Insert: {
-          agency_id: string
-          color?: string | null
+          care_level?: string | null
+          code: string
           created_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           name: string
+          typical_caregiver_role?: string | null
           updated_at?: string | null
         }
         Update: {
-          agency_id?: string
-          color?: string | null
+          care_level?: string | null
+          code?: string
           created_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
+          typical_caregiver_role?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -339,6 +345,51 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_care_needs: {
+        Row: {
+          care_need_code: string
+          client_id: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          priority: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          care_need_code: string
+          client_id: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          care_need_code?: string
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_care_needs_care_need_code_fkey"
+            columns: ["care_need_code"]
+            isOneToOne: false
+            referencedRelation: "care_needs"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "client_care_needs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
