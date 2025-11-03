@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award, Search, Upload, Eye, Trash2, Edit, X } from "lucide-react";
+import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award, Search, Upload, Eye, Trash2, Edit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import ReactSelect from "react-select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 const Caregivers = () => {
   const navigate = useNavigate();
@@ -30,12 +30,6 @@ const Caregivers = () => {
   const [viewCaregiver, setViewCaregiver] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [careTypes, setCareTypes] = useState<any[]>([]);
-  const [newSkill, setNewSkill] = useState({
-    care_type_code: "",
-    proficiency_level: "intermediate",
-    years_experience: 0,
-    is_certified: false,
-  });
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -45,6 +39,7 @@ const Caregivers = () => {
     employment_type: "full_time",
     city: "",
     state: "",
+    care_type_codes: [] as string[],
   });
 
   useEffect(() => {
@@ -143,6 +138,7 @@ const Caregivers = () => {
       employment_type: "full_time",
       city: "",
       state: "",
+      care_type_codes: [],
     });
     setIsAddDialogOpen(true);
   };
@@ -159,6 +155,7 @@ const Caregivers = () => {
       employment_type: caregiver.employment_type || "full_time",
       city: caregiver.city || "",
       state: caregiver.state || "",
+      care_type_codes: caregiver.caregiver_skills?.map((s: any) => s.care_type_code) || [],
     });
     setIsAddDialogOpen(true);
   };
@@ -188,24 +185,49 @@ const Caregivers = () => {
 
       if (error) {
         toast.error("Failed to update caregiver");
-      } else {
-        toast.success("Caregiver updated successfully");
-        setIsAddDialogOpen(false);
-        if (user) fetchCaregivers(user.id);
+        return;
       }
+
+      // Update caregiver skills
+      await supabase
+        .from("caregiver_skills")
+        .delete()
+        .eq("caregiver_id", editCaregiver.id);
+
+      if (formData.care_type_codes.length > 0) {
+        const skillsData = formData.care_type_codes.map((code) => ({
+          caregiver_id: editCaregiver.id,
+          care_type_code: code,
+        }));
+        await supabase.from("caregiver_skills").insert(skillsData);
+      }
+
+      toast.success("Caregiver updated successfully");
+      setIsAddDialogOpen(false);
+      if (user) fetchCaregivers(user.id);
     } else {
-      const { error } = await supabase.from("caregivers").insert({
+      const { data: newCaregiver, error } = await supabase.from("caregivers").insert({
         ...caregiverData,
         agency_id: user.id,
-      });
+      }).select().single();
 
       if (error) {
         toast.error("Failed to add caregiver");
-      } else {
-        toast.success("Caregiver added successfully");
-        setIsAddDialogOpen(false);
-        if (user) fetchCaregivers(user.id);
+        return;
       }
+
+      // Add caregiver skills
+      if (formData.care_type_codes.length > 0 && newCaregiver) {
+        const skillsData = formData.care_type_codes.map((code) => ({
+          caregiver_id: newCaregiver.id,
+          care_type_code: code,
+        }));
+        await supabase.from("caregiver_skills").insert(skillsData);
+      }
+
+      toast.success("Caregiver added successfully");
+      setIsAddDialogOpen(false);
+      if (user) fetchCaregivers(user.id);
     }
   };
 
@@ -224,62 +246,6 @@ const Caregivers = () => {
       toast.success("Caregiver deleted successfully");
       setDeleteCaregiver(null);
       if (user) fetchCaregivers(user.id);
-    }
-  };
-
-  const handleAddSkill = async () => {
-    if (!viewCaregiver || !newSkill.care_type_code) {
-      toast.error("Please select a care type");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("caregiver_skills")
-      .insert({
-        caregiver_id: viewCaregiver.id,
-        care_type_code: newSkill.care_type_code,
-        proficiency_level: newSkill.proficiency_level,
-        years_experience: newSkill.years_experience,
-        is_certified: newSkill.is_certified,
-      });
-
-    if (error) {
-      console.error("Error adding skill:", error);
-      toast.error("Failed to add skill");
-    } else {
-      toast.success("Skill added successfully");
-      setNewSkill({
-        care_type_code: "",
-        proficiency_level: "intermediate",
-        years_experience: 0,
-        is_certified: false,
-      });
-      if (user) {
-        await fetchCaregivers(user.id);
-        // Update viewCaregiver with fresh data
-        const updatedCaregiver = caregivers.find(c => c.id === viewCaregiver.id);
-        if (updatedCaregiver) setViewCaregiver(updatedCaregiver);
-      }
-    }
-  };
-
-  const handleDeleteSkill = async (skillId: string) => {
-    const { error } = await supabase
-      .from("caregiver_skills")
-      .delete()
-      .eq("id", skillId);
-
-    if (error) {
-      console.error("Error deleting skill:", error);
-      toast.error("Failed to delete skill");
-    } else {
-      toast.success("Skill removed successfully");
-      if (user) {
-        await fetchCaregivers(user.id);
-        // Update viewCaregiver with fresh data
-        const updatedCaregiver = caregivers.find(c => c.id === viewCaregiver.id);
-        if (updatedCaregiver) setViewCaregiver(updatedCaregiver);
-      }
     }
   };
 
@@ -504,8 +470,52 @@ const Caregivers = () => {
                       </Select>
                     </div>
                   </div>
-                  <div className="bg-muted p-3 rounded text-sm text-muted-foreground">
-                    Note: Caregiver skills can be managed through Care Types assignments after saving.
+                  <div className="space-y-2">
+                    <Label>Care Types / Skills</Label>
+                    <ReactSelect
+                      isMulti
+                      options={careTypes.map(ct => ({
+                        value: ct.code,
+                        label: `${ct.name} (${ct.category})`,
+                        category: ct.category
+                      }))}
+                      value={careTypes
+                        .filter(ct => formData.care_type_codes.includes(ct.code))
+                        .map(ct => ({
+                          value: ct.code,
+                          label: `${ct.name} (${ct.category})`,
+                          category: ct.category
+                        }))}
+                      onChange={(selected) => setFormData({ ...formData, care_type_codes: selected.map(s => s.value) })}
+                      className="react-select-container"
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--background))',
+                          borderColor: 'hsl(var(--input))',
+                          minHeight: '40px',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--popover))',
+                          zIndex: 9999,
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isFocused ? 'hsl(var(--accent))' : 'transparent',
+                          color: 'hsl(var(--popover-foreground))',
+                        }),
+                        multiValue: (base) => ({
+                          ...base,
+                          backgroundColor: 'hsl(var(--secondary))',
+                        }),
+                        multiValueLabel: (base) => ({
+                          ...base,
+                          color: 'hsl(var(--secondary-foreground))',
+                        }),
+                      }}
+                    />
                   </div>
                 </div>
                 <DialogFooter>
@@ -699,178 +709,62 @@ const Caregivers = () => {
 
       {/* View Details Dialog */}
       <Dialog open={!!viewCaregiver} onOpenChange={() => setViewCaregiver(null)}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Caregiver Details</DialogTitle>
           </DialogHeader>
           {viewCaregiver && (
-            <Tabs defaultValue="info" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="info">Information</TabsTrigger>
-                <TabsTrigger value="skills">Skills & Care Types</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="info" className="space-y-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-2xl font-bold mb-1">
-                      {viewCaregiver.first_name} {viewCaregiver.last_name}
-                    </h3>
-                    <Badge variant="outline" className={getRoleColor(viewCaregiver.employment_type)}>
-                      {viewCaregiver.employment_type?.replace("_", " ")}
-                    </Badge>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-primary">${viewCaregiver.hourly_rate}</div>
-                    <div className="text-xs text-muted-foreground">per hour</div>
-                  </div>
+            <div className="space-y-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold mb-1">
+                    {viewCaregiver.first_name} {viewCaregiver.last_name}
+                  </h3>
+                  <Badge variant="outline" className={getRoleColor(viewCaregiver.employment_type)}>
+                    {viewCaregiver.employment_type?.replace("_", " ")}
+                  </Badge>
                 </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-primary">${viewCaregiver.hourly_rate}</div>
+                  <div className="text-xs text-muted-foreground">per hour</div>
+                </div>
+              </div>
 
-                <div className="space-y-3">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{viewCaregiver.email}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{viewCaregiver.phone}</span>
+                </div>
+                {viewCaregiver.city && (
                   <div className="flex items-center gap-2 text-sm">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{viewCaregiver.email}</span>
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span>{viewCaregiver.city}, {viewCaregiver.state}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{viewCaregiver.phone}</span>
-                  </div>
-                  {viewCaregiver.city && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{viewCaregiver.city}, {viewCaregiver.state}</span>
-                    </div>
-                  )}
+                )}
+              </div>
+
+              <div className="border-t pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Award className="h-4 w-4 text-accent" />
+                  <span className="text-sm font-medium">Care Types & Skills</span>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="skills" className="space-y-4">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Award className="h-4 w-4 text-accent" />
-                    <span className="text-sm font-medium">Current Skills & Care Types</span>
+                {viewCaregiver.caregiver_skills && viewCaregiver.caregiver_skills.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {viewCaregiver.caregiver_skills.map((skill: any) => (
+                      <Badge key={skill.id} variant="secondary">
+                        {skill.care_types?.name || skill.care_type_code}
+                      </Badge>
+                    ))}
                   </div>
-                  
-                  {viewCaregiver.caregiver_skills && viewCaregiver.caregiver_skills.length > 0 ? (
-                    <div className="space-y-2">
-                      {viewCaregiver.caregiver_skills.map((skill: any) => (
-                        <div key={skill.id} className="flex items-start justify-between p-3 rounded border bg-card">
-                          <div className="flex-1">
-                            <div className="font-medium text-sm mb-1">
-                              {skill.care_types?.name || skill.care_type_code}
-                            </div>
-                            <div className="flex flex-wrap gap-2 text-xs">
-                              {skill.care_types?.category && (
-                                <Badge variant="outline" className="text-xs">
-                                  {skill.care_types.category}
-                                </Badge>
-                              )}
-                              <Badge variant="secondary" className="text-xs capitalize">
-                                {skill.proficiency_level}
-                              </Badge>
-                              {skill.years_experience > 0 && (
-                                <Badge variant="outline" className="text-xs">
-                                  {skill.years_experience} years
-                                </Badge>
-                              )}
-                              {skill.is_certified && (
-                                <Badge variant="default" className="text-xs">
-                                  Certified
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteSkill(skill.id)}
-                            className="ml-2"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No skills added yet
-                    </div>
-                  )}
-
-                  <div className="border-t pt-4">
-                    <h4 className="font-medium mb-3">Add New Skill</h4>
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <Label>Care Type *</Label>
-                        <Select
-                          value={newSkill.care_type_code}
-                          onValueChange={(value) => setNewSkill({ ...newSkill, care_type_code: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select care type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {careTypes.map((type) => (
-                              <SelectItem key={type.code} value={type.code}>
-                                {type.name} ({type.category})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label>Proficiency Level</Label>
-                          <Select
-                            value={newSkill.proficiency_level}
-                            onValueChange={(value) => setNewSkill({ ...newSkill, proficiency_level: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="beginner">Beginner</SelectItem>
-                              <SelectItem value="intermediate">Intermediate</SelectItem>
-                              <SelectItem value="advanced">Advanced</SelectItem>
-                              <SelectItem value="expert">Expert</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Years of Experience</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={newSkill.years_experience}
-                            onChange={(e) => setNewSkill({ ...newSkill, years_experience: parseInt(e.target.value) || 0 })}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="is_certified"
-                          checked={newSkill.is_certified}
-                          onChange={(e) => setNewSkill({ ...newSkill, is_certified: e.target.checked })}
-                          className="rounded border-input"
-                        />
-                        <Label htmlFor="is_certified" className="cursor-pointer">
-                          Certified in this care type
-                        </Label>
-                      </div>
-
-                      <Button onClick={handleAddSkill} className="w-full">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Skill
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No care types assigned</p>
+                )}
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
