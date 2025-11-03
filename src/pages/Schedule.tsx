@@ -226,8 +226,8 @@ const Schedule = () => {
           </CardContent>
         </Card>
 
-        {/* Weekly Calendar Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
+        {/* Weekly Calendar Grid - Days as Rows */}
+        <div className="space-y-4">
           {weekDays.map((day, index) => {
             const currentDate = addDays(currentWeekStart, index);
             const dayShifts = getShiftsForDay(index).filter(
@@ -235,61 +235,67 @@ const Schedule = () => {
             );
 
             return (
-              <Card key={index} className="flex flex-col">
+              <Card key={index}>
                 <CardContent className="p-4">
-                  <div className="mb-4 pb-2 border-b">
-                    <div className="font-semibold text-lg">{day}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {format(currentDate, "MMM dd")}
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    {/* Day Header */}
+                    <div className="lg:w-32 flex-shrink-0">
+                      <div className="font-semibold text-lg">{day}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {format(currentDate, "MMM dd")}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    {dayShifts.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">No shifts</p>
-                    ) : (
-                      dayShifts.map((shift) => (
-                        <div
-                          key={shift.id}
-                          className="p-3 rounded-lg border bg-card hover:shadow-md transition-shadow cursor-pointer"
-                          onClick={() => navigate(`/unassigned-shifts`)}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="text-sm font-medium">
-                              {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
-                            </div>
-                            <Badge variant="outline" className={`text-xs ${getCareTypeColor(shift.care_type)}`}>
-                              {shift.care_type?.replace("_", " ")}
-                            </Badge>
-                          </div>
-                          
-                          <div className="text-sm mb-1">
-                            <span className="font-medium">
-                              {shift.client?.first_name} {shift.client?.last_name}
-                            </span>
-                          </div>
-
-                          {shift.shift_assignments && shift.shift_assignments.length > 0 ? (
-                            <div className="text-xs text-primary">
-                              {shift.shift_assignments[0].caregiver?.first_name}{" "}
-                              {shift.shift_assignments[0].caregiver?.last_name}
-                            </div>
-                          ) : (
-                            <div className="text-xs text-destructive italic">Unassigned</div>
-                          )}
-
-                          {shift.client?.care_requirements && shift.client.care_requirements.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {shift.client.care_requirements.slice(0, 2).map((req: string, idx: number) => (
-                                <Badge key={idx} variant="secondary" className="text-xs">
-                                  {req}
+                    {/* Shifts Row */}
+                    <div className="flex-1 overflow-x-auto">
+                      {dayShifts.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic py-2">No shifts</p>
+                      ) : (
+                        <div className="flex gap-3 pb-2">
+                          {dayShifts.map((shift) => (
+                            <div
+                              key={shift.id}
+                              className="flex-shrink-0 w-64 p-3 rounded-lg border bg-card hover:shadow-md transition-shadow cursor-pointer"
+                              onClick={() => navigate(`/unassigned-shifts`)}
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="text-sm font-medium">
+                                  {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
+                                </div>
+                                <Badge variant="outline" className={`text-xs ${getCareTypeColor(shift.care_type)}`}>
+                                  {shift.care_type?.replace("_", " ")}
                                 </Badge>
-                              ))}
+                              </div>
+                              
+                              <div className="text-sm mb-1">
+                                <span className="font-medium">
+                                  {shift.client?.first_name} {shift.client?.last_name}
+                                </span>
+                              </div>
+
+                              {shift.shift_assignments && shift.shift_assignments.length > 0 ? (
+                                <div className="text-xs text-primary">
+                                  {shift.shift_assignments[0].caregiver?.first_name}{" "}
+                                  {shift.shift_assignments[0].caregiver?.last_name}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-destructive italic">Unassigned</div>
+                              )}
+
+                              {shift.client?.care_requirements && shift.client.care_requirements.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {shift.client.care_requirements.slice(0, 2).map((req: string, idx: number) => (
+                                    <Badge key={idx} variant="secondary" className="text-xs">
+                                      {req}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
+                          ))}
                         </div>
-                      ))
-                    )}
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
