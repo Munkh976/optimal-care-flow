@@ -11,6 +11,16 @@ interface ShiftDetailsDialogProps {
 export const ShiftDetailsDialog = ({ shift, open, onOpenChange }: ShiftDetailsDialogProps) => {
   if (!shift) return null;
 
+  const formatCareType = (careType: string) => {
+    const types: any = {
+      personal_care: "Personal Care",
+      companion: "Companion Care",
+      medical: "Medical Care",
+      respite: "Respite Care",
+    };
+    return types[careType] || careType;
+  };
+
   const getCareTypeColor = (careType: string) => {
     const colors: any = {
       personal_care: "bg-primary/10 text-primary border-primary/20",
@@ -25,7 +35,7 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange }: ShiftDetailsDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl">{shift.order_title || "Care Service Order"}</DialogTitle>
+          <DialogTitle className="text-2xl">{formatCareType(shift.care_type)}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
@@ -101,7 +111,7 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange }: ShiftDetailsDi
             </div>
             <div className="ml-6">
               <Badge className={getCareTypeColor(shift.care_type)}>
-                {shift.care_type?.replace("_", " ").toUpperCase()}
+                {formatCareType(shift.care_type)}
               </Badge>
             </div>
           </div>

@@ -155,6 +155,16 @@ const Schedule = () => {
     return shifts.filter(shift => shift.shift_date === targetDate);
   };
 
+  const formatCareType = (careType: string) => {
+    const types: any = {
+      personal_care: "Personal Care",
+      companion: "Companion Care",
+      medical: "Medical Care",
+      respite: "Respite Care",
+    };
+    return types[careType] || careType;
+  };
+
   const getCareTypeColor = (careType: string) => {
     const colors: any = {
       personal_care: "bg-primary/10 text-primary border-primary/20",
@@ -341,7 +351,7 @@ const Schedule = () => {
                                   }}
                                 >
                                   <div className="font-medium truncate text-xs">
-                                    {shift.order_title || "Care Service Order"}
+                                    {formatCareType(shift.care_type)}
                                   </div>
                                   <div className="text-[10px] opacity-80">
                                     {shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}
