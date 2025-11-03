@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package } from "lucide-react";
+import { Activity, LogOut, Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package, Database, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,7 +51,7 @@ const OrderManagement = () => {
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("all");
   
   const [formData, setFormData] = useState({
     client_id: "",
@@ -447,20 +447,31 @@ const OrderManagement = () => {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
-    // Date filter
-    if (dateFilter !== "all") {
+    // Period filter
+    if (periodFilter !== "all") {
       const now = new Date();
       filtered = filtered.filter(order => {
-        const orderDate = new Date(order.created_at);
-        switch (dateFilter) {
-          case "today":
-            return orderDate.toDateString() === now.toDateString();
-          case "week":
-            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            return orderDate >= weekAgo;
-          case "month":
-            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            return orderDate >= monthAgo;
+        const orderStart = new Date(order.start_date);
+        const orderEnd = new Date(order.end_date);
+        
+        switch (periodFilter) {
+          case "weekly":
+            // Current week
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - now.getDay());
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            return (orderStart <= weekEnd && orderEnd >= weekStart);
+          case "monthly":
+            // Current month
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            return (orderStart <= monthEnd && orderEnd >= monthStart);
+          case "yearly":
+            // Current year
+            const yearStart = new Date(now.getFullYear(), 0, 1);
+            const yearEnd = new Date(now.getFullYear(), 11, 31);
+            return (orderStart <= yearEnd && orderEnd >= yearStart);
           default:
             return true;
         }
@@ -468,7 +479,7 @@ const OrderManagement = () => {
     }
 
     setFilteredOrders(filtered);
-  }, [searchQuery, statusFilter, dateFilter, orders]);
+  }, [searchQuery, statusFilter, periodFilter, orders]);
 
   const handleAddShift = () => {
     if (currentShift.selected_days.length === 0 || !currentShift.care_type) {
@@ -582,6 +593,111 @@ const OrderManagement = () => {
     }));
   };
 
+  const handleGenerateSampleData = async () => {
+    if (!user || clients.length === 0 || careTypes.length === 0) {
+      toast.error("Please ensure you have clients and care types before generating sample data");
+      return;
+    }
+
+    const confirmGenerate = confirm("This will create 5-10 sample orders with shifts. Continue?");
+    if (!confirmGenerate) return;
+
+    toast.info("Generating sample orders...");
+
+    try {
+      const numberOfOrders = Math.floor(Math.random() * 6) + 5; // 5-10 orders
+      const sampleOrders = [];
+
+      for (let i = 0; i < numberOfOrders; i++) {
+        const randomClient = clients[Math.floor(Math.random() * clients.length)];
+        const randomCareType = careTypes[Math.floor(Math.random() * careTypes.length)];
+        
+        // Random date in the past 3 months or future 2 months
+        const daysOffset = Math.floor(Math.random() * 150) - 90;
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() + daysOffset);
+        
+        const duration = Math.floor(Math.random() * 8) + 1; // 1-8 weeks
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + (duration * 7));
+
+        const statuses = ['draft', 'active', 'completed', 'submitted'];
+        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+
+        const orderNumber = `ORD-${Date.now()}-${i}`;
+
+        // Create order
+        const { data: orderData, error: orderError } = await supabase
+          .from("client_orders")
+          .insert({
+            agency_id: user.id,
+            client_id: randomClient.id,
+            order_number: orderNumber,
+            start_date: startDate.toISOString().split("T")[0],
+            end_date: endDate.toISOString().split("T")[0],
+            frequency: "weekly",
+            days_of_week: "Mon,Wed,Fri",
+            notes: `Sample order for ${randomClient.first_name} ${randomClient.last_name}`,
+            status: randomStatus,
+          })
+          .select()
+          .single();
+
+        if (orderError || !orderData) {
+          console.error("Error creating sample order:", orderError);
+          continue;
+        }
+
+        // Generate 3-7 shifts for this order
+        const numberOfShifts = Math.floor(Math.random() * 5) + 3;
+        const shiftInserts = [];
+
+        for (let j = 0; j < numberOfShifts; j++) {
+          const shiftDate = new Date(startDate);
+          shiftDate.setDate(shiftDate.getDate() + (j * 2)); // Every 2 days
+
+          const startHour = Math.floor(Math.random() * 12) + 8; // 8am-8pm
+          const durationHours = [2, 4, 6, 8][Math.floor(Math.random() * 4)];
+          const endHour = startHour + durationHours;
+
+          shiftInserts.push({
+            agency_id: user.id,
+            client_id: randomClient.id,
+            shift_date: shiftDate.toISOString().split("T")[0],
+            start_time: `${String(startHour).padStart(2, "0")}:00`,
+            end_time: `${String(endHour).padStart(2, "0")}:00`,
+            care_type: randomCareType.code,
+            duration_hours: durationHours,
+            status: randomStatus === 'draft' ? 'open' : randomStatus === 'active' ? 'open' : 'filled',
+            order_title: randomCareType.name,
+            special_notes: `Sample shift ${j + 1}`,
+          });
+        }
+
+        const { data: shiftData, error: shiftError } = await supabase
+          .from("shifts")
+          .insert(shiftInserts)
+          .select();
+
+        if (!shiftError && shiftData) {
+          // Link shifts to order
+          const orderShiftInserts = shiftData.map((shift) => ({
+            order_id: orderData.id,
+            shift_id: shift.id,
+          }));
+
+          await supabase.from("order_shifts").insert(orderShiftInserts);
+        }
+      }
+
+      toast.success(`Successfully generated ${numberOfOrders} sample orders!`);
+      if (user) fetchOrders(user.id);
+    } catch (error) {
+      console.error("Error generating sample data:", error);
+      toast.error("Failed to generate sample data");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -618,15 +734,25 @@ const OrderManagement = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <div>
             <h2 className="text-3xl font-bold">Order Management</h2>
-            <p className="text-muted-foreground mt-1">Manage client care orders</p>
+            <p className="text-muted-foreground mt-1">Manage client care orders and schedules</p>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Order
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleGenerateSampleData}>
+              <Database className="mr-2 h-4 w-4" />
+              Generate Sample Data
+            </Button>
+            <Button variant="secondary" onClick={() => navigate("/auto-schedule")}>
+              <Zap className="mr-2 h-4 w-4" />
+              Auto Schedule
+            </Button>
+            <Button onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Order
+            </Button>
+          </div>
         </div>
 
         {/* Search and Filters */}
@@ -660,15 +786,15 @@ const OrderManagement = () => {
                 </Select>
               </div>
               <div>
-                <Select value={dateFilter} onValueChange={setDateFilter}>
+                <Select value={periodFilter} onValueChange={setPeriodFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Filter by date" />
+                    <SelectValue placeholder="Filter by period" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="week">Last 7 Days</SelectItem>
-                    <SelectItem value="month">Last 30 Days</SelectItem>
+                    <SelectItem value="all">All Periods</SelectItem>
+                    <SelectItem value="weekly">This Week</SelectItem>
+                    <SelectItem value="monthly">This Month</SelectItem>
+                    <SelectItem value="yearly">This Year</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
