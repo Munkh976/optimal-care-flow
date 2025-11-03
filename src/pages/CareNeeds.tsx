@@ -28,23 +28,9 @@ const CareNeeds = () => {
   const [formData, setFormData] = useState({
     code: "",
     name: "",
-    description: "",
     category: "",
-    nhats_reference: "",
-    care_type_code: "",
-  });
-
-  const { data: careTypes } = useQuery({
-    queryKey: ["care-types"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("care_types")
-        .select("*")
-        .order("code");
-      
-      if (error) throw error;
-      return data;
-    },
+    description: "",
+    related_care_type_codes: [] as string[],
   });
 
   const { data: careNeeds, isLoading } = useQuery({
@@ -52,13 +38,7 @@ const CareNeeds = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("care_needs")
-        .select(`
-          *,
-          care_types!care_needs_care_type_code_fkey (
-            name,
-            code
-          )
-        `)
+        .select("*")
         .order("code");
       
       if (error) throw error;
@@ -71,10 +51,9 @@ const CareNeeds = () => {
     setFormData({
       code: careNeed.code,
       name: careNeed.name,
-      description: careNeed.description || "",
       category: careNeed.category || "",
-      nhats_reference: careNeed.nhats_reference || "",
-      care_type_code: careNeed.care_type_code || "",
+      description: careNeed.description || "",
+      related_care_type_codes: careNeed.related_care_type_codes || [],
     });
     setIsDialogOpen(true);
   };
@@ -114,10 +93,9 @@ const CareNeeds = () => {
           .from("care_needs")
           .update({
             name: formData.name,
-            description: formData.description,
             category: formData.category,
-            nhats_reference: formData.nhats_reference,
-            care_type_code: formData.care_type_code || null,
+            description: formData.description,
+            related_care_type_codes: formData.related_care_type_codes,
           })
           .eq("id", selectedCareNeed.id);
 
@@ -129,10 +107,9 @@ const CareNeeds = () => {
           .insert({
             code: formData.code,
             name: formData.name,
-            description: formData.description,
             category: formData.category,
-            nhats_reference: formData.nhats_reference,
-            care_type_code: formData.care_type_code || null,
+            description: formData.description,
+            related_care_type_codes: formData.related_care_type_codes,
           });
 
         if (error) throw error;
@@ -142,7 +119,7 @@ const CareNeeds = () => {
       queryClient.invalidateQueries({ queryKey: ["care-needs"] });
       setIsDialogOpen(false);
       setSelectedCareNeed(null);
-      setFormData({ code: "", name: "", description: "", category: "", nhats_reference: "", care_type_code: "" });
+      setFormData({ code: "", name: "", category: "", description: "", related_care_type_codes: [] });
     } catch (error: any) {
       toast.error(error.message || "Failed to save care need");
     }
@@ -179,13 +156,13 @@ const CareNeeds = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
           <h2 className="text-3xl font-bold mb-2">Care Needs</h2>
-          <p className="text-muted-foreground">Manage specific care requirements (NHATS)</p>
+          <p className="text-muted-foreground">Manage client care requirements (NHATS)</p>
         </div>
         <Button
           className="gap-2"
           onClick={() => {
             setSelectedCareNeed(null);
-            setFormData({ code: "", name: "", description: "", category: "", nhats_reference: "", care_type_code: "" });
+            setFormData({ code: "", name: "", category: "", description: "", related_care_type_codes: [] });
             setIsDialogOpen(true);
           }}
         >
@@ -215,9 +192,12 @@ const CareNeeds = () => {
               <SelectItem value="IADL">IADL</SelectItem>
               <SelectItem value="Mobility">Mobility</SelectItem>
               <SelectItem value="Cognitive">Cognitive</SelectItem>
-              <SelectItem value="Health">Health</SelectItem>
-              <SelectItem value="Nutrition">Nutrition</SelectItem>
               <SelectItem value="Emotional">Emotional</SelectItem>
+              <SelectItem value="Social">Social</SelectItem>
+              <SelectItem value="Health">Health</SelectItem>
+              <SelectItem value="Household">Household</SelectItem>
+              <SelectItem value="Transport">Transport</SelectItem>
+              <SelectItem value="Specialized">Specialized</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -239,8 +219,8 @@ const CareNeeds = () => {
                 <TableHead>Code</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Care Type</TableHead>
-                <TableHead>NHATS Reference</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Related Care Types</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -260,11 +240,15 @@ const CareNeeds = () => {
                     <TableCell>
                       <Badge variant="outline">{careNeed.category}</Badge>
                     </TableCell>
-                    <TableCell>
-                      {careNeed.care_types?.name || "N/A"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {careNeed.nhats_reference || "N/A"}
+                    <TableCell className="max-w-xs truncate">{careNeed.description || "-"}</TableCell>
+                    <TableCell className="text-sm">
+                      <div className="flex flex-wrap gap-1">
+                        {careNeed.related_care_type_codes?.map((code: string) => (
+                          <Badge key={code} variant="secondary" className="text-xs">
+                            {code}
+                          </Badge>
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={careNeed.is_active ? "default" : "secondary"}>
@@ -318,7 +302,7 @@ const CareNeeds = () => {
                   id="code"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="e.g., ADL_BATH"
+                  placeholder="e.g., CN001"
                   disabled={!!selectedCareNeed}
                 />
               </div>
@@ -333,21 +317,23 @@ const CareNeeds = () => {
               </div>
               <div>
                 <Label htmlFor="category">Category</Label>
-                <select
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                >
-                  <option value="">Select category</option>
-                  <option value="ADL">ADL</option>
-                  <option value="IADL">IADL</option>
-                  <option value="Mobility">Mobility</option>
-                  <option value="Cognitive">Cognitive</option>
-                  <option value="Health">Health</option>
-                  <option value="Nutrition">Nutrition</option>
-                  <option value="Emotional">Emotional</option>
-                </select>
+                <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADL">ADL - Activities of Daily Living</SelectItem>
+                    <SelectItem value="IADL">IADL - Instrumental Activities</SelectItem>
+                    <SelectItem value="Mobility">Mobility</SelectItem>
+                    <SelectItem value="Cognitive">Cognitive</SelectItem>
+                    <SelectItem value="Emotional">Emotional</SelectItem>
+                    <SelectItem value="Social">Social</SelectItem>
+                    <SelectItem value="Health">Health</SelectItem>
+                    <SelectItem value="Household">Household</SelectItem>
+                    <SelectItem value="Transport">Transport</SelectItem>
+                    <SelectItem value="Specialized">Specialized</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="description">Description</Label>
@@ -359,29 +345,16 @@ const CareNeeds = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="nhats_reference">NHATS Reference</Label>
+                <Label>Related Care Type Codes</Label>
                 <Input
-                  id="nhats_reference"
-                  value={formData.nhats_reference}
-                  onChange={(e) => setFormData({ ...formData, nhats_reference: e.target.value })}
-                  placeholder="e.g., adl_bath"
+                  value={formData.related_care_type_codes.join(", ")}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    related_care_type_codes: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
+                  })}
+                  placeholder="e.g., CT001, CT002"
                 />
-              </div>
-              <div>
-                <Label htmlFor="care_type_code">Care Type</Label>
-                <select
-                  id="care_type_code"
-                  value={formData.care_type_code}
-                  onChange={(e) => setFormData({ ...formData, care_type_code: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                >
-                  <option value="">Select a care type</option>
-                  {careTypes?.map((type: any) => (
-                    <option key={type.id} value={type.code}>
-                      {type.code} - {type.name}
-                    </option>
-                  ))}
-                </select>
+                <p className="text-sm text-muted-foreground mt-1">Comma-separated care type codes</p>
               </div>
             </div>
           </div>
@@ -423,12 +396,14 @@ const CareNeeds = () => {
                 <p>{viewCareNeed.description || "-"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground">NHATS Reference</Label>
-                <p>{viewCareNeed.nhats_reference || "-"}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground">Care Type</Label>
-                <p>{viewCareNeed.care_types?.name || "N/A"}</p>
+                <Label className="text-muted-foreground">Related Care Type Codes</Label>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {viewCareNeed.related_care_type_codes?.map((code: string) => (
+                    <Badge key={code} variant="secondary">
+                      {code}
+                    </Badge>
+                  ))}
+                </div>
               </div>
               <div>
                 <Label className="text-muted-foreground">Status</Label>

@@ -16,83 +16,72 @@ export type Database = {
     Tables: {
       care_needs: {
         Row: {
-          care_type_code: string | null
-          category: string | null
+          category: string
           code: string
           created_at: string | null
           description: string | null
           id: string
           is_active: boolean | null
           name: string
-          nhats_reference: string | null
+          related_care_type_codes: string[] | null
+          related_care_type_names: string | null
           updated_at: string | null
         }
         Insert: {
-          care_type_code?: string | null
-          category?: string | null
+          category: string
           code: string
           created_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           name: string
-          nhats_reference?: string | null
+          related_care_type_codes?: string[] | null
+          related_care_type_names?: string | null
           updated_at?: string | null
         }
         Update: {
-          care_type_code?: string | null
-          category?: string | null
+          category?: string
           code?: string
           created_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
-          nhats_reference?: string | null
+          related_care_type_codes?: string[] | null
+          related_care_type_names?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "care_needs_care_type_code_fkey"
-            columns: ["care_type_code"]
-            isOneToOne: false
-            referencedRelation: "care_types"
-            referencedColumns: ["code"]
-          },
-        ]
+        Relationships: []
       }
       care_types: {
         Row: {
-          care_level: string | null
+          category: string
           code: string
           created_at: string | null
           description: string | null
           id: string
           is_active: boolean | null
           name: string
-          typical_caregiver_role: string | null
           updated_at: string | null
         }
         Insert: {
-          care_level?: string | null
+          category: string
           code: string
           created_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           name: string
-          typical_caregiver_role?: string | null
           updated_at?: string | null
         }
         Update: {
-          care_level?: string | null
+          category?: string
           code?: string
           created_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
-          typical_caregiver_role?: string | null
           updated_at?: string | null
         }
         Relationships: []

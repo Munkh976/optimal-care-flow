@@ -26,10 +26,9 @@ const CareTypes = () => {
   const [viewCareType, setViewCareType] = useState<any>(null);
   const [formData, setFormData] = useState({
     code: "",
+    category: "",
     name: "",
     description: "",
-    typical_caregiver_role: "",
-    care_level: "",
   });
 
   const { data: careTypes, isLoading } = useQuery({
@@ -49,10 +48,9 @@ const CareTypes = () => {
     setSelectedCareType(careType);
     setFormData({
       code: careType.code,
+      category: careType.category,
       name: careType.name,
       description: careType.description || "",
-      typical_caregiver_role: careType.typical_caregiver_role || "",
-      care_level: careType.care_level || "",
     });
     setIsDialogOpen(true);
   };
@@ -91,10 +89,9 @@ const CareTypes = () => {
         const { error } = await supabase
           .from("care_types")
           .update({
+            category: formData.category,
             name: formData.name,
             description: formData.description,
-            typical_caregiver_role: formData.typical_caregiver_role,
-            care_level: formData.care_level,
           })
           .eq("id", selectedCareType.id);
 
@@ -105,10 +102,9 @@ const CareTypes = () => {
           .from("care_types")
           .insert({
             code: formData.code,
+            category: formData.category,
             name: formData.name,
             description: formData.description,
-            typical_caregiver_role: formData.typical_caregiver_role,
-            care_level: formData.care_level,
           });
 
         if (error) throw error;
@@ -118,7 +114,7 @@ const CareTypes = () => {
       queryClient.invalidateQueries({ queryKey: ["care-types"] });
       setIsDialogOpen(false);
       setSelectedCareType(null);
-      setFormData({ code: "", name: "", description: "", typical_caregiver_role: "", care_level: "" });
+      setFormData({ code: "", category: "", name: "", description: "" });
     } catch (error: any) {
       toast.error(error.message || "Failed to save care type");
     }
@@ -159,7 +155,7 @@ const CareTypes = () => {
           className="gap-2"
           onClick={() => {
             setSelectedCareType(null);
-            setFormData({ code: "", name: "", description: "", typical_caregiver_role: "", care_level: "" });
+            setFormData({ code: "", category: "", name: "", description: "" });
             setIsDialogOpen(true);
           }}
         >
@@ -196,10 +192,9 @@ const CareTypes = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Code</TableHead>
+                <TableHead>Category</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Caregiver Role</TableHead>
-                <TableHead>Care Level</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -207,7 +202,7 @@ const CareTypes = () => {
             <TableBody>
               {filteredCareTypes?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No care types found
                   </TableCell>
                 </TableRow>
@@ -215,12 +210,11 @@ const CareTypes = () => {
                 filteredCareTypes?.map((careType) => (
                   <TableRow key={careType.id}>
                     <TableCell className="font-medium">{careType.code}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{careType.category}</Badge>
+                    </TableCell>
                     <TableCell>{careType.name}</TableCell>
                     <TableCell className="max-w-xs truncate">{careType.description || "-"}</TableCell>
-                    <TableCell className="text-sm">{careType.typical_caregiver_role || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{careType.care_level}</Badge>
-                    </TableCell>
                     <TableCell>
                       <Badge variant={careType.is_active ? "default" : "secondary"}>
                         {careType.is_active ? "Active" : "Inactive"}
@@ -278,6 +272,26 @@ const CareTypes = () => {
                 />
               </div>
               <div>
+                <Label htmlFor="category">Category</Label>
+                <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADL">ADL - Activities of Daily Living</SelectItem>
+                    <SelectItem value="IADL">IADL - Instrumental Activities</SelectItem>
+                    <SelectItem value="Mobility">Mobility</SelectItem>
+                    <SelectItem value="Cognitive">Cognitive</SelectItem>
+                    <SelectItem value="Emotional">Emotional</SelectItem>
+                    <SelectItem value="Social">Social</SelectItem>
+                    <SelectItem value="Health">Health</SelectItem>
+                    <SelectItem value="Household">Household</SelectItem>
+                    <SelectItem value="Transport">Transport</SelectItem>
+                    <SelectItem value="Specialized">Specialized</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label htmlFor="name">Name</Label>
                 <Input
                   id="name"
@@ -294,30 +308,6 @@ const CareTypes = () => {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Enter description"
                 />
-              </div>
-              <div>
-                <Label htmlFor="typical_caregiver_role">Typical Caregiver Role</Label>
-                <Input
-                  id="typical_caregiver_role"
-                  value={formData.typical_caregiver_role}
-                  onChange={(e) => setFormData({ ...formData, typical_caregiver_role: e.target.value })}
-                  placeholder="e.g., CNA, HHA"
-                />
-              </div>
-              <div>
-                <Label htmlFor="care_level">Care Level</Label>
-                <select
-                  id="care_level"
-                  value={formData.care_level}
-                  onChange={(e) => setFormData({ ...formData, care_level: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                >
-                  <option value="">Select care level</option>
-                  <option value="companionship">Companionship</option>
-                  <option value="personal_care">Personal Care</option>
-                  <option value="skilled_nursing">Skilled Nursing</option>
-                  <option value="hospice">Hospice</option>
-                </select>
               </div>
             </div>
           </div>
@@ -345,22 +335,18 @@ const CareTypes = () => {
                 <p className="text-lg font-medium">{viewCareType.code}</p>
               </div>
               <div>
+                <Label className="text-muted-foreground">Category</Label>
+                <div className="mt-1">
+                  <Badge variant="outline">{viewCareType.category}</Badge>
+                </div>
+              </div>
+              <div>
                 <Label className="text-muted-foreground">Name</Label>
                 <p className="text-lg font-medium">{viewCareType.name}</p>
               </div>
               <div>
                 <Label className="text-muted-foreground">Description</Label>
                 <p>{viewCareType.description || "-"}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground">Typical Caregiver Role</Label>
-                <p>{viewCareType.typical_caregiver_role || "-"}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground">Care Level</Label>
-                <div className="mt-1">
-                  <Badge variant="outline">{viewCareType.care_level}</Badge>
-                </div>
               </div>
               <div>
                 <Label className="text-muted-foreground">Status</Label>
