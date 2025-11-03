@@ -14,6 +14,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      care_needs: {
+        Row: {
+          agency_id: string
+          care_type_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          requires_certification: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          care_type_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          requires_certification?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          care_type_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          requires_certification?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "care_needs_care_type_id_fkey"
+            columns: ["care_type_id"]
+            isOneToOne: false
+            referencedRelation: "care_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      care_types: {
+        Row: {
+          agency_id: string
+          color: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       caregiver_availability: {
         Row: {
           caregiver_id: string

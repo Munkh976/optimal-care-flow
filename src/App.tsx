@@ -20,6 +20,8 @@ import CaregiverApprovals from "./pages/CaregiverApprovals";
 import Users from "./pages/Users";
 import AddUser from "./pages/AddUser";
 import SystemAdminDashboard from "./pages/SystemAdminDashboard";
+import CareTypes from "./pages/CareTypes";
+import CareNeeds from "./pages/CareNeeds";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +50,8 @@ const App = () => (
           <Route path="/users" element={<Users />} />
           <Route path="/users/add" element={<AddUser />} />
           <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
+          <Route path="/care-types" element={<CareTypes />} />
+          <Route path="/care-needs" element={<CareNeeds />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

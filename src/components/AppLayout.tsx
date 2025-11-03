@@ -16,6 +16,8 @@ import {
   LogOut,
   Menu,
   X,
+  Tag,
+  List,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -71,6 +73,18 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       label: "Clients",
       icon: UserCog,
       path: "/clients",
+      roles: ["agency_admin", "manager"],
+    },
+    {
+      label: "Care Types",
+      icon: Tag,
+      path: "/care-types",
+      roles: ["agency_admin", "manager"],
+    },
+    {
+      label: "Care Needs",
+      icon: List,
+      path: "/care-needs",
       roles: ["agency_admin", "manager"],
     },
     {
