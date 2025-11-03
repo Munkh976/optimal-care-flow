@@ -31,6 +31,7 @@ const Clients = () => {
   const [editClient, setEditClient] = useState<any>(null);
   const [viewClient, setViewClient] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [careNeeds, setCareNeeds] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -41,7 +42,7 @@ const Clients = () => {
     zip_code: "",
     date_of_birth: "",
     medical_conditions: [] as string[],
-    care_requirements: [] as string[],
+    care_need_codes: [] as string[],
     emergency_contact_name: "",
     emergency_contact_phone: "",
     notes: "",
@@ -58,16 +59,6 @@ const Clients = () => {
     { value: "COPD", label: "COPD" },
   ];
 
-  const careRequirementsOptions = [
-    { value: "Medication Management", label: "Medication Management" },
-    { value: "Mobility Assistance", label: "Mobility Assistance" },
-    { value: "Personal Hygiene", label: "Personal Hygiene" },
-    { value: "Meal Preparation", label: "Meal Preparation" },
-    { value: "Companionship", label: "Companionship" },
-    { value: "Transportation", label: "Transportation" },
-    { value: "Light Housekeeping", label: "Light Housekeeping" },
-    { value: "Memory Care", label: "Memory Care" },
-  ];
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -93,6 +84,7 @@ const Clients = () => {
     };
 
     checkAuth();
+    fetchCareNeeds();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
@@ -105,10 +97,32 @@ const Clients = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const fetchCareNeeds = async () => {
+    const { data, error } = await supabase
+      .from("care_needs")
+      .select("*")
+      .eq("is_active", true)
+      .order("category", { ascending: true })
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching care needs:", error);
+    } else {
+      setCareNeeds(data || []);
+    }
+  };
+
   const fetchClients = async (userId: string) => {
     const { data, error } = await supabase
       .from("clients")
-      .select("*")
+      .select(`
+        *,
+        client_care_needs(
+          care_need_code,
+          priority,
+          care_needs(code, name, category)
+        )
+      `)
       .eq("agency_id", userId)
       .order("first_name", { ascending: true });
 
@@ -152,7 +166,7 @@ const Clients = () => {
       zip_code: "",
       date_of_birth: "",
       medical_conditions: [],
-      care_requirements: [],
+      care_need_codes: [],
       emergency_contact_name: "",
       emergency_contact_phone: "",
       notes: "",
@@ -173,7 +187,7 @@ const Clients = () => {
       zip_code: client.zip_code || "",
       date_of_birth: client.date_of_birth || "",
       medical_conditions: client.medical_conditions || [],
-      care_requirements: client.care_requirements || [],
+      care_need_codes: client.client_care_needs?.map((cn: any) => cn.care_need_code) || [],
       emergency_contact_name: client.emergency_contact_name || "",
       emergency_contact_phone: client.emergency_contact_phone || "",
       notes: client.notes || "",
@@ -197,7 +211,6 @@ const Clients = () => {
       zip_code: formData.zip_code,
       date_of_birth: formData.date_of_birth || null,
       medical_conditions: formData.medical_conditions,
-      care_requirements: formData.care_requirements,
       emergency_contact_name: formData.emergency_contact_name,
       emergency_contact_phone: formData.emergency_contact_phone,
       notes: formData.notes,
@@ -211,24 +224,53 @@ const Clients = () => {
 
       if (error) {
         toast.error("Failed to update client");
-      } else {
-        toast.success("Client updated successfully");
-        setIsAddDialogOpen(false);
-        if (user) fetchClients(user.id);
+        return;
       }
+
+      // Update care needs
+      await supabase
+        .from("client_care_needs")
+        .delete()
+        .eq("client_id", editClient.id);
+
+      if (formData.care_need_codes.length > 0) {
+        const careNeedsData = formData.care_need_codes.map((code, idx) => ({
+          client_id: editClient.id,
+          care_need_code: code,
+          priority: idx + 1,
+        }));
+
+        await supabase.from("client_care_needs").insert(careNeedsData);
+      }
+
+      toast.success("Client updated successfully");
+      setIsAddDialogOpen(false);
+      if (user) fetchClients(user.id);
     } else {
-      const { error } = await supabase.from("clients").insert({
+      const { data: newClient, error } = await supabase.from("clients").insert({
         ...clientData,
         agency_id: user.id,
-      });
+      }).select().single();
 
       if (error) {
         toast.error("Failed to add client");
-      } else {
-        toast.success("Client added successfully");
-        setIsAddDialogOpen(false);
-        if (user) fetchClients(user.id);
+        return;
       }
+
+      // Add care needs
+      if (formData.care_need_codes.length > 0 && newClient) {
+        const careNeedsData = formData.care_need_codes.map((code, idx) => ({
+          client_id: newClient.id,
+          care_need_code: code,
+          priority: idx + 1,
+        }));
+
+        await supabase.from("client_care_needs").insert(careNeedsData);
+      }
+
+      toast.success("Client added successfully");
+      setIsAddDialogOpen(false);
+      if (user) fetchClients(user.id);
     }
   };
 
@@ -317,8 +359,8 @@ const Clients = () => {
       client.medical_conditions?.some((condition: string) => 
         condition.toLowerCase().includes(searchQuery.toLowerCase())
       ) ||
-      client.care_requirements?.some((req: string) => 
-        req.toLowerCase().includes(searchQuery.toLowerCase())
+      client.client_care_needs?.some((cn: any) => 
+        cn.care_needs?.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
     const matchesPhone = searchPhone === "" || 
@@ -505,12 +547,22 @@ const Clients = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Care Requirements</Label>
+                    <Label>Care Needs</Label>
                     <ReactSelect
                       isMulti
-                      options={careRequirementsOptions}
-                      value={careRequirementsOptions.filter(opt => formData.care_requirements.includes(opt.value))}
-                      onChange={(selected) => setFormData({ ...formData, care_requirements: selected.map(s => s.value) })}
+                      options={careNeeds.map(cn => ({
+                        value: cn.code,
+                        label: `${cn.name} (${cn.category})`,
+                        category: cn.category
+                      }))}
+                      value={careNeeds
+                        .filter(cn => formData.care_need_codes.includes(cn.code))
+                        .map(cn => ({
+                          value: cn.code,
+                          label: `${cn.name} (${cn.category})`,
+                          category: cn.category
+                        }))}
+                      onChange={(selected) => setFormData({ ...formData, care_need_codes: selected.map(s => s.value) })}
                       className="react-select-container"
                       classNamePrefix="react-select"
                       styles={{
@@ -750,18 +802,18 @@ const Clients = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {client.care_requirements && client.care_requirements.length > 0 ? (
-                            client.care_requirements.slice(0, 2).map((req: string, idx: number) => (
+                          {client.client_care_needs && client.client_care_needs.length > 0 ? (
+                            client.client_care_needs.slice(0, 2).map((cn: any, idx: number) => (
                               <Badge key={idx} variant="secondary" className="text-xs">
-                                {req}
+                                {cn.care_needs?.name || cn.care_need_code}
                               </Badge>
                             ))
                           ) : (
                             <span className="text-xs text-muted-foreground">None</span>
                           )}
-                          {client.care_requirements && client.care_requirements.length > 2 && (
+                          {client.client_care_needs && client.client_care_needs.length > 2 && (
                             <Badge variant="outline" className="text-xs">
-                              +{client.care_requirements.length - 2}
+                              +{client.client_care_needs.length - 2}
                             </Badge>
                           )}
                         </div>
@@ -856,17 +908,28 @@ const Clients = () => {
                 </div>
               )}
 
-              {viewClient.care_requirements && viewClient.care_requirements.length > 0 && (
+              {viewClient.client_care_needs && viewClient.client_care_needs.length > 0 && (
                 <div className="pt-3 border-t">
                   <div className="flex items-center gap-2 mb-2">
                     <Heart className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Care Requirements</span>
+                    <span className="text-sm font-medium">Care Needs</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {viewClient.care_requirements.map((req: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
-                        {req}
-                      </Badge>
+                  <div className="space-y-2">
+                    {viewClient.client_care_needs.map((cn: any, idx: number) => (
+                      <div key={idx} className="flex items-start justify-between p-2 rounded bg-secondary/10">
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">
+                            {cn.care_needs?.name || cn.care_need_code}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {cn.care_needs?.category && (
+                              <Badge variant="outline" className="text-xs">
+                                {cn.care_needs.category}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>

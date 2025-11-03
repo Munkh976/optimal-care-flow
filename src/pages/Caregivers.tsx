@@ -78,7 +78,16 @@ const Caregivers = () => {
   const fetchCaregivers = async (userId: string) => {
     const { data, error } = await supabase
       .from("caregivers")
-      .select("*")
+      .select(`
+        *,
+        caregiver_skills(
+          care_type_code,
+          proficiency_level,
+          years_experience,
+          is_certified,
+          care_types(code, name, category)
+        )
+      `)
       .eq("agency_id", userId)
       .order("first_name", { ascending: true });
 
@@ -519,8 +528,8 @@ const Caregivers = () => {
                     <TableHead>Employment</TableHead>
                     <TableHead>Rate</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Skills</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>Care Types</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -554,6 +563,24 @@ const Caregivers = () => {
                         <Badge variant={caregiver.is_active ? "default" : "secondary"}>
                           {caregiver.is_active ? "Active" : "Inactive"}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {caregiver.caregiver_skills && caregiver.caregiver_skills.length > 0 ? (
+                            caregiver.caregiver_skills.slice(0, 2).map((skill: any, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {skill.care_types?.name || skill.care_type_code}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">None</span>
+                          )}
+                          {caregiver.caregiver_skills && caregiver.caregiver_skills.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{caregiver.caregiver_skills.length - 2}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -629,30 +656,39 @@ const Caregivers = () => {
                 )}
               </div>
 
-              {viewCaregiver.certifications && viewCaregiver.certifications.length > 0 && (
+              {viewCaregiver.caregiver_skills && viewCaregiver.caregiver_skills.length > 0 && (
                 <div className="pt-3 border-t">
                   <div className="flex items-center gap-2 mb-2">
                     <Award className="h-4 w-4 text-accent" />
-                    <span className="text-sm font-medium">Certifications</span>
+                    <span className="text-sm font-medium">Care Types & Skills</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {viewCaregiver.certifications.map((cert: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
-                        {cert}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {viewCaregiver.skills && viewCaregiver.skills.length > 0 && (
-                <div className="pt-3 border-t">
-                  <p className="text-sm font-medium mb-2">Skills</p>
-                  <div className="flex flex-wrap gap-2">
-                    {viewCaregiver.skills.map((skill: string, idx: number) => (
-                      <Badge key={idx} variant="outline" className="text-xs">
-                        {skill}
-                      </Badge>
+                  <div className="space-y-2">
+                    {viewCaregiver.caregiver_skills.map((skill: any, idx: number) => (
+                      <div key={idx} className="flex items-start justify-between p-2 rounded bg-muted/50">
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">
+                            {skill.care_types?.name || skill.care_type_code}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {skill.care_types?.category && (
+                              <Badge variant="outline" className="text-xs mr-2">
+                                {skill.care_types.category}
+                              </Badge>
+                            )}
+                            {skill.proficiency_level && (
+                              <span className="capitalize">{skill.proficiency_level}</span>
+                            )}
+                            {skill.years_experience > 0 && (
+                              <span className="ml-2">• {skill.years_experience} yrs</span>
+                            )}
+                          </div>
+                        </div>
+                        {skill.is_certified && (
+                          <Badge variant="secondary" className="text-xs">
+                            Certified
+                          </Badge>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
