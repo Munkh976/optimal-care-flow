@@ -67,28 +67,55 @@ const QuickAssign = () => {
     try {
       setLoading(true);
 
+      // First check if a specific shift was requested via URL
+      let specificShift = null;
+      if (shiftIdParam) {
+        const specificShiftResult = await supabase
+          .from("shifts")
+          .select(`
+            *,
+            clients (first_name, last_name, city, address, state, zip_code)
+          `)
+          .eq("id", shiftIdParam)
+          .single();
+        
+        if (specificShiftResult.data) {
+          specificShift = specificShiftResult.data;
+        }
+      }
+
+      // Fetch all open/unassigned shifts
       const shiftsResult = await supabase
         .from("shifts")
         .select(`
           *,
-          clients (first_name, last_name, city, address, state, zip_code)
+          clients (first_name, last_name, city, address, state, zip_code),
+          shift_assignments(id)
         `)
         .eq("agency_id", userId)
-        .eq("status", "open")
+        .in("status", ["open", "unassigned"])
         .order("shift_date", { ascending: true })
         .limit(50);
 
       if (shiftsResult.error) throw shiftsResult.error;
 
-      setOpenShifts(shiftsResult.data || []);
+      // Filter to only truly unassigned shifts (no shift_assignments)
+      const unassignedShifts = (shiftsResult.data || []).filter(
+        shift => !shift.shift_assignments || shift.shift_assignments.length === 0
+      );
+
+      // If we have a specific shift from URL, make sure it's in the list
+      let allShifts = unassignedShifts;
+      if (specificShift && !allShifts.find(s => s.id === specificShift.id)) {
+        allShifts = [specificShift, ...allShifts];
+      }
+
+      setOpenShifts(allShifts);
 
       // If shift ID provided, auto-select and fetch matches
-      if (shiftIdParam) {
-        const shift = shiftsResult.data?.find(s => s.id === shiftIdParam);
-        if (shift) {
-          setSelectedShift(shift);
-          await fetchMatchedCaregivers(shiftIdParam);
-        }
+      if (shiftIdParam && specificShift) {
+        setSelectedShift(specificShift);
+        await fetchMatchedCaregivers(shiftIdParam);
       }
     } catch (error) {
       console.error("Error:", error);
