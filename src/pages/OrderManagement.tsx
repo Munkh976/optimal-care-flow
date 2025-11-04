@@ -200,7 +200,19 @@ const OrderManagement = () => {
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + (parseInt(duration_weeks) * 7) - 1);
 
-    const orderNumber = selectedOrder?.order_number || `ORD-${Date.now()}`;
+    // Generate sequential order number if creating new order
+    let orderNumber = selectedOrder?.order_number;
+    if (!orderNumber) {
+      const { data: newOrderNumber, error: fnError } = await supabase
+        .rpc('generate_order_number');
+      
+      if (fnError) {
+        console.error('Error generating order number:', fnError);
+        toast.error('Failed to generate order number');
+        return;
+      }
+      orderNumber = newOrderNumber;
+    }
     
     // Collect all unique days across all shifts
     const allDays = new Set<string>();
@@ -678,7 +690,12 @@ const OrderManagement = () => {
                 <div className="text-sm text-muted-foreground">Total Orders</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{orders.filter(o => o.status === 'active').length}</div>
+                <div className="text-2xl font-bold text-blue-600">
+                  {(() => {
+                    const today = new Date().toISOString().split('T')[0];
+                    return orders.filter(o => o.start_date <= today && o.end_date >= today && o.status !== 'draft').length;
+                  })()}
+                </div>
                 <div className="text-sm text-muted-foreground">Active</div>
               </div>
               <div className="text-center">
@@ -750,13 +767,24 @@ const OrderManagement = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={
-                            order.status === "submitted" || order.status === "active" ? "default" : 
-                            order.status === "draft" ? "secondary" : 
-                            order.status === "completed" ? "outline" : "destructive"
-                          }>
-                            {order.status}
-                          </Badge>
+                          {(() => {
+                            const today = new Date().toISOString().split('T')[0];
+                            const isActive = order.start_date <= today && order.end_date >= today;
+                            const isCompleted = order.end_date < today;
+                            const isDraft = order.status === 'draft';
+                            
+                            const displayStatus = isDraft ? 'draft' : isActive ? 'active' : isCompleted ? 'completed' : order.status;
+                            
+                            return (
+                              <Badge variant={
+                                isDraft ? "secondary" :
+                                isActive ? "default" :
+                                isCompleted ? "outline" : "default"
+                              }>
+                                {displayStatus}
+                              </Badge>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(order.created_at).toLocaleDateString()}
