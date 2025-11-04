@@ -384,7 +384,6 @@ const OrderManagement = () => {
 
     if (shifts) {
       setOrderShifts(prev => ({ ...prev, [orderId]: shifts }));
-      }
     }
   };
 
