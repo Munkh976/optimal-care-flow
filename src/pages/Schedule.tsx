@@ -341,12 +341,24 @@ const Schedule = () => {
     const hours = generateTimeSlots();
     const uniqueCaregivers = [...new Set(filteredShifts.map(s => s.caregiver_id).filter(Boolean))];
     
+    const getShiftBgColor = (careTypeCode: string) => {
+      const colors = {
+        personal_care: "bg-blue-600",
+        medication: "bg-green-600",
+        medical: "bg-red-600",
+        mobility: "bg-purple-600",
+        companionship: "bg-cyan-600",
+        meal_prep: "bg-amber-600",
+      };
+      return colors[careTypeCode] || "bg-gray-600";
+    };
+    
     return (
       <div className="overflow-x-auto">
         <div className="min-w-[1000px]">
           {/* Time header */}
-          <div className="flex border-b-2 border-border pb-2 mb-4">
-            <div className="w-40 font-medium text-muted-foreground">Caregiver</div>
+          <div className="flex border-b-2 border-border pb-3 mb-4">
+            <div className="w-40 font-semibold text-foreground">Caregiver</div>
             <div className="relative flex-1">
               <div className="flex">
                 {hours.map((hour, idx) => (
@@ -360,8 +372,9 @@ const Schedule = () => {
 
           {/* Caregiver lanes */}
           {uniqueCaregivers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No assigned caregivers in this period
+            <div className="text-center py-12 text-muted-foreground">
+              <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium">No assigned caregivers in this period</p>
             </div>
           ) : (
             uniqueCaregivers.map(caregiverId => {
@@ -371,37 +384,35 @@ const Schedule = () => {
               if (!caregiver) return null;
               
               return (
-                <div key={caregiverId} className="flex border-b border-border py-2 min-h-[80px]">
+                <div key={caregiverId} className="flex border-b border-border py-3 min-h-[90px] hover:bg-muted/30 transition-colors">
                   <div className="w-40 pr-4">
-                    <div className="font-medium">{caregiver.first_name} {caregiver.last_name}</div>
-                    <div className="text-xs text-muted-foreground">{caregiver.role}</div>
+                    <div className="font-semibold text-foreground">{caregiver.first_name} {caregiver.last_name}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{caregiver.role}</div>
                   </div>
                   <div className="relative flex-1 h-16">
                     {caregiverShifts.map(shift => (
                       <div
                         key={shift.id}
-                        className="absolute top-0 h-full rounded-lg border-2 border-white shadow-sm hover:shadow-lg transition-all cursor-pointer hover:z-10"
+                        className={`absolute top-0 h-full rounded-lg border-2 border-white shadow-md hover:shadow-xl hover:scale-105 transition-all cursor-pointer hover:z-10 ${getShiftBgColor(shift.care_type_code)}`}
                         style={{
                           left: `${getShiftPosition(shift)}px`,
                           width: `${getShiftWidth(shift.duration_hours)}px`,
-                          backgroundColor: getCareColor(shift.care_type_code),
-                          opacity: 0.9
                         }}
                         onClick={() => setSelectedShift(shift)}
                       >
                         <div className="p-2 text-white h-full flex flex-col justify-between">
                           <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                               {getCareIcon(shift.care_type_code)}
-                              <span className="text-xs font-medium truncate">
+                              <span className="text-xs font-semibold truncate">
                                 {shift.clients?.first_name} {shift.clients?.last_name}
                               </span>
                             </div>
                             {shift.status === 'urgent' && (
-                              <AlertCircle className="w-3 h-3 text-yellow-300" />
+                              <AlertTriangle className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
                             )}
                           </div>
-                          <div className="text-xs opacity-90 truncate">
+                          <div className="text-xs font-medium opacity-95 truncate">
                             {formatCareType(shift.care_type_code)}
                           </div>
                         </div>
@@ -421,29 +432,39 @@ const Schedule = () => {
   const DensityGridView = () => {
     const timeSlots = generateTimeSlots().filter((_, idx) => idx % 2 === 0); // Every hour
     
-    const ShiftBadge = ({ shift }) => (
-      <div
-        className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white cursor-pointer hover:scale-105 transition-transform"
-        style={{ backgroundColor: getCareColor(shift.care_type_code) }}
-        onClick={() => setSelectedShift(shift)}
-      >
-        {getCareIcon(shift.care_type_code)}
-        <span className="truncate max-w-[100px]">
-          {shift.clients?.first_name} {shift.clients?.last_name}
-        </span>
-        {shift.status === 'urgent' && <AlertCircle className="w-3 h-3" />}
-      </div>
-    );
+    const ShiftBadge = ({ shift }) => {
+      const bgColorClass = {
+        personal_care: "bg-blue-600 hover:bg-blue-700",
+        medication: "bg-green-600 hover:bg-green-700",
+        medical: "bg-red-600 hover:bg-red-700",
+        mobility: "bg-purple-600 hover:bg-purple-700",
+        companionship: "bg-cyan-600 hover:bg-cyan-700",
+        meal_prep: "bg-amber-600 hover:bg-amber-700",
+      }[shift.care_type_code] || "bg-gray-600 hover:bg-gray-700";
+
+      return (
+        <div
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium text-white cursor-pointer transition-all shadow-sm ${bgColorClass}`}
+          onClick={() => setSelectedShift(shift)}
+        >
+          {getCareIcon(shift.care_type_code)}
+          <span className="truncate max-w-[120px]">
+            {shift.clients?.first_name} {shift.clients?.last_name}
+          </span>
+          {shift.status === 'urgent' && <AlertTriangle className="w-3 h-3 text-yellow-300" />}
+        </div>
+      );
+    };
 
     return (
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b-2 border-border">
-              <th className="text-left py-2 px-3 font-medium w-24">Time</th>
-              <th className="text-left py-2 px-3 font-medium">Active Care Sessions</th>
-              <th className="text-center py-2 px-3 font-medium w-20">Count</th>
-              <th className="text-center py-2 px-3 font-medium w-32">Staff Load</th>
+            <tr className="border-b-2 border-border bg-muted/30">
+              <th className="text-left py-3 px-4 font-semibold text-sm w-24">Time</th>
+              <th className="text-left py-3 px-4 font-semibold text-sm">Active Care Sessions</th>
+              <th className="text-center py-3 px-4 font-semibold text-sm w-24">Count</th>
+              <th className="text-center py-3 px-4 font-semibold text-sm w-32">Staff Load</th>
             </tr>
           </thead>
           <tbody>
@@ -451,19 +472,19 @@ const Schedule = () => {
               const activeShifts = getShiftsAtTime(time);
               const uniqueCaregivers = [...new Set(activeShifts.map(s => s.caregiver_id).filter(Boolean))];
               
-              const getDensityColor = (count) => {
-                if (count === 0) return 'bg-background';
-                if (count <= 2) return 'bg-green-500/10';
-                if (count <= 4) return 'bg-yellow-500/10';
-                return 'bg-orange-500/10';
+              const getDensityBg = (count) => {
+                if (count === 0) return 'bg-background hover:bg-muted/20';
+                if (count <= 2) return 'bg-green-50 hover:bg-green-100 dark:bg-green-950/20 dark:hover:bg-green-950/30';
+                if (count <= 4) return 'bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-950/20 dark:hover:bg-yellow-950/30';
+                return 'bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/20 dark:hover:bg-orange-950/30';
               };
 
               return (
-                <tr key={time} className={`border-b ${getDensityColor(activeShifts.length)}`}>
-                  <td className="py-3 px-3 font-medium">{time}</td>
-                  <td className="py-3 px-3">
+                <tr key={time} className={`border-b border-border transition-colors ${getDensityBg(activeShifts.length)}`}>
+                  <td className="py-4 px-4 font-semibold text-foreground">{time}</td>
+                  <td className="py-4 px-4">
                     {activeShifts.length === 0 ? (
-                      <span className="text-muted-foreground text-sm">No active shifts</span>
+                      <span className="text-muted-foreground text-sm italic">No active shifts</span>
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {activeShifts.slice(0, 3).map(shift => (
@@ -473,19 +494,19 @@ const Schedule = () => {
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button
-                                variant="outline"
+                                variant="secondary"
                                 size="sm"
-                                className="h-7 px-2 text-xs"
+                                className="h-8 px-3 text-xs font-semibold shadow-sm"
                               >
                                 +{activeShifts.length - 3} more
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-80">
-                              <div className="space-y-2">
-                                <h4 className="font-medium text-sm">All shifts at {time}</h4>
-                                <div className="space-y-1">
+                            <PopoverContent className="w-80 max-h-96 overflow-y-auto">
+                              <div className="space-y-3">
+                                <h4 className="font-semibold text-sm border-b pb-2">All shifts at {time}</h4>
+                                <div className="space-y-2">
                                   {activeShifts.slice(3).map(shift => (
-                                    <div key={shift.id} className="flex items-center gap-2">
+                                    <div key={shift.id}>
                                       <ShiftBadge shift={shift} />
                                     </div>
                                   ))}
@@ -497,20 +518,20 @@ const Schedule = () => {
                       </div>
                     )}
                   </td>
-                  <td className="py-3 px-3 text-center">
-                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
+                  <td className="py-4 px-4 text-center">
+                    <span className={`inline-flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold shadow-sm ${
                       activeShifts.length === 0 ? 'bg-muted text-muted-foreground' :
-                      activeShifts.length <= 2 ? 'bg-green-500 text-white' :
-                      activeShifts.length <= 4 ? 'bg-yellow-500 text-white' :
-                      'bg-orange-500 text-white'
+                      activeShifts.length <= 2 ? 'bg-green-600 text-white' :
+                      activeShifts.length <= 4 ? 'bg-yellow-600 text-white' :
+                      'bg-orange-600 text-white'
                     }`}>
                       {activeShifts.length}
                     </span>
                   </td>
-                  <td className="py-3 px-3 text-center">
-                    <div className="flex justify-center items-center gap-1">
+                  <td className="py-4 px-4 text-center">
+                    <div className="flex justify-center items-center gap-2">
                       <Users className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">{uniqueCaregivers.length} staff</span>
+                      <span className="text-sm font-medium text-foreground">{uniqueCaregivers.length} staff</span>
                     </div>
                   </td>
                 </tr>
@@ -528,75 +549,96 @@ const Schedule = () => {
     
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {uniquePatients.map(clientId => {
-          const client = clients.find(c => c.id === clientId);
-          if (!client) return null;
-          
-          const patientShifts = filteredShifts.filter(s => s.client_id === clientId);
-          const totalCareHours = patientShifts.reduce((sum, s) => sum + (s.duration_hours || 0), 0);
-          const careTypesUsed = [...new Set(patientShifts.map(s => s.care_type_code))];
+        {uniquePatients.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-muted-foreground">
+            <UserCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p className="text-lg font-medium">No patient shifts in this period</p>
+          </div>
+        ) : (
+          uniquePatients.map(clientId => {
+            const client = clients.find(c => c.id === clientId);
+            if (!client) return null;
+            
+            const patientShifts = filteredShifts.filter(s => s.client_id === clientId);
+            const totalCareHours = patientShifts.reduce((sum, s) => sum + (s.duration_hours || 0), 0);
+            const careTypesUsed = [...new Set(patientShifts.map(s => s.care_type_code))];
 
-          return (
-            <Card key={clientId} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="font-semibold">{client.first_name} {client.last_name}</h3>
-                    <p className="text-sm text-muted-foreground">{client.city}, {client.state}</p>
-                  </div>
-                  <UserCheck className="w-5 h-5 text-green-500" />
-                </div>
+            const getCareTypeBgColor = (code: string) => {
+              const colors = {
+                personal_care: "bg-blue-600",
+                medication: "bg-green-600",
+                medical: "bg-red-600",
+                mobility: "bg-purple-600",
+                companionship: "bg-cyan-600",
+                meal_prep: "bg-amber-600",
+              };
+              return colors[code] || "bg-gray-600";
+            };
 
-                <div className="mb-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{totalCareHours.toFixed(1)} hours of care</span>
+            return (
+              <Card key={clientId} className="hover:shadow-xl transition-shadow border-2 hover:border-primary/30">
+                <CardContent className="p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-lg text-foreground">{client.first_name} {client.last_name}</h3>
+                      <p className="text-sm text-muted-foreground mt-0.5">{client.city}, {client.state}</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                      <UserCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
                   </div>
-                  <div className="flex gap-1 mt-2">
-                    {careTypesUsed.map(code => (
+
+                  <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
+                      <Clock className="w-4 h-4" />
+                      <span>{totalCareHours.toFixed(1)} hours of care</span>
+                    </div>
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {careTypesUsed.map(code => (
+                        <div
+                          key={code}
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm ${getCareTypeBgColor(code)}`}
+                          title={formatCareType(code)}
+                        >
+                          {getCareIcon(code)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {patientShifts.map(shift => (
                       <div
-                        key={code}
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-white"
-                        style={{ backgroundColor: getCareColor(code) }}
-                        title={formatCareType(code)}
+                        key={shift.id}
+                        className="p-3 bg-card rounded-lg border-l-4 cursor-pointer hover:bg-muted/70 hover:shadow-md transition-all"
+                        style={{ borderLeftColor: getCareColor(shift.care_type_code) }}
+                        onClick={() => setSelectedShift(shift)}
                       >
-                        {getCareIcon(code)}
+                        <div className="flex justify-between items-center mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-foreground">
+                              {shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}
+                            </span>
+                            {shift.status && getUrgencyBadge(shift.status)}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground font-medium mt-1">
+                          {formatCareType(shift.care_type_code)}
+                        </div>
+                        {shift.caregiver_id && (
+                          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                            <User className="w-3 h-3" />
+                            <span>by {caregivers.find(c => c.id === shift.caregiver_id)?.first_name}</span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  {patientShifts.map(shift => (
-                    <div
-                      key={shift.id}
-                      className="p-2 bg-muted/50 rounded-lg border-l-4 cursor-pointer hover:bg-muted transition-colors"
-                      style={{ borderLeftColor: getCareColor(shift.care_type_code) }}
-                      onClick={() => setSelectedShift(shift)}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
-                            {shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}
-                          </span>
-                          {shift.status && getUrgencyBadge(shift.status)}
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {formatCareType(shift.care_type_code)}
-                      </div>
-                      {shift.caregiver_id && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          by {caregivers.find(c => c.id === shift.caregiver_id)?.first_name}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
     );
   };
