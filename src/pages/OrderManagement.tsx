@@ -134,7 +134,7 @@ const OrderManagement = () => {
     const ordersWithCounts = await Promise.all(
       (ordersData || []).map(async (order) => {
         const { count } = await supabase
-          .from("order_shifts")
+          .from("shifts")
           .select("*", { count: "exact", head: true })
           .eq("order_id", order.id);
         
@@ -229,17 +229,8 @@ const OrderManagement = () => {
         return;
       }
 
-      // Delete existing order_shifts and shifts
-      const { data: existingOrderShifts } = await supabase
-        .from("order_shifts")
-        .select("shift_id")
-        .eq("order_id", selectedOrder.id);
-
-      if (existingOrderShifts) {
-        const shiftIds = existingOrderShifts.map(os => os.shift_id);
-        await supabase.from("order_shifts").delete().eq("order_id", selectedOrder.id);
-        await supabase.from("shifts").delete().in("id", shiftIds);
-      }
+      // Delete existing shifts for this order
+      await supabase.from("shifts").delete().eq("order_id", selectedOrder.id);
     } else {
       const { data: orderData, error: orderError } = await supabase
         .from("client_orders")
@@ -302,6 +293,7 @@ const OrderManagement = () => {
       return {
         agency_id: user.id,
         client_id,
+        order_id: orderId,
         shift_date: shift.shift_date,
         start_time: shift.start_time,
         end_time: shift.end_time,
@@ -321,22 +313,6 @@ const OrderManagement = () => {
     if (shiftError || !shiftData) {
       toast.error("Failed to create shifts");
       console.error(shiftError);
-      return;
-    }
-
-    // Link shifts to order
-    const orderShiftInserts = shiftData.map((shift) => ({
-      order_id: orderId,
-      shift_id: shift.id,
-    }));
-
-    const { error: linkError } = await supabase
-      .from("order_shifts")
-      .insert(orderShiftInserts);
-
-    if (linkError) {
-      toast.error("Failed to link shifts to order");
-      console.error(linkError);
       return;
     }
 
@@ -367,21 +343,8 @@ const OrderManagement = () => {
       return;
     }
 
-    // Get order shifts first
-    const { data: orderShifts } = await supabase
-      .from("order_shifts")
-      .select("shift_id")
-      .eq("order_id", orderId);
-
-    if (orderShifts && orderShifts.length > 0) {
-      const shiftIds = orderShifts.map(os => os.shift_id);
-      
-      // Delete order_shifts first
-      await supabase.from("order_shifts").delete().eq("order_id", orderId);
-      
-      // Delete shifts
-      await supabase.from("shifts").delete().in("id", shiftIds);
-    }
+    // Delete shifts for this order (cascade will handle it, but we'll be explicit)
+    await supabase.from("shifts").delete().eq("order_id", orderId);
 
     // Delete order
     const { error } = await supabase
@@ -413,21 +376,14 @@ const OrderManagement = () => {
   };
 
   const fetchOrderShifts = async (orderId: string) => {
-    const { data: orderShiftData } = await supabase
-      .from("order_shifts")
-      .select("shift_id")
-      .eq("order_id", orderId);
+    const { data: shifts } = await supabase
+      .from("shifts")
+      .select("*")
+      .eq("order_id", orderId)
+      .order("shift_date");
 
-    if (orderShiftData && orderShiftData.length > 0) {
-      const shiftIds = orderShiftData.map(os => os.shift_id);
-      const { data: shifts } = await supabase
-        .from("shifts")
-        .select("*")
-        .in("id", shiftIds)
-        .order("shift_date");
-
-      if (shifts) {
-        setOrderShifts(prev => ({ ...prev, [orderId]: shifts }));
+    if (shifts) {
+      setOrderShifts(prev => ({ ...prev, [orderId]: shifts }));
       }
     }
   };
@@ -510,10 +466,11 @@ const OrderManagement = () => {
     const weeks = Math.ceil(diffDays / 7);
 
     // Get all shifts to reconstruct shift configurations
-    const { data: orderShifts } = await supabase
-      .from("order_shifts")
-      .select("shift_id")
-      .eq("order_id", order.id);
+    const { data: shifts } = await supabase
+      .from("shifts")
+      .select("*")
+      .eq("order_id", order.id)
+      .order("shift_date");
 
     const reconstructedShifts: Array<{
       selected_days: string[];
@@ -523,16 +480,8 @@ const OrderManagement = () => {
       notes: string;
     }> = [];
 
-    if (orderShifts && orderShifts.length > 0) {
-      const shiftIds = orderShifts.map(os => os.shift_id);
-      const { data: shifts } = await supabase
-        .from("shifts")
-        .select("*")
-        .in("id", shiftIds)
-        .order("shift_date");
-
-      if (shifts && shifts.length > 0) {
-        // Group shifts by their configuration (time, care_type, duration)
+    if (shifts && shifts.length > 0) {
+      // Group shifts by their configuration (time, care_type, duration)
         const configMap = new Map<string, Set<string>>();
         
         shifts.forEach(shift => {
@@ -561,7 +510,6 @@ const OrderManagement = () => {
             notes: firstShift?.special_notes || "",
           });
         });
-      }
     }
 
     setFormData({

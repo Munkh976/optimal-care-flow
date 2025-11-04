@@ -150,11 +150,12 @@ export const OrdersManagement = ({
               shiftsToCreate.push({
                 client_id: clientProfile.id,
                 agency_id: user.id,
+                order_id: currentOrder!.id,
                 shift_date: shiftDate,
                 start_time: careNeed.start_time,
                 end_time: endTime,
                 duration_hours: careNeed.duration,
-                care_type: 'companion_care',
+                care_type_code: careNeed.care_need_code,
                 status: 'open',
                 special_notes: careNeed.notes,
                 order_title: `Care Need - ${careNeed.care_need_code}`
@@ -169,17 +170,6 @@ export const OrdersManagement = ({
           .select();
 
         if (shiftsError) throw shiftsError;
-
-        const orderShifts = shifts.map(shift => ({
-          order_id: currentOrder!.id,
-          shift_id: shift.id
-        }));
-
-        const { error: linkError } = await supabase
-          .from("order_shifts")
-          .insert(orderShifts);
-
-        if (linkError) throw linkError;
 
         const { error: updateError } = await supabase
           .from("client_orders")

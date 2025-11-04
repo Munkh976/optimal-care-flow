@@ -553,39 +553,6 @@ export type Database = {
           },
         ]
       }
-      order_shifts: {
-        Row: {
-          created_at: string | null
-          order_id: string
-          shift_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          order_id: string
-          shift_id: string
-        }
-        Update: {
-          created_at?: string | null
-          order_id?: string
-          shift_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_shifts_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "client_orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_shifts_shift_id_fkey"
-            columns: ["shift_id"]
-            isOneToOne: false
-            referencedRelation: "shifts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           agency_name: string
@@ -779,6 +746,7 @@ export type Database = {
           end_time: string
           id: string
           is_recurring: boolean | null
+          order_id: string | null
           order_title: string
           pay_rate: number | null
           recurrence_pattern: string | null
@@ -801,6 +769,7 @@ export type Database = {
           end_time: string
           id?: string
           is_recurring?: boolean | null
+          order_id?: string | null
           order_title?: string
           pay_rate?: number | null
           recurrence_pattern?: string | null
@@ -823,6 +792,7 @@ export type Database = {
           end_time?: string
           id?: string
           is_recurring?: boolean | null
+          order_id?: string | null
           order_title?: string
           pay_rate?: number | null
           recurrence_pattern?: string | null
@@ -861,6 +831,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "client_orders"
             referencedColumns: ["id"]
           },
         ]
