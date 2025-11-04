@@ -35,7 +35,9 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange }: ShiftDetailsDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl">{shift.care_type_code} - {formatCareType(shift.care_type_code)}</DialogTitle>
+          <DialogTitle className="text-2xl">
+            {shift.care_type_code} - {shift.care_type?.name || formatCareType(shift.care_type_code)}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">

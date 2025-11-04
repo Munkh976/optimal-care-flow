@@ -98,12 +98,13 @@ const Schedule = () => {
     
     setCareTypes(careTypesData || []);
 
-    // Fetch shifts with assignments and trade info
+    // Fetch shifts with assignments, trade info, and care type names
     const { data: shiftsData, error: shiftsError } = await supabase
       .from("shifts")
       .select(`
         *,
         client:clients(first_name, last_name, care_requirements, address, city, state, zip_code),
+        care_type:care_types!shifts_care_type_code_fkey(code, name),
         shift_assignments(
           id,
           caregiver:caregivers(first_name, last_name),
