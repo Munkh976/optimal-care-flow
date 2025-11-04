@@ -158,7 +158,7 @@ const AutoSchedule = () => {
         const matchedCaregivers = caregivers?.filter((caregiver) => {
           // Check skill match
           const hasSkill = caregiver.caregiver_skills?.some(
-            (skill: any) => skill.care_type_code === shift.care_type
+            (skill: any) => skill.care_type_code === shift.care_type_code
           );
           if (!hasSkill) return false;
 
@@ -432,7 +432,7 @@ const AutoSchedule = () => {
                             {shift.clients?.first_name} {shift.clients?.last_name}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">{shift.care_type}</Badge>
+                            <Badge variant="outline">{shift.care_type_code}</Badge>
                           </TableCell>
                           <TableCell>{shift.clients?.city || "N/A"}</TableCell>
                           <TableCell>

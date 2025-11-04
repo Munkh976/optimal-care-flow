@@ -18,7 +18,7 @@ interface Assignment {
     shift_date: string;
     start_time: string;
     end_time: string;
-    care_type: string;
+    care_type_code: string;
     duration_hours: number;
     clients: {
       first_name: string;
@@ -35,7 +35,7 @@ interface OpenShift {
   start_time: string;
   end_time: string;
   duration_hours: number;
-  care_type: string;
+  care_type_code: string;
   ai_match_score: number | null;
   clients: {
     first_name: string;
@@ -303,8 +303,8 @@ const CaregiverDashboard = () => {
                             <Badge className={getStatusColor(assignment.status)}>
                               {assignment.status}
                             </Badge>
-                            <Badge className={getCareTypeColor(assignment.shifts?.care_type)}>
-                              {assignment.shifts?.care_type.replace(/_/g, " ")}
+                            <Badge className={getCareTypeColor(assignment.shifts?.care_type_code)}>
+                              {assignment.shifts?.care_type_code.replace(/_/g, " ")}
                             </Badge>
                           </div>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">

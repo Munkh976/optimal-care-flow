@@ -14,7 +14,7 @@ interface OpenShift {
   shift_date: string;
   start_time: string;
   end_time: string;
-  care_type: string;
+  care_type_code: string;
   order_title: string;
   clients: {
     first_name: string;
@@ -217,7 +217,7 @@ const QuickAssign = () => {
                         {shift.clients?.first_name} {shift.clients?.last_name} - {" "}
                         {format(new Date(shift.shift_date), "MMM d")} {" "}
                         ({shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}) - {" "}
-                        {shift.care_type.replace(/_/g, " ")}
+                        {shift.care_type_code.replace(/_/g, " ")}
                       </SelectItem>
                     ))
                   )}
@@ -232,7 +232,7 @@ const QuickAssign = () => {
                     <p><span className="font-medium">Location:</span> {selectedShift.clients?.city}, {selectedShift.clients?.state}</p>
                     <p><span className="font-medium">Date:</span> {format(new Date(selectedShift.shift_date), "MMM d, yyyy")}</p>
                     <p><span className="font-medium">Time:</span> {selectedShift.start_time.slice(0, 5)} - {selectedShift.end_time.slice(0, 5)}</p>
-                    <p><span className="font-medium">Care Type:</span> {selectedShift.care_type.replace(/_/g, " ")}</p>
+                    <p><span className="font-medium">Care Type:</span> {selectedShift.care_type_code.replace(/_/g, " ")}</p>
                   </div>
                 </div>
               )}

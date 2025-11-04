@@ -771,7 +771,7 @@ export type Database = {
         Row: {
           agency_id: string
           ai_match_score: number | null
-          care_type: Database["public"]["Enums"]["care_type"]
+          care_type_code: string
           caregiver_id: string | null
           client_id: string
           created_at: string | null
@@ -793,7 +793,7 @@ export type Database = {
         Insert: {
           agency_id: string
           ai_match_score?: number | null
-          care_type: Database["public"]["Enums"]["care_type"]
+          care_type_code: string
           caregiver_id?: string | null
           client_id: string
           created_at?: string | null
@@ -815,7 +815,7 @@ export type Database = {
         Update: {
           agency_id?: string
           ai_match_score?: number | null
-          care_type?: Database["public"]["Enums"]["care_type"]
+          care_type_code?: string
           caregiver_id?: string | null
           client_id?: string
           created_at?: string | null
@@ -841,6 +841,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_care_type_code_fkey"
+            columns: ["care_type_code"]
+            isOneToOne: false
+            referencedRelation: "care_types"
+            referencedColumns: ["code"]
           },
           {
             foreignKeyName: "shifts_caregiver_id_fkey"

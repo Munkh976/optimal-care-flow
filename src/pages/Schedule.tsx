@@ -203,7 +203,7 @@ const Schedule = () => {
     
     return shifts.filter(shift => {
       if (shift.shift_date !== targetDate) return false;
-      if (selectedCategory !== "all" && shift.care_type !== selectedCategory) return false;
+      if (selectedCategory !== "all" && shift.care_type_code !== selectedCategory) return false;
       
       // Apply assignment filter
       const hasAssignment = shift.shift_assignments && shift.shift_assignments.length > 0;
@@ -370,7 +370,7 @@ const Schedule = () => {
                               {shiftsInSlot.map((shift) => (
                                 <div
                                   key={shift.id}
-                                  className={`p-1.5 rounded text-xs cursor-pointer hover:shadow-sm transition-shadow ${getCareTypeColor(shift.care_type)}`}
+                                  className={`p-1.5 rounded text-xs cursor-pointer hover:shadow-sm transition-shadow ${getCareTypeColor(shift.care_type_code)}`}
                                    onClick={() => {
                                     setSelectedShift(shift);
                                     setIsDetailsOpen(true);

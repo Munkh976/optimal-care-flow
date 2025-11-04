@@ -68,7 +68,7 @@ Return a JSON array of caregiver matches with scores from 0-100, reasoning, and 
 Shift Details:
 - Date: ${shift.shift_date}
 - Time: ${shift.start_time} to ${shift.end_time}
-- Care Type: ${shift.care_type}
+- Care Type: ${shift.care_type_code}
 - Required Skills: ${shift.required_skills?.join(', ') || 'None specified'}
 - Duration: ${shift.duration_hours} hours
 - Client: ${shift.clients?.first_name} ${shift.clients?.last_name}

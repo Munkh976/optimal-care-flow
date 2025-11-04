@@ -35,7 +35,7 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange }: ShiftDetailsDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl">{formatCareType(shift.care_type)}</DialogTitle>
+          <DialogTitle className="text-2xl">{formatCareType(shift.care_type_code)}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
@@ -110,8 +110,8 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange }: ShiftDetailsDi
               Care Type
             </div>
             <div className="ml-6">
-              <Badge className={getCareTypeColor(shift.care_type)}>
-                {formatCareType(shift.care_type)}
+              <Badge className={getCareTypeColor(shift.care_type_code)}>
+                {formatCareType(shift.care_type_code)}
               </Badge>
             </div>
           </div>

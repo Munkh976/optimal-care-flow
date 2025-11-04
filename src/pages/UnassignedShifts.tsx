@@ -16,7 +16,7 @@ interface UnassignedShift {
   start_time: string;
   end_time: string;
   duration_hours: number;
-  care_type: string;
+  care_type_code: string;
   status: string;
   clients: {
     first_name: string;
@@ -313,8 +313,8 @@ const UnassignedShifts = () => {
                             </p>
                             <AlertCircle className="w-3 h-3 text-warning flex-shrink-0" />
                           </div>
-                          <Badge className={`text-xs ${getCareTypeColor(shift.care_type)}`}>
-                            {shift.care_type.replace(/_/g, " ")}
+                          <Badge className={`text-xs ${getCareTypeColor(shift.care_type_code)}`}>
+                            {shift.care_type_code.replace(/_/g, " ")}
                           </Badge>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Clock className="w-3 h-3" />

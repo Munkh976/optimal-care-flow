@@ -128,7 +128,7 @@ const Dashboard = () => {
     setUrgentRequests((urgentShifts || []).map(shift => ({
       id: shift.id,
       client_name: `${shift.clients?.first_name || ''} ${shift.clients?.last_name || ''}`,
-      care_type: shift.care_type,
+      care_type: shift.care_type_code,
       shift_date: shift.shift_date,
       start_time: shift.start_time,
     })));

@@ -288,7 +288,7 @@ const OrderManagement = () => {
             shift_date: shiftDate.toISOString().split("T")[0],
             start_time: shiftConfig.start_time,
             end_time: `${String(endTimeObj.getHours()).padStart(2, "0")}:${String(endTimeObj.getMinutes()).padStart(2, "0")}`,
-            care_type: shiftConfig.care_type,
+            care_type_code: shiftConfig.care_type,
             duration_hours: parseInt(shiftConfig.time_slot),
             notes: shiftConfig.notes,
           });
@@ -305,7 +305,7 @@ const OrderManagement = () => {
         shift_date: shift.shift_date,
         start_time: shift.start_time,
         end_time: shift.end_time,
-        care_type: shift.care_type as any,
+        care_type_code: shift.care_type,
         duration_hours: shift.duration_hours,
         status: "open" as any,
         order_title: careTypeName,
@@ -536,7 +536,7 @@ const OrderManagement = () => {
         const configMap = new Map<string, Set<string>>();
         
         shifts.forEach(shift => {
-          const key = `${shift.start_time}-${shift.care_type}-${shift.duration_hours}`;
+          const key = `${shift.start_time}-${shift.care_type_code}-${shift.duration_hours}`;
           if (!configMap.has(key)) {
             configMap.set(key, new Set());
           }
@@ -546,10 +546,10 @@ const OrderManagement = () => {
         });
 
         configMap.forEach((days, key) => {
-          const [start_time, care_type, duration] = key.split("-");
+          const [start_time, care_type_code, duration] = key.split("-");
           const firstShift = shifts.find(s => 
             s.start_time === start_time && 
-            s.care_type === care_type && 
+            s.care_type_code === care_type_code && 
             s.duration_hours?.toString() === duration
           );
           
@@ -557,7 +557,7 @@ const OrderManagement = () => {
             selected_days: Array.from(days),
             time_slot: duration,
             start_time,
-            care_type,
+            care_type: care_type_code,
             notes: firstShift?.special_notes || "",
           });
         });
@@ -862,7 +862,7 @@ const OrderManagement = () => {
                               {orderShifts[order.id] && orderShifts[order.id].length > 0 ? (
                                 <div className="space-y-2">
                                   {orderShifts[order.id].map((shift, idx) => {
-                                    const careTypeName = careTypes.find(ct => ct.code === shift.care_type)?.name || shift.care_type;
+                                    const careTypeName = careTypes.find(ct => ct.code === shift.care_type_code)?.name || shift.care_type_code;
                                     return (
                                       <div key={idx} className="flex items-center justify-between p-3 bg-background rounded-lg border">
                                         <div className="flex-1 grid grid-cols-5 gap-4">
