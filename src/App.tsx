@@ -12,7 +12,6 @@ import Clients from "./pages/Clients";
 import TimeOffRequests from "./pages/TimeOffRequests";
 import LiveOperations from "./pages/LiveOperations";
 import QuickAssign from "./pages/QuickAssign";
-import UnassignedShifts from "./pages/UnassignedShifts";
 import ShiftTrades from "./pages/ShiftTrades";
 import CaregiverDashboard from "./pages/CaregiverDashboard";
 import ClientDashboard from "./pages/ClientDashboard";
@@ -43,7 +42,6 @@ const App = () => (
           <Route path="/clients" element={<Clients />} />
           <Route path="/time-off" element={<TimeOffRequests />} />
           <Route path="/live-operations" element={<LiveOperations />} />
-          <Route path="/unassigned-shifts" element={<UnassignedShifts />} />
           <Route path="/quick-assign" element={<QuickAssign />} />
           <Route path="/shift-trades" element={<ShiftTrades />} />
           <Route path="/caregiver-registration" element={<CaregiverRegistration />} />

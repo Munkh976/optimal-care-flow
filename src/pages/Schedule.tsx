@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Activity, LogOut, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar, LogOut, Activity } from "lucide-react";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addWeeks, addMonths, subWeeks, subMonths, eachDayOfInterval, isSameDay, isToday, addDays } from "date-fns";
+import { toast } from "sonner";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
 
 const Schedule = () => {
@@ -15,132 +21,127 @@ const Schedule = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [shifts, setShifts] = useState<any[]>([]);
-  const [caregivers, setCaregivers] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [assignmentFilter, setAssignmentFilter] = useState<string>("all");
+  const [view, setView] = useState<"week" | "month">("week");
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedShift, setSelectedShift] = useState(null);
+  const [careTypes, setCareTypes] = useState([]);
+  const [caregivers, setCaregivers] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
   const [caregiverProfile, setCaregiverProfile] = useState<any>(null);
-  const [selectedShift, setSelectedShift] = useState<any>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [careTypes, setCareTypes] = useState<any[]>([]);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate("/auth");
-        return;
-      }
-
-      setUser(session.user);
-
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", session.user.id)
-        .single();
-
-      if (profileData) {
-        setProfile(profileData);
-      }
-
-      // Check if user is a caregiver
-      const { data: caregiverData } = await supabase
-        .from("caregivers")
-        .select("*")
-        .eq("email", session.user.email)
-        .maybeSingle();
-
-      if (caregiverData) {
-        setCaregiverProfile(caregiverData);
-        await fetchScheduleData(caregiverData.agency_id, caregiverData.id);
-      } else if (profileData) {
-        await fetchScheduleData(session.user.id, null);
-      }
-    };
-
     checkAuth();
+  }, [currentDate, view]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!session) {
-        navigate("/auth");
-      } else {
-        setUser(session.user);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (user) {
-      if (caregiverProfile) {
-        fetchScheduleData(caregiverProfile.agency_id, caregiverProfile.id);
-      } else {
-        fetchScheduleData(user.id, null);
-      }
-    }
-  }, [currentWeekStart, user, caregiverProfile]);
-
-  const fetchScheduleData = async (agencyId: string, caregiverId: string | null) => {
-    setLoading(true);
-    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-
-    // Fetch care types for filter
-    const { data: careTypesData } = await supabase
-      .from("care_types")
-      .select("*")
-      .eq("is_active", true)
-      .order("name");
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
     
-    setCareTypes(careTypesData || []);
-
-    // Fetch shifts with assignments, trade info, and care type names
-    const { data: shiftsData, error: shiftsError } = await supabase
-      .from("shifts")
-      .select(`
-        *,
-        client:clients(first_name, last_name, care_requirements, address, city, state, zip_code),
-        care_type:care_types!shifts_care_type_code_fkey(code, name),
-        shift_assignments(
-          id,
-          caregiver:caregivers(first_name, last_name),
-          status,
-          shift_trades:shift_trades(id, status, trade_type)
-        )
-      `)
-      .eq("agency_id", agencyId)
-      .gte("shift_date", format(currentWeekStart, "yyyy-MM-dd"))
-      .lte("shift_date", format(weekEnd, "yyyy-MM-dd"))
-      .order("shift_date", { ascending: true });
-
-    if (shiftsError) {
-      console.error("Error fetching shifts:", shiftsError);
-      toast.error("Failed to load schedule");
-    } else {
-      setShifts(shiftsData || []);
+    if (!session) {
+      navigate("/auth");
+      return;
     }
 
-    // Fetch all caregivers
-    const { data: caregiversData } = await supabase
+    setUser(session.user);
+
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .single();
+
+    if (profileData) {
+      setProfile(profileData);
+    }
+
+    // Check if user is a caregiver
+    const { data: caregiverData } = await supabase
       .from("caregivers")
       .select("*")
-      .eq("agency_id", agencyId)
-      .eq("is_active", true);
+      .eq("email", session.user.email)
+      .maybeSingle();
 
-    setCaregivers(caregiversData || []);
+    if (caregiverData) {
+      setCaregiverProfile(caregiverData);
+      await fetchScheduleData(caregiverData.agency_id, caregiverData.id);
+    } else if (profileData) {
+      await fetchScheduleData(session.user.id, null);
+    }
+  };
 
-    // Fetch all clients
-    const { data: clientsData } = await supabase
-      .from("clients")
-      .select("*")
-      .eq("agency_id", agencyId);
+  const fetchScheduleData = async (userId, caregiverId = null) => {
+    try {
+      setLoading(true);
+      
+      const startDate = view === "week" 
+        ? startOfWeek(currentDate)
+        : startOfMonth(currentDate);
+      
+      const endDate = view === "week"
+        ? endOfWeek(currentDate)
+        : endOfMonth(currentDate);
 
-    setClients(clientsData || []);
-    setLoading(false);
+      // Fetch care types
+      const { data: careTypesData } = await supabase
+        .from("care_types")
+        .select("*")
+        .order("name");
+      setCareTypes(careTypesData || []);
+
+      // Fetch shifts
+      const shiftsQuery = supabase
+        .from("shifts")
+        .select(`
+          *,
+          clients (
+            first_name,
+            last_name,
+            address,
+            city,
+            state,
+            zip_code
+          ),
+          care_types (
+            name
+          )
+        `)
+        .eq("agency_id", userId)
+        .gte("shift_date", format(startDate, "yyyy-MM-dd"))
+        .lte("shift_date", format(endDate, "yyyy-MM-dd"))
+        .order("shift_date", { ascending: true })
+        .order("start_time", { ascending: true });
+
+      if (caregiverId) {
+        shiftsQuery.eq("caregiver_id", caregiverId);
+      }
+
+      const { data: shiftsData, error } = await shiftsQuery;
+
+      if (error) throw error;
+      setShifts(shiftsData || []);
+
+      // Fetch caregivers
+      const { data: caregiversData } = await supabase
+        .from("caregivers")
+        .select("*")
+        .eq("agency_id", userId)
+        .eq("is_active", true);
+      setCaregivers(caregiversData || []);
+
+      // Fetch clients
+      const { data: clientsData } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("agency_id", userId);
+      setClients(clientsData || []);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Failed to load schedule");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -149,44 +150,62 @@ const Schedule = () => {
     navigate("/auth");
   };
 
-  const goToPreviousWeek = () => {
-    setCurrentWeekStart(addDays(currentWeekStart, -7));
+  const goToPrevious = () => {
+    if (view === "week") {
+      setCurrentDate(subWeeks(currentDate, 1));
+    } else {
+      setCurrentDate(subMonths(currentDate, 1));
+    }
   };
 
-  const goToNextWeek = () => {
-    setCurrentWeekStart(addDays(currentWeekStart, 7));
+  const goToNext = () => {
+    if (view === "week") {
+      setCurrentDate(addWeeks(currentDate, 1));
+    } else {
+      setCurrentDate(addMonths(currentDate, 1));
+    }
   };
 
-  const goToCurrentWeek = () => {
-    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const goToToday = () => {
+    setCurrentDate(new Date());
   };
 
-  const getShiftsForDay = (dayOffset: number) => {
-    const targetDate = format(addDays(currentWeekStart, dayOffset), "yyyy-MM-dd");
-    return shifts.filter(shift => shift.shift_date === targetDate);
+  const getDaysInView = () => {
+    if (view === "week") {
+      return eachDayOfInterval({
+        start: startOfWeek(currentDate),
+        end: endOfWeek(currentDate)
+      });
+    }
+    return eachDayOfInterval({
+      start: startOfMonth(currentDate),
+      end: endOfMonth(currentDate)
+    });
   };
 
-  const formatCareType = (careType: string) => {
-    const types: any = {
-      personal_care: "Personal Care",
-      companion: "Companion Care",
-      medical: "Medical Care",
-      respite: "Respite Care",
+  const getShiftsForDay = (day) => {
+    return filteredShifts.filter(shift => 
+      isSameDay(new Date(shift.shift_date), day)
+    );
+  };
+
+  const formatCareType = (code) => {
+    const careType = careTypes.find(ct => ct.code === code);
+    return careType?.name || code;
+  };
+
+  const getCareTypeColor = (type) => {
+    const colors = {
+      personal_care: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+      companionship: "bg-purple-500/10 text-purple-600 border-purple-500/20",
+      medication: "bg-green-500/10 text-green-600 border-green-500/20",
+      mobility: "bg-orange-500/10 text-orange-600 border-orange-500/20",
+      dementia_care: "bg-pink-500/10 text-pink-600 border-pink-500/20",
+      hospice: "bg-gray-500/10 text-gray-600 border-gray-500/20"
     };
-    return types[careType] || careType;
+    return colors[type] || "bg-muted";
   };
 
-  const getCareTypeColor = (careType: string) => {
-    const colors: any = {
-      personal_care: "bg-primary/10 text-primary border-primary/20",
-      companion: "bg-accent/10 text-accent border-accent/20",
-      medical: "bg-destructive/10 text-destructive border-destructive/20",
-      respite: "bg-secondary/10 text-secondary border-secondary/20",
-    };
-    return colors[careType] || "bg-muted";
-  };
-
-  // Generate time slots from 6 AM to 10 PM (hourly)
   const generateTimeSlots = () => {
     const slots = [];
     for (let hour = 6; hour <= 22; hour++) {
@@ -195,31 +214,30 @@ const Schedule = () => {
     return slots;
   };
 
-  const timeSlots = generateTimeSlots();
-  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-  const getShiftsForDayAndTime = (dayOffset: number, timeSlot: string) => {
-    const targetDate = format(addDays(currentWeekStart, dayOffset), "yyyy-MM-dd");
-    const [slotHour] = timeSlot.split(':').map(Number);
+  const getShiftsForDayAndTime = (day, time) => {
+    const [slotHour] = time.split(':').map(Number);
     
-    return shifts.filter(shift => {
-      if (shift.shift_date !== targetDate) return false;
-      if (selectedCategory !== "all" && shift.care_type_code !== selectedCategory) return false;
-      
-      // Apply assignment filter
-      const hasAssignment = shift.shift_assignments && shift.shift_assignments.length > 0;
-      const hasActiveTrade = hasAssignment && shift.shift_assignments.some((assignment: any) => 
-        assignment.shift_trades && assignment.shift_trades.some((trade: any) => trade.status === 'pending')
-      );
-
-      if (assignmentFilter === "unassigned" && hasAssignment) return false;
-      if (assignmentFilter === "assigned" && !hasAssignment) return false;
-      if (assignmentFilter === "in_trade" && !hasActiveTrade) return false;
+    return filteredShifts.filter(shift => {
+      if (!isSameDay(new Date(shift.shift_date), day)) return false;
       
       const [startHour] = shift.start_time.split(':').map(Number);
       return startHour === slotHour;
     });
   };
+
+  // Apply filters
+  const filteredShifts = shifts.filter(shift => {
+    if (categoryFilter !== "all" && shift.care_type_code !== categoryFilter) return false;
+    
+    const hasAssignment = shift.caregiver_id !== null;
+    
+    if (assignmentFilter === "unassigned" && hasAssignment) return false;
+    if (assignmentFilter === "assigned" && !hasAssignment) return false;
+    
+    return true;
+  });
+
+  const isCaregiverUser = !!caregiverProfile;
 
   if (loading) {
     return (
@@ -261,11 +279,11 @@ const Schedule = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
-            <h2 className="text-3xl font-bold mb-2">Everyone's Schedule</h2>
-            <p className="text-muted-foreground">Weekly view of all shifts and assignments</p>
+            <h2 className="text-3xl font-bold mb-2">Schedule</h2>
+            <p className="text-muted-foreground">View and manage shifts</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Care Types" />
               </SelectTrigger>
@@ -286,125 +304,132 @@ const Schedule = () => {
                 <SelectItem value="all">All Shifts</SelectItem>
                 <SelectItem value="assigned">Assigned</SelectItem>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
-                <SelectItem value="in_trade">In Trade</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        {/* Week Navigation and AI Match */}
+        {/* Calendar Navigation */}
         <Card className="mb-6">
           <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
-                  <ChevronLeft className="h-4 w-4" />
+                <Calendar className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-semibold text-foreground">
+                  {format(currentDate, view === "week" ? "'Week of' MMM d, yyyy" : "MMMM yyyy")}
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={view === "week" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setView("week")}
+                >
+                  Week
                 </Button>
-                <div className="flex items-center gap-3">
-                  <CalendarIcon className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold">
-                    Week of {format(currentWeekStart, "MMM dd, yyyy")}
-                  </h3>
-                  <Button variant="ghost" size="sm" onClick={goToCurrentWeek}>
-                    Today
-                  </Button>
-                </div>
-                <Button variant="outline" size="sm" onClick={goToNextWeek}>
-                  <ChevronRight className="h-4 w-4" />
+                <Button
+                  variant={view === "month" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setView("month")}
+                >
+                  Month
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPrevious}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToToday}
+                >
+                  Today
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNext}
+                >
+                  Next
                 </Button>
               </div>
-              {!caregiverProfile && (
-                <Button 
-                  variant="default"
-                  onClick={() => {
-                    const weekStart = format(currentWeekStart, "yyyy-MM-dd");
-                    const weekEnd = format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), "yyyy-MM-dd");
-                    navigate(`/auto-schedule?weekStart=${weekStart}&weekEnd=${weekEnd}`);
-                  }}
-                >
-                  <Activity className="h-4 w-4 mr-2" />
-                  AI Match This Week
-                </Button>
-              )}
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Calendar Grid View - Days as Rows, Time Slots as Columns */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="overflow-x-auto">
-              <div className="min-w-max">
-                {/* Header Row - Time Slots */}
-                <div className="flex border-b">
-                  <div className="w-24 flex-shrink-0 p-2 font-semibold border-r bg-muted/50">
-                    Day
-                  </div>
-                  {timeSlots.map((slot) => (
-                    <div key={slot} className="w-32 flex-shrink-0 p-2 text-center text-xs font-medium border-r bg-muted/50">
-                      {slot}
+            {/* Calendar Grid */}
+            <div className="bg-card rounded-lg border border-border/40 overflow-hidden">
+              {view === "week" ? (
+                <>
+                  {/* Week View - Days Header */}
+                  <div className="grid grid-cols-8 border-b border-border/40 bg-muted/30">
+                    <div className="p-2 text-center text-xs font-semibold text-muted-foreground">
+                      Time
                     </div>
-                  ))}
-                </div>
-
-                {/* Day Rows */}
-                {weekDays.map((day, dayIndex) => {
-                  const currentDate = addDays(currentWeekStart, dayIndex);
-                  
-                  return (
-                    <div key={dayIndex} className="flex border-b hover:bg-muted/20 transition-colors">
-                      {/* Day Label */}
-                      <div className="w-24 flex-shrink-0 p-2 border-r bg-card">
-                        <div className="font-semibold text-sm">{day}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {format(currentDate, "MMM dd")}
+                    {getDaysInView().map((day, i) => {
+                      const isCurrentDay = isToday(day);
+                      return (
+                        <div
+                          key={i}
+                          className={`p-2 text-center ${
+                            isCurrentDay
+                              ? "bg-primary/10 text-primary font-semibold"
+                              : "text-foreground"
+                          }`}
+                        >
+                          <div className="text-xs font-semibold">
+                            {format(day, "EEE")}
+                          </div>
+                          <div className="text-lg">{format(day, "d")}</div>
                         </div>
-                      </div>
+                      );
+                    })}
+                  </div>
 
-                      {/* Time Slot Cells */}
-                      {timeSlots.map((slot) => {
-                        const shiftsInSlot = getShiftsForDayAndTime(dayIndex, slot);
-                        
-                        return (
-                          <div key={slot} className="w-32 flex-shrink-0 p-1 border-r min-h-[80px] bg-card">
-                            <div className="space-y-1">
-                              {shiftsInSlot.map((shift) => (
-                                <div
-                                  key={shift.id}
-                                  className={`p-1.5 rounded text-xs cursor-pointer hover:shadow-sm transition-shadow ${getCareTypeColor(shift.care_type_code)}`}
-                                   onClick={() => {
-                                    setSelectedShift(shift);
-                                    setIsDetailsOpen(true);
-                                  }}
-                                >
-                                  <div className="font-medium truncate text-xs">
-                                    {shift.care_type_code}
-                                  </div>
-                                  <div className="text-[10px] opacity-80">
-                                    {shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}
-                                  </div>
-                                  {shift.shift_assignments && shift.shift_assignments.length > 0 ? (
-                                    <>
-                                      <div className="text-[10px] font-medium mt-0.5 truncate">
-                                        {shift.shift_assignments[0].caregiver?.first_name} {shift.shift_assignments[0].caregiver?.last_name}
+                  {/* Week View - Time Slots */}
+                  <div className="divide-y divide-border/40">
+                    {generateTimeSlots().map((time) => (
+                      <div key={time} className="grid grid-cols-8 min-h-[80px]">
+                        <div className="p-2 text-xs text-muted-foreground text-center bg-muted/20 flex items-center justify-center">
+                          {time}
+                        </div>
+                        {getDaysInView().map((day, i) => {
+                          const shifts = getShiftsForDayAndTime(day, time);
+                          return (
+                            <div
+                              key={i}
+                              className="p-1 border-l border-border/40 min-h-[80px]"
+                            >
+                              <div className="space-y-1">
+                                {shifts.map((shift) => (
+                                  <Card
+                                    key={shift.id}
+                                    className={`cursor-pointer hover:shadow-md transition-shadow ${getCareTypeColor(
+                                      shift.care_type_code
+                                    )}`}
+                                    onClick={() => setSelectedShift(shift)}
+                                  >
+                                    <CardContent className="p-2">
+                                      <div className="text-xs font-semibold truncate">
+                                        {shift.clients?.first_name}{" "}
+                                        {shift.clients?.last_name}
                                       </div>
-                                      {shift.shift_assignments[0].shift_trades && 
-                                       shift.shift_assignments[0].shift_trades.some((trade: any) => trade.status === 'pending') && (
-                                        <div className="text-[10px] text-amber-600 italic mt-0.5">
-                                          In Trade
-                                        </div>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div className="text-[10px] text-destructive italic mt-0.5">
-                                        Unassigned
+                                      <div className="text-xs text-muted-foreground">
+                                        {shift.start_time.slice(0, 5)} -{" "}
+                                        {shift.end_time.slice(0, 5)}
                                       </div>
-                                      {!caregiverProfile && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs mt-1"
+                                      >
+                                        {formatCareType(shift.care_type_code)}
+                                      </Badge>
+                                      {!shift.caregiver_id && !isCaregiverUser && (
                                         <Button
                                           size="sm"
                                           variant="outline"
-                                          className="text-[10px] h-5 px-1 mt-1 w-full"
+                                          className="text-xs h-6 px-2 mt-1 w-full"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             navigate(`/quick-assign?shift=${shift.id}`);
@@ -413,24 +438,73 @@ const Schedule = () => {
                                           Quick Assign
                                         </Button>
                                       )}
-                                    </>
-                                  )}
-                                </div>
-                              ))}
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
                             </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                /* Month View - Calendar Grid */
+                <div className="grid grid-cols-7 gap-2 p-4">
+                  {getDaysInView().map((day, idx) => {
+                    const dayShifts = getShiftsForDay(day);
+                    const isCurrentDay = isToday(day);
+                    
+                    return (
+                      <div
+                        key={idx}
+                        className={`min-h-[120px] p-3 rounded-lg border ${
+                          isCurrentDay
+                            ? "bg-primary/5 border-primary/30"
+                            : "bg-card border-border/40"
+                        }`}
+                      >
+                        <div className="text-center mb-2">
+                          <div className="text-xs text-muted-foreground">
+                            {format(day, "EEE")}
                           </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
+                          <div className={`text-lg font-semibold ${
+                            isCurrentDay ? "text-primary" : "text-foreground"
+                          }`}>
+                            {format(day, "d")}
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          {dayShifts.map((shift) => (
+                            <Card
+                              key={shift.id}
+                              className="cursor-pointer hover:shadow-md transition-shadow"
+                              onClick={() => setSelectedShift(shift)}
+                            >
+                              <CardContent className="p-2 space-y-1">
+                                <div className="text-xs font-medium truncate">
+                                  {shift.clients?.first_name} {shift.clients?.last_name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {shift.start_time.slice(0, 5)}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
         {/* Summary Stats */}
-        <div className="grid sm:grid-cols-4 gap-4 mt-6">
+        <div className="grid sm:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">Total Shifts</div>
@@ -440,8 +514,8 @@ const Schedule = () => {
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">Assigned</div>
-              <div className="text-2xl font-bold text-primary">
-                {shifts.filter(s => s.shift_assignments && s.shift_assignments.length > 0).length}
+              <div className="text-2xl font-bold">
+                {shifts.filter(s => s.caregiver_id).length}
               </div>
             </CardContent>
           </Card>
@@ -449,24 +523,23 @@ const Schedule = () => {
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">Unassigned</div>
               <div className="text-2xl font-bold text-destructive">
-                {shifts.filter(s => !s.shift_assignments || s.shift_assignments.length === 0).length}
+                {shifts.filter(s => !s.caregiver_id).length}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">Active Caregivers</div>
-              <div className="text-2xl font-bold text-accent">{caregivers.length}</div>
+              <div className="text-2xl font-bold">{caregivers.length}</div>
             </CardContent>
           </Card>
         </div>
       </main>
 
-      {/* Shift Details Dialog */}
-      <ShiftDetailsDialog 
+      <ShiftDetailsDialog
         shift={selectedShift}
-        open={isDetailsOpen}
-        onOpenChange={setIsDetailsOpen}
+        open={!!selectedShift}
+        onOpenChange={(open) => !open && setSelectedShift(null)}
       />
     </div>
   );
