@@ -377,7 +377,7 @@ const Schedule = () => {
                                   }}
                                 >
                                   <div className="font-medium truncate text-xs">
-                                    {shift.order_title}
+                                    {shift.care_type_code}
                                   </div>
                                   <div className="text-[10px] opacity-80">
                                     {shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}
