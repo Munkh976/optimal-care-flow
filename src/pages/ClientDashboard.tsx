@@ -41,6 +41,7 @@ interface CareType {
     category: string;
     description: string | null;
     keywords: string | null;
+    price: number;
   };
 }
 

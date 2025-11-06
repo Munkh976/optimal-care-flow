@@ -18,6 +18,7 @@ interface CareType {
     category: string;
     keywords: string;
     description: string;
+    price: number;
   };
 }
 
@@ -193,14 +194,30 @@ export const OrdersManagement = ({
   }, [step, bookingData.day]);
 
   const selectPrimaryService = (service: CareType) => {
-    setBookingData(prev => ({ ...prev, primaryService: service, duration: 4 }));
+    setBookingData(prev => ({ 
+      ...prev, 
+      primaryService: service, 
+      duration: 4,
+      rate: service.care_types.price || 35
+    }));
   };
 
   const selectAdditionalService = (service: CareType | null) => {
     if (service) {
-      setBookingData(prev => ({ ...prev, additionalService: service, duration: 8 }));
+      const totalRate = (bookingData.primaryService?.care_types.price || 35) + (service.care_types.price || 35);
+      setBookingData(prev => ({ 
+        ...prev, 
+        additionalService: service, 
+        duration: 8,
+        rate: totalRate / 2 // Average rate
+      }));
     } else {
-      setBookingData(prev => ({ ...prev, additionalService: null, duration: 4 }));
+      setBookingData(prev => ({ 
+        ...prev, 
+        additionalService: null, 
+        duration: 4,
+        rate: bookingData.primaryService?.care_types.price || 35
+      }));
     }
   };
 
@@ -414,7 +431,10 @@ export const OrdersManagement = ({
                             {getServiceIcon(service.care_types.category)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-base mb-1">{service.care_types.name}</h4>
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <h4 className="font-semibold text-base">{service.care_types.name}</h4>
+                              <Badge variant="secondary" className="shrink-0">${service.care_types.price}/hr</Badge>
+                            </div>
                             <p className="text-sm text-muted-foreground line-clamp-2">
                               {service.care_types.description || service.care_types.keywords}
                             </p>
@@ -433,14 +453,14 @@ export const OrdersManagement = ({
                         <span className="text-sm text-muted-foreground">Current Selection</span>
                         <Badge>{bookingData.duration} Hours</Badge>
                       </div>
-                      <p className="text-lg font-semibold">${bookingData.duration * bookingData.rate}</p>
+                      <p className="text-lg font-semibold">${(bookingData.duration * bookingData.rate).toFixed(2)}</p>
                     </div>
 
                     <div className="grid gap-3 mb-4">
                       <Card
-                        className={`cursor-pointer transition-all hover:shadow-md ${
+                        className={`cursor-pointer transition-all hover:shadow-md hover:scale-[1.01] ${
                           !bookingData.additionalService
-                            ? 'border-primary bg-primary/5'
+                            ? 'border-primary bg-primary/5 ring-2 ring-primary'
                             : 'hover:border-primary/50'
                         }`}
                         onClick={() => selectAdditionalService(null)}
@@ -459,20 +479,23 @@ export const OrdersManagement = ({
                       {additionalServices.map((service) => (
                         <Card
                           key={service.id}
-                          className={`cursor-pointer transition-all hover:shadow-md ${
+                          className={`cursor-pointer transition-all hover:shadow-md hover:scale-[1.01] ${
                             bookingData.additionalService?.id === service.id
-                              ? 'border-primary bg-primary/5'
+                              ? 'border-primary bg-primary/5 ring-2 ring-primary'
                               : 'hover:border-primary/50'
                           }`}
                           onClick={() => selectAdditionalService(service)}
                         >
                           <CardContent className="p-3">
                             <div className="flex items-start gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent to-success flex items-center justify-center text-xl">
+                              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent to-success flex items-center justify-center text-xl flex-shrink-0">
                                 {getServiceIcon(service.care_types.category)}
                               </div>
-                              <div className="flex-1">
-                                <h4 className="font-medium text-sm mb-1">{service.care_types.name}</h4>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <h4 className="font-medium text-sm">{service.care_types.name}</h4>
+                                  <Badge variant="secondary" className="shrink-0">${service.care_types.price}/hr</Badge>
+                                </div>
                                 <p className="text-xs text-muted-foreground line-clamp-1">
                                   {service.care_types.description}
                                 </p>
@@ -514,7 +537,7 @@ export const OrdersManagement = ({
                     <span className="text-sm text-muted-foreground">Service Duration</span>
                     <div className="text-right">
                       <p className="text-2xl font-bold text-primary">{bookingData.duration} Hours</p>
-                      <p className="text-sm">${bookingData.duration * bookingData.rate}</p>
+                      <p className="text-sm">${(bookingData.duration * bookingData.rate).toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
