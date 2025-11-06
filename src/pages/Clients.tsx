@@ -4,12 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Phone, MapPin, Heart, AlertCircle, User, Search, Upload, Eye, Trash2, Edit } from "lucide-react";
+import { Activity, LogOut, Plus, Phone, MapPin, Heart, AlertCircle, User, Search, Upload, Eye, Trash2, Edit, Key } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import ReactSelect from "react-select";
@@ -33,6 +33,10 @@ const Clients = () => {
   const [viewClient, setViewClient] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [careTypes, setCareTypes] = useState<any[]>([]);
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -357,6 +361,54 @@ const Clients = () => {
       toast.success("Client added successfully");
       setIsAddDialogOpen(false);
       if (user) fetchClients(user.id);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedClient || !newPassword) return;
+
+    setResetting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No session found");
+
+      // Get user_id from client profile
+      const userId = selectedClient.user_id;
+      if (!userId) {
+        throw new Error("Client doesn't have a user account");
+      }
+
+      // Call edge function to reset password
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: userId,
+            newPassword: newPassword,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to reset password");
+      }
+
+      toast.success("Password reset successfully!");
+      setResetPasswordDialogOpen(false);
+      setNewPassword("");
+      setSelectedClient(null);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reset password");
+      console.error(error);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -737,6 +789,18 @@ const Clients = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                onClick={() => {
+                                  setSelectedClient(client);
+                                  setResetPasswordDialogOpen(true);
+                                }}
+                                disabled={!client.user_id}
+                                title={!client.user_id ? "Client doesn't have a user account" : "Reset password"}
+                              >
+                                <Key className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => setDeleteClient(client)}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -1017,6 +1081,53 @@ const Clients = () => {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {selectedClient?.first_name} {selectedClient?.last_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">
+                Minimum 6 characters required
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResetPasswordDialogOpen(false);
+                setNewPassword("");
+                setSelectedClient(null);
+              }}
+              disabled={resetting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleResetPassword}
+              disabled={resetting || newPassword.length < 6}
+            >
+              {resetting ? "Resetting..." : "Reset Password"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
