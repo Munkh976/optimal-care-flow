@@ -4,13 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Package, CheckCircle2, Edit, Users, Star, ArrowUpDown } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Calendar, Plus, Package, CheckCircle2, Clock, Users, Star, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Checkbox } from "@/components/ui/checkbox";
 
 interface CareType {
   id: string;
@@ -19,6 +16,8 @@ interface CareType {
     name: string;
     code: string;
     category: string;
+    keywords: string;
+    description: string;
   };
 }
 
@@ -38,14 +37,13 @@ interface Caregiver {
   last_name: string;
   hourly_rate: number;
   performance_rating: number;
-  availability: any;
-  caregiver_availability?: TimeSlot[];
-}
-
-interface TimeSlot {
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
+  caregiver_availability?: {
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    is_available: boolean;
+  }[];
+  service_zipcodes: string[];
 }
 
 interface OrdersManagementProps {
@@ -56,14 +54,35 @@ interface OrdersManagementProps {
   onRefresh: () => void;
 }
 
-interface Shift {
-  dayOfWeek: number;
-  caregiverId: string;
-  caregiverName: string;
-  startTime: string;
-  endTime: string;
-  hourlyRate: number;
+interface BookingData {
+  primaryService: CareType | null;
+  additionalService: CareType | null;
+  duration: number;
+  day: number | null;
+  repeat: 'once' | 'weekly' | 'biweekly' | 'monthly';
+  caregiver: Caregiver | null;
+  time: string;
+  startDate: string;
+  rate: number;
 }
+
+const getServiceIcon = (category: string) => {
+  const iconMap: Record<string, string> = {
+    'Activities of Daily Living (ADL)': '🛁',
+    'Instrumental Activities of Daily Living (IADL)': '🏠',
+    'Health Monitoring & Care': '❤️',
+    'Cognitive & Emotional Support': '🧠',
+    'Safety & Transportation': '🚗',
+    'Specialized Care': '⚕️',
+  };
+  return iconMap[category] || '💼';
+};
+
+const timeSlots = {
+  morning: ['6:00', '7:00', '8:00', '9:00', '10:00'],
+  afternoon: ['12:00', '1:00', '2:00', '3:00', '4:00'],
+  evening: ['6:00', '7:00', '8:00'],
+};
 
 export const OrdersManagement = ({ 
   clientProfile, 
@@ -74,55 +93,39 @@ export const OrdersManagement = ({
 }: OrdersManagementProps) => {
   const [step, setStep] = useState(1);
   const [showOrderForm, setShowOrderForm] = useState(false);
-  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [bookingData, setBookingData] = useState<BookingData>({
+    primaryService: null,
+    additionalService: null,
+    duration: 4,
+    day: null,
+    repeat: 'once',
+    caregiver: null,
+    time: '',
+    startDate: '',
+    rate: 35,
+  });
   
-  // Step 1: Care Need Selection
-  const [selectedCareNeed, setSelectedCareNeed] = useState("");
-  const [selectedCareTypeCodes, setSelectedCareTypeCodes] = useState<string[]>([]);
-  const [careNeedDurationHours, setCareNeedDurationHours] = useState<number | null>(null);
+  const [availableCaregivers, setAvailableCaregivers] = useState<Caregiver[]>([]);
+  const [loadingCaregivers, setLoadingCaregivers] = useState(false);
   
-  // Step 2: Day Selection
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  
-  // Step 3: Caregiver Selection for selected day
-  const [availableCaregivers, setAvailableCaregivers] = useState<any[]>([]);
-  const [selectedCaregiver, setSelectedCaregiver] = useState("");
-  const [sortBy, setSortBy] = useState<"rating" | "price">("rating");
-  
-  // Step 4: Timeslot Selection
-  const [selectedStartTime, setSelectedStartTime] = useState("");
-  const [selectedEndTime, setSelectedEndTime] = useState("");
-  
-  // Step 5: Collected Shifts
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  
-  // Step 6: Start Date & Duration
-  const [startDate, setStartDate] = useState("");
-  const [durationMonths, setDurationMonths] = useState(1);
-  const [durationWeeks, setDurationWeeks] = useState(1);
-  
-  const [notes, setNotes] = useState("");
-
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  useEffect(() => {
-    if (step === 3 && selectedDay !== null) {
-      fetchAvailableCaregiversForDay();
-    }
-  }, [step, selectedDay, sortBy]);
+  const primaryServices = availableCareTypes.filter(
+    s => s.care_types?.category === 'Activities of Daily Living (ADL)' || 
+         s.care_types?.category === 'Health Monitoring & Care' ||
+         s.care_types?.category === 'Instrumental Activities of Daily Living (IADL)'
+  );
 
-  const getNextMonday = () => {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-    const nextMonday = new Date(today);
-    nextMonday.setDate(today.getDate() + daysUntilMonday);
-    return nextMonday.toISOString().split('T')[0];
-  };
+  const additionalServices = availableCareTypes.filter(
+    s => s.care_types?.category === 'Cognitive & Emotional Support' ||
+         s.care_types?.category === 'Safety & Transportation'
+  );
 
-  const fetchAvailableCaregiversForDay = async () => {
-    if (!clientProfile || selectedDay === null) return;
+  const loadAvailableCaregivers = async () => {
+    if (!clientProfile || bookingData.day === null) return;
 
+    setLoadingCaregivers(true);
     try {
       const { data: clientData, error: clientErr } = await supabase
         .from("clients")
@@ -130,10 +133,7 @@ export const OrdersManagement = ({
         .eq("id", clientProfile.id)
         .single();
       
-      if (clientErr) {
-        toast.error("Could not load client location");
-        return;
-      }
+      if (clientErr) throw clientErr;
 
       const clientZipCode = clientData?.zip_code;
       if (!clientZipCode) {
@@ -161,60 +161,82 @@ export const OrdersManagement = ({
 
       if (error) throw error;
 
-      // Filter: must service client's zipcode AND be available on selected day
       const filteredCaregivers = (caregivers || [])
         .filter((cg) => {
           const serviceZipcodes = cg.service_zipcodes || [];
           if (!serviceZipcodes.includes(clientZipCode)) return false;
           
           const daySlot = cg.caregiver_availability?.find(
-            (slot: any) => slot.day_of_week === selectedDay && slot.is_available
+            (slot: any) => slot.day_of_week === bookingData.day && slot.is_available
           );
           return !!daySlot;
         })
-        .map((cg) => {
-          const daySlot = cg.caregiver_availability?.find(
-            (slot: any) => slot.day_of_week === selectedDay
-          );
-          return {
-            ...cg,
-            availableSlot: daySlot ? {
-              start_time: typeof daySlot.start_time === "string" ? daySlot.start_time.slice(0, 5) : daySlot.start_time,
-              end_time: typeof daySlot.end_time === "string" ? daySlot.end_time.slice(0, 5) : daySlot.end_time,
-            } : null
-          };
-        });
+        .sort((a, b) => (b.performance_rating || 0) - (a.performance_rating || 0));
 
-      const sortedCaregivers = [...filteredCaregivers].sort((a, b) => {
-        if (sortBy === "rating") {
-          return (b.performance_rating || 0) - (a.performance_rating || 0);
-        } else {
-          return (a.hourly_rate || 0) - (b.hourly_rate || 0);
-        }
-      });
+      setAvailableCaregivers(filteredCaregivers);
 
-      setAvailableCaregivers(sortedCaregivers);
-
-      if (sortedCaregivers.length === 0) {
-        toast.info(`No caregivers available on ${dayNames[selectedDay]}`);
+      if (filteredCaregivers.length === 0) {
+        toast.info(`No caregivers available on ${dayNames[bookingData.day]}`);
       }
     } catch (error: any) {
       toast.error("Failed to fetch caregivers");
       console.error(error);
+    } finally {
+      setLoadingCaregivers(false);
     }
   };
 
-  const handleSubmitOrder = async () => {
-    if (!clientProfile || shifts.length === 0 || !startDate) {
+  useEffect(() => {
+    if (step === 2 && bookingData.day !== null) {
+      loadAvailableCaregivers();
+    }
+  }, [step, bookingData.day]);
+
+  const selectPrimaryService = (service: CareType) => {
+    setBookingData(prev => ({ ...prev, primaryService: service, duration: 4 }));
+  };
+
+  const selectAdditionalService = (service: CareType | null) => {
+    if (service) {
+      setBookingData(prev => ({ ...prev, additionalService: service, duration: 8 }));
+    } else {
+      setBookingData(prev => ({ ...prev, additionalService: null, duration: 4 }));
+    }
+  };
+
+  const selectDay = (dayIndex: number) => {
+    setBookingData(prev => ({ ...prev, day: dayIndex, caregiver: null, time: '' }));
+  };
+
+  const selectTimeSlot = (caregiver: Caregiver, time: string, period: string) => {
+    const timeString = `${time} ${period}`;
+    setBookingData(prev => ({ ...prev, caregiver, time: timeString, rate: caregiver.hourly_rate }));
+  };
+
+  const handleSubmitBooking = async () => {
+    if (!clientProfile || !bookingData.primaryService || !bookingData.caregiver || 
+        !bookingData.time || bookingData.day === null) {
       toast.error("Please complete all required fields");
       return;
     }
 
+    setLoading(true);
     try {
-      const start = new Date(startDate);
-      const end = new Date(start);
-      const totalWeeks = durationMonths * 4 + durationWeeks;
-      end.setDate(start.getDate() + (totalWeeks * 7) - 1);
+      // Calculate dates based on repeat frequency
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() + ((bookingData.day - startDate.getDay() + 7) % 7 || 7));
+      const start = startDate.toISOString().split('T')[0];
+      
+      let end = new Date(startDate);
+      if (bookingData.repeat === 'weekly') {
+        end.setMonth(end.getMonth() + 3); // 3 months for weekly
+      } else if (bookingData.repeat === 'biweekly') {
+        end.setMonth(end.getMonth() + 6); // 6 months for biweekly  
+      } else if (bookingData.repeat === 'monthly') {
+        end.setMonth(end.getMonth() + 12); // 12 months for monthly
+      } else {
+        end = startDate; // one time only
+      }
 
       const orderNumber = `ORD-${Date.now()}`;
       const { data: newOrder, error: orderError } = await supabase
@@ -223,9 +245,9 @@ export const OrdersManagement = ({
           client_id: clientProfile.id,
           agency_id: clientProfile.agency_id,
           order_number: orderNumber,
-          start_date: startDate,
+          start_date: start,
           end_date: end.toISOString().split('T')[0],
-          frequency: "weekly",
+          frequency: bookingData.repeat,
           status: "submitted"
         })
         .select()
@@ -233,136 +255,73 @@ export const OrdersManagement = ({
 
       if (orderError) throw orderError;
 
-      await createShiftsFromCollection(newOrder.id);
+      // Create shifts
+      const shiftsToCreate = [];
+      const [timeValue, period] = bookingData.time.split(' ');
+      let [hours] = timeValue.split(':').map(Number);
+      
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      
+      const startTimeHours = hours;
+      const endTimeHours = hours + bookingData.duration;
+      const startTime = `${String(startTimeHours).padStart(2, '0')}:00`;
+      const endTime = `${String(endTimeHours % 24).padStart(2, '0')}:00`;
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        if (d.getDay() === bookingData.day) {
+          const shiftDate = d.toISOString().split('T')[0];
+          shiftsToCreate.push({
+            client_id: clientProfile.id,
+            agency_id: clientProfile.agency_id,
+            caregiver_id: bookingData.caregiver.id,
+            order_id: newOrder.id,
+            shift_date: shiftDate,
+            start_time: startTime,
+            end_time: endTime,
+            duration_hours: bookingData.duration,
+            care_type_code: bookingData.primaryService.care_need_code,
+            status: 'scheduled',
+            special_notes: bookingData.additionalService 
+              ? `Includes ${bookingData.additionalService.care_types.name}` 
+              : null,
+            order_title: bookingData.primaryService.care_types.name
+          });
+        }
+      }
+
+      const { error: shiftsError } = await supabase
+        .from("shifts")
+        .insert(shiftsToCreate);
+
+      if (shiftsError) throw shiftsError;
+
       toast.success("Order submitted successfully!");
-      resetForm();
+      setStep(3);
       onRefresh();
     } catch (error: any) {
       toast.error(error.message || "Failed to submit order");
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const createShiftsFromCollection = async (orderId: string) => {
-    const shiftsToCreate = [];
-    const start = new Date(startDate);
-    const end = new Date(start);
-    const totalWeeks = durationMonths * 4 + durationWeeks;
-    end.setDate(start.getDate() + (totalWeeks * 7) - 1);
-
-    const primaryCareTypeCode = selectedCareTypeCodes[0] || selectedCareNeed;
-
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dayOfWeek = d.getDay();
-      const shift = shifts.find(s => s.dayOfWeek === dayOfWeek);
-      
-      if (shift) {
-        const shiftDate = d.toISOString().split('T')[0];
-        const [startHour, startMin] = shift.startTime.split(':').map(Number);
-        const [endHour, endMin] = shift.endTime.split(':').map(Number);
-        const durationHours = (endHour * 60 + endMin - startHour * 60 - startMin) / 60;
-
-        shiftsToCreate.push({
-          client_id: clientProfile!.id,
-          agency_id: clientProfile!.agency_id,
-          caregiver_id: shift.caregiverId,
-          order_id: orderId,
-          shift_date: shiftDate,
-          start_time: shift.startTime,
-          end_time: shift.endTime,
-          duration_hours: durationHours,
-          care_type_code: primaryCareTypeCode,
-          status: 'scheduled',
-          special_notes: notes,
-          order_title: `Care Service`
-        });
-      }
-    }
-
-    const { error } = await supabase
-      .from("shifts")
-      .insert(shiftsToCreate);
-
-    if (error) throw error;
   };
 
   const resetForm = () => {
     setShowOrderForm(false);
-    setEditingOrderId(null);
     setStep(1);
-    setSelectedCareNeed("");
-    setSelectedCareTypeCodes([]);
-    setCareNeedDurationHours(null);
-    setSelectedDay(null);
+    setBookingData({
+      primaryService: null,
+      additionalService: null,
+      duration: 4,
+      day: null,
+      repeat: 'once',
+      caregiver: null,
+      time: '',
+      startDate: '',
+      rate: 35,
+    });
     setAvailableCaregivers([]);
-    setSelectedCaregiver("");
-    setSortBy("rating");
-    setSelectedStartTime("");
-    setSelectedEndTime("");
-    setShifts([]);
-    setStartDate("");
-    setDurationMonths(1);
-    setDurationWeeks(1);
-    setNotes("");
-  };
-  
-  const addShiftToCollection = () => {
-    if (!selectedCaregiver || !selectedStartTime || !selectedEndTime || selectedDay === null) {
-      toast.error("Please complete all shift details");
-      return;
-    }
-    
-    const caregiver = availableCaregivers.find(c => c.id === selectedCaregiver);
-    if (!caregiver) return;
-    
-    // Check if shift already exists for this day
-    if (shifts.some(s => s.dayOfWeek === selectedDay)) {
-      toast.error(`You already have a shift scheduled for ${dayNames[selectedDay]}`);
-      return;
-    }
-    
-    const newShift: Shift = {
-      dayOfWeek: selectedDay,
-      caregiverId: selectedCaregiver,
-      caregiverName: `${caregiver.first_name} ${caregiver.last_name}`,
-      startTime: selectedStartTime,
-      endTime: selectedEndTime,
-      hourlyRate: caregiver.hourly_rate
-    };
-    
-    setShifts([...shifts, newShift]);
-    
-    // Reset for next shift
-    setSelectedDay(null);
-    setSelectedCaregiver("");
-    setSelectedStartTime("");
-    setSelectedEndTime("");
-    setAvailableCaregivers([]);
-    setStep(2); // Back to day selection
-    
-    toast.success("Shift added! Add more or continue to review.");
-  };
-  
-  const removeShift = (dayOfWeek: number) => {
-    setShifts(shifts.filter(s => s.dayOfWeek !== dayOfWeek));
-  };
-
-  const handleEditDraft = async (order: Order) => {
-    setEditingOrderId(order.id);
-    setStartDate(order.start_date);
-    setShowOrderForm(true);
-    setStep(1);
-  };
-
-  const updateStartTime = (value: string) => {
-    setSelectedStartTime(value);
-    // Auto-calculate end time if care need has fixed duration
-    if (careNeedDurationHours && !Number.isNaN(careNeedDurationHours)) {
-      const [sh, sm] = value.split(':').map(Number);
-      const minutes = sh * 60 + sm + Math.round(careNeedDurationHours * 60);
-      const eh = Math.floor(minutes / 60) % 24;
-      const em = minutes % 60;
-      setSelectedEndTime(`${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`);
-    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -394,12 +353,12 @@ export const OrdersManagement = ({
 
       {/* Order Form */}
       {showOrderForm && (
-        <Card className="border-primary/20 shadow-lg">
+        <Card className="border-primary/20 shadow-xl">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>{editingOrderId ? 'Edit' : 'Create'} Care Order</CardTitle>
-                <CardDescription>Step {step} of 2</CardDescription>
+                <CardTitle>Create Care Order</CardTitle>
+                <CardDescription>Step {step} of 3</CardDescription>
               </div>
               <Button variant="ghost" size="sm" onClick={resetForm}>
                 Cancel
@@ -407,527 +366,422 @@ export const OrdersManagement = ({
             </div>
           </CardHeader>
           <CardContent>
-            {/* Progress */}
-            <div className="mb-6">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold ${step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+            {/* Progress Bar */}
+            <div className="mb-8">
+              <div className="flex items-center justify-center gap-4 mb-4">
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                  step >= 1 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
+                }`}>
                   1
                 </div>
-                <div className={`h-1 w-12 ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold ${step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                <div className={`h-1 w-16 transition-all ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                  step >= 2 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
+                }`}>
                   2
                 </div>
-                <div className={`h-1 w-12 ${step >= 3 ? 'bg-primary' : 'bg-muted'}`} />
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold ${step >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                <div className={`h-1 w-16 transition-all ${step >= 3 ? 'bg-primary' : 'bg-muted'}`} />
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                  step >= 3 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
+                }`}>
                   3
                 </div>
-                <div className={`h-1 w-12 ${step >= 4 ? 'bg-primary' : 'bg-muted'}`} />
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold ${step >= 4 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                  4
-                </div>
-                <div className={`h-1 w-12 ${step >= 5 ? 'bg-primary' : 'bg-muted'}`} />
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold ${step >= 5 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                  5
-                </div>
-              </div>
-              <div className="text-center text-sm text-muted-foreground">
-                {step === 1 && "Select Care Need"}
-                {step === 2 && "Choose Day"}
-                {step === 3 && "Select Caregiver"}
-                {step === 4 && "Choose Timeslot"}
-                {step === 5 && "Review & Schedule"}
               </div>
             </div>
 
-            {/* Step 1: Select Care Need */}
+            {/* Step 1: Select Primary Service */}
             {step === 1 && (
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label>Select Your Care Need</Label>
-                  <Select 
-                    value={selectedCareNeed} 
-                    onValueChange={async (value) => {
-                      setSelectedCareNeed(value);
-                      try {
-                        const selected = availableCareTypes.find(n => n.care_need_code === value);
-                        const typeName = selected?.care_types?.name || "";
-                        
-                        // Use the selected care type code directly
-                        setSelectedCareTypeCodes([value]);
-                        
-                        // Set a default duration if needed (can be adjusted)
-                        setCareNeedDurationHours(4); // Default 4 hours, can be customized per care type
-                      } catch (e) {
-                        console.warn("Care type mapping fallback used", e);
-                        setSelectedCareTypeCodes([]);
-                        setCareNeedDurationHours(null);
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose from your care needs" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableCareTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.care_need_code}>
-                          <div>
-                            <div className="font-medium">{type.care_types.name}</div>
-                            <div className="text-xs text-muted-foreground">{type.care_types.category}</div>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {careNeedDurationHours && (
-                    <p className="text-sm text-muted-foreground">
-                      Standard duration: {careNeedDurationHours} hours per shift
-                    </p>
-                  )}
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h3 className="text-2xl font-bold mb-2">Select Primary Service</h3>
+                  <p className="text-sm text-muted-foreground">Choose your main care need</p>
                 </div>
+                
+                <div className="grid gap-3 max-h-[400px] overflow-y-auto">
+                  {primaryServices.map((service) => (
+                    <Card
+                      key={service.id}
+                      className={`cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${
+                        bookingData.primaryService?.id === service.id
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary'
+                          : 'hover:border-primary/50'
+                      }`}
+                      onClick={() => selectPrimaryService(service)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl flex-shrink-0">
+                            {getServiceIcon(service.care_types.category)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-base mb-1">{service.care_types.name}</h4>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {service.care_types.description || service.care_types.keywords}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {bookingData.primaryService && (
+                  <div className="border-t pt-6">
+                    <h4 className="text-lg font-semibold mb-3">Add Another Service? (Optional)</h4>
+                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Current Selection</span>
+                        <Badge>{bookingData.duration} Hours</Badge>
+                      </div>
+                      <p className="text-lg font-semibold">${bookingData.duration * bookingData.rate}</p>
+                    </div>
+
+                    <div className="grid gap-3 mb-4">
+                      <Card
+                        className={`cursor-pointer transition-all hover:shadow-md ${
+                          !bookingData.additionalService
+                            ? 'border-primary bg-primary/5'
+                            : 'hover:border-primary/50'
+                        }`}
+                        onClick={() => selectAdditionalService(null)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="text-2xl">➡️</div>
+                            <div>
+                              <p className="font-medium">Skip - No Additional Service</p>
+                              <p className="text-xs text-muted-foreground">Continue with 4-hour service only</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {additionalServices.map((service) => (
+                        <Card
+                          key={service.id}
+                          className={`cursor-pointer transition-all hover:shadow-md ${
+                            bookingData.additionalService?.id === service.id
+                              ? 'border-primary bg-primary/5'
+                              : 'hover:border-primary/50'
+                          }`}
+                          onClick={() => selectAdditionalService(service)}
+                        >
+                          <CardContent className="p-3">
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent to-success flex items-center justify-center text-xl">
+                                {getServiceIcon(service.care_types.category)}
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-sm mb-1">{service.care_types.name}</h4>
+                                <p className="text-xs text-muted-foreground line-clamp-1">
+                                  {service.care_types.description}
+                                </p>
+                                <Badge variant="secondary" className="mt-1">+4 hours</Badge>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex gap-3 pt-4">
                   <Button variant="outline" onClick={resetForm} className="flex-1">
                     Cancel
                   </Button>
                   <Button 
-                    onClick={() => {
-                      if (selectedCareNeed) {
-                        setStep(2);
-                      } else {
-                        toast.error("Please select a care need");
-                      }
-                    }} 
+                    onClick={() => setStep(2)} 
                     className="flex-1"
-                    disabled={!selectedCareNeed}
+                    disabled={!bookingData.primaryService}
                   >
-                    Next: Choose Day
+                    Continue
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* Step 2: Choose Day */}
+            {/* Step 2: Choose Day & Time + Caregiver */}
             {step === 2 && (
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label className="text-lg font-semibold">Select a Day for Care</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Choose which day of the week you need care. You can add more days later.
-                  </p>
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h3 className="text-2xl font-bold mb-2">Choose Day & Time</h3>
+                  <p className="text-sm text-muted-foreground">Select when you need care</p>
                 </div>
-                
-                {shifts.length > 0 && (
-                  <Card className="bg-primary/5 border-primary/20">
-                    <CardContent className="p-4">
-                      <Label className="text-sm font-semibold mb-2 block">Shifts Added ({shifts.length})</Label>
-                      <div className="space-y-2">
-                        {shifts.map((shift) => (
-                          <div key={shift.dayOfWeek} className="flex items-center justify-between text-sm bg-background p-2 rounded">
-                            <span className="font-medium">{dayNames[shift.dayOfWeek]}</span>
-                            <span className="text-muted-foreground">{shift.caregiverName}</span>
-                            <span className="text-xs">{shift.startTime} - {shift.endTime}</span>
-                            <Button variant="ghost" size="sm" onClick={() => removeShift(shift.dayOfWeek)}>
-                              Remove
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {dayNames.map((day, idx) => {
-                    const alreadyScheduled = shifts.some(s => s.dayOfWeek === idx);
-                    return (
-                      <Card 
+
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Service Duration</span>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-primary">{bookingData.duration} Hours</p>
+                      <p className="text-sm">${bookingData.duration * bookingData.rate}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Day Selection */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Select Day</Label>
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                    {dayNames.map((day, idx) => (
+                      <Card
                         key={idx}
-                        className={`cursor-pointer transition-all ${
-                          selectedDay === idx 
-                            ? 'ring-2 ring-primary border-primary bg-primary/10' 
-                            : alreadyScheduled
-                            ? 'opacity-50 cursor-not-allowed'
+                        className={`cursor-pointer text-center transition-all hover:scale-105 ${
+                          bookingData.day === idx
+                            ? 'border-primary bg-primary text-primary-foreground'
                             : 'hover:border-primary/50'
                         }`}
-                        onClick={() => {
-                          if (!alreadyScheduled) {
-                            setSelectedDay(idx);
-                          }
-                        }}
+                        onClick={() => selectDay(idx)}
                       >
-                        <CardContent className="p-4 text-center">
-                          <div className="font-semibold">{day}</div>
-                          {alreadyScheduled && (
-                            <Badge variant="secondary" className="mt-2 text-xs">Scheduled</Badge>
-                          )}
-                          {selectedDay === idx && (
-                            <CheckCircle2 className="h-4 w-4 text-primary mx-auto mt-2" />
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <Button variant="outline" onClick={() => setStep(1)}>
-                    <ChevronLeft className="mr-2 h-4 w-4" />
-                    Back
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      if (selectedDay !== null) {
-                        setStep(3);
-                      } else {
-                        toast.error("Please select a day");
-                      }
-                    }} 
-                    className="flex-1"
-                    disabled={selectedDay === null}
-                  >
-                    Next: View Caregivers
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Select Caregiver */}
-            {step === 3 && selectedDay !== null && (
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label className="text-lg font-semibold">Available Caregivers for {dayNames[selectedDay]}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Select a caregiver who is available on {dayNames[selectedDay]}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    {availableCaregivers.length} caregiver{availableCaregivers.length !== 1 ? 's' : ''} available
-                  </p>
-                  <Select value={sortBy} onValueChange={(value: "rating" | "price") => setSortBy(value)}>
-                    <SelectTrigger className="w-[180px]">
-                      <ArrowUpDown className="mr-2 h-4 w-4" />
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="rating">Sort by Rating</SelectItem>
-                      <SelectItem value="price">Sort by Price</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {availableCaregivers.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                    <p className="text-muted-foreground">No caregivers available on {dayNames[selectedDay]}</p>
-                    <Button variant="outline" className="mt-4" onClick={() => {
-                      setSelectedDay(null);
-                      setStep(2);
-                    }}>
-                      Choose Different Day
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                    {availableCaregivers.map((caregiver) => (
-                      <Card 
-                        key={caregiver.id}
-                        className={`cursor-pointer transition-all hover:shadow-md ${selectedCaregiver === caregiver.id ? 'border-primary border-2 bg-primary/5' : ''}`}
-                        onClick={() => setSelectedCaregiver(caregiver.id)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-12 w-12">
-                                <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
-                                  {caregiver.first_name[0]}{caregiver.last_name[0]}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <div className="font-semibold text-base">
-                                  {caregiver.first_name} {caregiver.last_name}
-                                </div>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <div className="flex items-center gap-1">
-                                    {[...Array(5)].map((_, i) => (
-                                      <Star 
-                                        key={i} 
-                                        className={`h-3 w-3 ${i < Math.floor(caregiver.performance_rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/30'}`}
-                                      />
-                                    ))}
-                                    <span className="text-sm text-muted-foreground ml-1">
-                                      {caregiver.performance_rating?.toFixed(1) || '0.0'}
-                                    </span>
-                                  </div>
-                                  <Badge variant="secondary" className="font-semibold">
-                                    ${caregiver.hourly_rate}/hr
-                                  </Badge>
-                                </div>
-                                {caregiver.availableSlot && (
-                                  <div className="text-xs text-muted-foreground mt-1">
-                                    Available: {caregiver.availableSlot.start_time} - {caregiver.availableSlot.end_time}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            {selectedCaregiver === caregiver.id && (
-                              <CheckCircle2 className="h-5 w-5 text-primary" />
-                            )}
-                          </div>
+                        <CardContent className="p-3">
+                          <p className="text-sm font-semibold">{day}</p>
                         </CardContent>
                       </Card>
                     ))}
                   </div>
-                )}
-
-                <div className="flex gap-3 pt-4">
-                  <Button variant="outline" onClick={() => {
-                    setSelectedCaregiver("");
-                    setSelectedDay(null);
-                    setAvailableCaregivers([]);
-                    setStep(2);
-                  }}>
-                    <ChevronLeft className="mr-2 h-4 w-4" />
-                    Back
-                  </Button>
-                  <Button 
-                    onClick={() => setStep(4)} 
-                    className="flex-1"
-                    disabled={!selectedCaregiver}
-                  >
-                    Next: Choose Time
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 4: Choose Timeslot */}
-            {step === 4 && selectedCaregiver && (
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label className="text-lg font-semibold">Select Shift Times</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Choose start and end times for your shift on {dayNames[selectedDay!]}
-                  </p>
                 </div>
 
-                {(() => {
-                  const caregiver = availableCaregivers.find(c => c.id === selectedCaregiver);
-                  const slot = caregiver?.availableSlot;
-                  
-                  return slot && (
-                    <>
-                      <Card className="bg-muted/50">
-                        <CardContent className="p-4">
-                          <Label className="text-sm font-medium">Caregiver Availability</Label>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {slot.start_time} - {slot.end_time}
-                          </p>
-                        </CardContent>
-                      </Card>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="start-time">Start Time</Label>
-                          <Input
-                            id="start-time"
-                            type="time"
-                            value={selectedStartTime}
-                            onChange={(e) => updateStartTime(e.target.value)}
-                            min={slot.start_time}
-                            max={slot.end_time}
-                            className="font-mono"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="end-time" className="flex items-center gap-2">
-                            End Time
-                            {careNeedDurationHours && (
-                              <Badge variant="secondary" className="text-xs">
-                                Auto: {careNeedDurationHours}h
-                              </Badge>
-                            )}
-                          </Label>
-                          <Input
-                            id="end-time"
-                            type="time"
-                            value={selectedEndTime}
-                            onChange={(e) => setSelectedEndTime(e.target.value)}
-                            min={selectedStartTime || slot.start_time}
-                            max={slot.end_time}
-                            readOnly={!!careNeedDurationHours}
-                            className={`font-mono ${careNeedDurationHours ? 'bg-muted' : ''}`}
-                          />
-                        </div>
-                      </div>
-
-                      {selectedStartTime && selectedEndTime && (
-                        <Card className="bg-primary/5 border-primary/20">
-                          <CardContent className="p-4">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle2 className="h-4 w-4 text-primary" />
-                              <p className="text-sm font-medium">
-                                Shift: {dayNames[selectedDay!]}, {selectedStartTime} - {selectedEndTime}
-                              </p>
+                {/* Repeat Options */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Repeat Schedule</Label>
+                  <RadioGroup value={bookingData.repeat} onValueChange={(value) => 
+                    setBookingData(prev => ({ ...prev, repeat: value as any }))
+                  }>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Label className="cursor-pointer">
+                        <Card className={`transition-all ${bookingData.repeat === 'once' ? 'border-primary bg-primary/5' : ''}`}>
+                          <CardContent className="p-3 flex items-center gap-2">
+                            <RadioGroupItem value="once" id="once" />
+                            <div>
+                              <p className="font-medium text-sm">One time only</p>
                             </div>
                           </CardContent>
                         </Card>
-                      )}
-                    </>
-                  );
-                })()}
+                      </Label>
+                      <Label className="cursor-pointer">
+                        <Card className={`transition-all ${bookingData.repeat === 'weekly' ? 'border-primary bg-primary/5' : ''}`}>
+                          <CardContent className="p-3 flex items-center gap-2">
+                            <RadioGroupItem value="weekly" id="weekly" />
+                            <div>
+                              <p className="font-medium text-sm">Weekly</p>
+                              <p className="text-xs text-muted-foreground">Same day each week</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </Label>
+                      <Label className="cursor-pointer">
+                        <Card className={`transition-all ${bookingData.repeat === 'biweekly' ? 'border-primary bg-primary/5' : ''}`}>
+                          <CardContent className="p-3 flex items-center gap-2">
+                            <RadioGroupItem value="biweekly" id="biweekly" />
+                            <div>
+                              <p className="font-medium text-sm">Every 2 weeks</p>
+                              <p className="text-xs text-muted-foreground">Same day, bi-weekly</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </Label>
+                      <Label className="cursor-pointer">
+                        <Card className={`transition-all ${bookingData.repeat === 'monthly' ? 'border-primary bg-primary/5' : ''}`}>
+                          <CardContent className="p-3 flex items-center gap-2">
+                            <RadioGroupItem value="monthly" id="monthly" />
+                            <div>
+                              <p className="font-medium text-sm">Monthly</p>
+                              <p className="text-xs text-muted-foreground">Once per month</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {/* Available Caregivers */}
+                {bookingData.day !== null && (
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold">Available Caregivers & Times</Label>
+                    
+                    {loadingCaregivers ? (
+                      <div className="flex flex-col items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                        <p className="text-sm text-muted-foreground">Finding available caregivers...</p>
+                      </div>
+                    ) : availableCaregivers.length === 0 ? (
+                      <Card className="bg-muted/50">
+                        <CardContent className="p-8 text-center">
+                          <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            No caregivers available for {dayNames[bookingData.day]}. Please select another day.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                        {availableCaregivers.map((caregiver) => {
+                          const daySlot = caregiver.caregiver_availability?.find(
+                            slot => slot.day_of_week === bookingData.day
+                          );
+                          
+                          return (
+                            <Card
+                              key={caregiver.id}
+                              className={`transition-all ${
+                                bookingData.caregiver?.id === caregiver.id
+                                  ? 'border-primary bg-primary/5'
+                                  : ''
+                              }`}
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex items-center gap-3 mb-3">
+                                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold">
+                                    {caregiver.first_name[0]}{caregiver.last_name[0]}
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-semibold">{caregiver.first_name} {caregiver.last_name}</h4>
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <Star className="h-4 w-4 fill-warning text-warning" />
+                                      <span>{caregiver.performance_rating.toFixed(1)}</span>
+                                      <span className="text-muted-foreground">•</span>
+                                      <span>${caregiver.hourly_rate}/hr</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {daySlot && (
+                                  <div className="space-y-2">
+                                    <p className="text-xs font-medium text-muted-foreground uppercase">Morning</p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {timeSlots.morning.map(time => (
+                                        <Button
+                                          key={time}
+                                          variant={bookingData.time === `${time} AM` && bookingData.caregiver?.id === caregiver.id ? 'default' : 'outline'}
+                                          size="sm"
+                                          className="text-xs"
+                                          onClick={() => selectTimeSlot(caregiver, time, 'AM')}
+                                        >
+                                          {time} AM
+                                        </Button>
+                                      ))}
+                                    </div>
+                                    
+                                    <p className="text-xs font-medium text-muted-foreground uppercase mt-3">Afternoon</p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {timeSlots.afternoon.map(time => (
+                                        <Button
+                                          key={time}
+                                          variant={bookingData.time === `${time} PM` && bookingData.caregiver?.id === caregiver.id ? 'default' : 'outline'}
+                                          size="sm"
+                                          className="text-xs"
+                                          onClick={() => selectTimeSlot(caregiver, time, 'PM')}
+                                        >
+                                          {time} PM
+                                        </Button>
+                                      ))}
+                                    </div>
+
+                                    <p className="text-xs font-medium text-muted-foreground uppercase mt-3">Evening</p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {timeSlots.evening.map(time => (
+                                        <Button
+                                          key={time}
+                                          variant={bookingData.time === `${time} PM` && bookingData.caregiver?.id === caregiver.id ? 'default' : 'outline'}
+                                          size="sm"
+                                          className="text-xs"
+                                          onClick={() => selectTimeSlot(caregiver, time, 'PM')}
+                                        >
+                                          {time} PM
+                                        </Button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex gap-3 pt-4">
-                  <Button variant="outline" onClick={() => {
-                    setSelectedStartTime("");
-                    setSelectedEndTime("");
-                    setStep(3);
-                  }}>
-                    <ChevronLeft className="mr-2 h-4 w-4" />
+                  <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
                     Back
                   </Button>
                   <Button 
-                    variant="outline"
-                    onClick={() => {
-                      addShiftToCollection();
-                    }} 
+                    onClick={() => setStep(3)} 
                     className="flex-1"
-                    disabled={!selectedStartTime || !selectedEndTime}
+                    disabled={!bookingData.caregiver || !bookingData.time}
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add More Shifts
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      addShiftToCollection();
-                      setStep(5);
-                    }} 
-                    className="flex-1"
-                    disabled={!selectedStartTime || !selectedEndTime}
-                  >
-                    Next: Review
+                    Continue
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* Step 5: Review & Schedule */}
-            {step === 5 && (
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label className="text-lg font-semibold">Review & Schedule</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Review your shifts and set the start date and duration
-                  </p>
+            {/* Step 3: Confirm Booking */}
+            {step === 3 && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h3 className="text-2xl font-bold mb-2">Confirm Booking</h3>
+                  <p className="text-sm text-muted-foreground">Review your care request</p>
                 </div>
 
-                {/* Shifts Summary */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Scheduled Shifts ({shifts.length})</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {shifts.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No shifts added yet</p>
-                    ) : (
-                      shifts.map((shift) => (
-                        <div key={shift.dayOfWeek} className="flex items-center justify-between p-3 bg-muted/50 rounded">
-                          <div className="space-y-1">
-                            <div className="font-semibold">{dayNames[shift.dayOfWeek]}</div>
-                            <div className="text-sm text-muted-foreground">{shift.caregiverName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {shift.startTime} - {shift.endTime} • ${shift.hourlyRate}/hr
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="sm" onClick={() => removeShift(shift.dayOfWeek)}>
-                            Remove
-                          </Button>
-                        </div>
-                      ))
-                    )}
+                <Card className="bg-muted/50">
+                  <CardContent className="p-6 space-y-4">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Services:</span>
+                      <span className="font-semibold text-right">
+                        {bookingData.primaryService?.care_types.name}
+                        {bookingData.additionalService && `, ${bookingData.additionalService.care_types.name}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Caregiver:</span>
+                      <span className="font-semibold">
+                        {bookingData.caregiver?.first_name} {bookingData.caregiver?.last_name}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Schedule:</span>
+                      <span className="font-semibold">
+                        {bookingData.day !== null && dayNames[bookingData.day]} ({bookingData.repeat})
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Time:</span>
+                      <span className="font-semibold">{bookingData.time}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Duration:</span>
+                      <span className="font-semibold">{bookingData.duration} hours</span>
+                    </div>
+                    <div className="border-t pt-4 flex justify-between">
+                      <span className="text-lg font-bold">Total:</span>
+                      <span className="text-lg font-bold text-primary">
+                        ${bookingData.duration * bookingData.rate}
+                        {bookingData.repeat !== 'once' && `/${bookingData.repeat}`}
+                      </span>
+                    </div>
                   </CardContent>
                 </Card>
 
-                {/* Start Date & Duration */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="start-date">Start Date</Label>
-                    <Input
-                      id="start-date"
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      min={getNextMonday()}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="duration-months">Duration (Months)</Label>
-                    <Input
-                      id="duration-months"
-                      type="number"
-                      min="0"
-                      max="12"
-                      value={durationMonths}
-                      onChange={(e) => setDurationMonths(Math.max(0, parseInt(e.target.value) || 0))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="duration-weeks">+ Weeks</Label>
-                    <Input
-                      id="duration-weeks"
-                      type="number"
-                      min="1"
-                      max="4"
-                      value={durationWeeks}
-                      onChange={(e) => setDurationWeeks(Math.max(1, parseInt(e.target.value) || 1))}
-                    />
-                  </div>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Total duration: {durationMonths > 0 ? `${durationMonths} month${durationMonths > 1 ? 's' : ''}` : ''} 
-                  {durationMonths > 0 && durationWeeks > 0 ? ' and ' : ''}
-                  {durationWeeks > 0 ? `${durationWeeks} week${durationWeeks > 1 ? 's' : ''}` : ''}
-                </div>
-
-                {/* Notes */}
-                <div className="space-y-2">
-                  <Label>Additional Notes</Label>
-                  <Textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Any special instructions or requirements..."
-                    rows={3}
-                  />
-                </div>
-
                 <div className="flex gap-3 pt-4">
-                  <Button variant="outline" onClick={() => {
-                    if (shifts.length === 0) {
-                      setStep(2);
-                    } else {
-                      toast.info("Add more shifts or submit order");
-                    }
-                  }}>
-                    {shifts.length === 0 ? (
-                      <>
-                        <ChevronLeft className="mr-2 h-4 w-4" />
-                        Back
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add More Shifts
-                      </>
-                    )}
+                  <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
+                    Back
                   </Button>
                   <Button 
-                    onClick={handleSubmitOrder} 
+                    onClick={handleSubmitBooking} 
                     className="flex-1"
-                    disabled={shifts.length === 0 || !startDate}
+                    disabled={loading}
                   >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Submit Order
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      'Confirm Booking'
+                    )}
                   </Button>
                 </div>
               </div>
@@ -936,39 +790,37 @@ export const OrdersManagement = ({
         </Card>
       )}
 
-      {/* Orders List */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Your Orders</h3>
-        {currentOrder ? (
-          <Card className="hover-scale">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle>{currentOrder.order_number}</CardTitle>
-                  <CardDescription>
-                    {new Date(currentOrder.start_date).toLocaleDateString()} - {new Date(currentOrder.end_date).toLocaleDateString()}
-                  </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  {getStatusBadge(currentOrder.status)}
-                  {currentOrder.status === 'draft' && (
-                    <Button variant="ghost" size="sm" onClick={() => handleEditDraft(currentOrder)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+      {/* Current Order Display */}
+      {currentOrder && !showOrderForm && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Active Order: {currentOrder.order_number}
+                </CardTitle>
+                <CardDescription>
+                  {new Date(currentOrder.start_date).toLocaleDateString()} - {new Date(currentOrder.end_date).toLocaleDateString()}
+                </CardDescription>
               </div>
-            </CardHeader>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Package className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No orders yet</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+              {getStatusBadge(currentOrder.status)}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs text-muted-foreground">Frequency</Label>
+                <p className="font-medium capitalize">{currentOrder.frequency}</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Created</Label>
+                <p className="font-medium">{new Date(currentOrder.created_at).toLocaleDateString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

@@ -40,6 +40,7 @@ interface CareType {
     code: string;
     category: string;
     description: string | null;
+    keywords: string | null;
   };
 }
 
