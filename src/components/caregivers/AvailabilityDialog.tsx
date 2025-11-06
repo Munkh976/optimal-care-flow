@@ -52,9 +52,16 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
       console.error("Error fetching availability:", error);
       toast.error("Failed to load availability");
     } else {
-      setAvailability(data || []);
-      // Initialize empty slots if none exist
-      if (!data || data.length === 0) {
+      if (data && data.length > 0) {
+        const normalizeTime = (t: string) => (typeof t === "string" ? t.slice(0, 5) : t);
+        const normalized = (data as any[]).map((slot) => ({
+          ...slot,
+          start_time: normalizeTime(slot.start_time as string),
+          end_time: normalizeTime(slot.end_time as string),
+          is_available: slot.is_available ?? true,
+        }));
+        setAvailability(normalized as any);
+      } else {
         const emptySlots = daysOfWeek.map((day) => ({
           day_of_week: day.value,
           start_time: "09:00",
@@ -200,7 +207,7 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
                       }
                     >
                       <SelectTrigger className="w-[120px]">
-                        <SelectValue />
+                        <SelectValue placeholder="Start" />
                       </SelectTrigger>
                       <SelectContent>
                         {timeOptions.map((time) => (
@@ -220,7 +227,7 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
                       }
                     >
                       <SelectTrigger className="w-[120px]">
-                        <SelectValue />
+                        <SelectValue placeholder="End" />
                       </SelectTrigger>
                       <SelectContent>
                         {timeOptions.map((time) => (
