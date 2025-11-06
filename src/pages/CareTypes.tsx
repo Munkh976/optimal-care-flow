@@ -31,6 +31,7 @@ const CareTypes = () => {
     description: "",
     keywords: "",
     price: "",
+    duration: "4",
   });
 
   const { data: careTypes, isLoading } = useQuery({
@@ -55,6 +56,7 @@ const CareTypes = () => {
       description: careType.description || "",
       keywords: careType.keywords || "",
       price: careType.price?.toString() || "35.00",
+      duration: careType.duration_hours?.toString() || "4",
     });
     setIsDialogOpen(true);
   };
@@ -95,6 +97,12 @@ const CareTypes = () => {
         return;
       }
 
+      const durationValue = parseFloat(formData.duration);
+      if (isNaN(durationValue) || durationValue <= 0) {
+        toast.error("Please enter a valid duration");
+        return;
+      }
+
       if (selectedCareType) {
         const { error } = await supabase
           .from("care_types")
@@ -104,6 +112,7 @@ const CareTypes = () => {
             description: formData.description,
             keywords: formData.keywords,
             price: priceValue,
+            duration_hours: durationValue,
           })
           .eq("id", selectedCareType.id);
 
@@ -119,6 +128,7 @@ const CareTypes = () => {
             description: formData.description,
             keywords: formData.keywords,
             price: priceValue,
+            duration_hours: durationValue,
           });
 
         if (error) throw error;
@@ -128,7 +138,7 @@ const CareTypes = () => {
       queryClient.invalidateQueries({ queryKey: ["care-types"] });
       setIsDialogOpen(false);
       setSelectedCareType(null);
-      setFormData({ code: "", category: "", name: "", description: "", keywords: "", price: "" });
+      setFormData({ code: "", category: "", name: "", description: "", keywords: "", price: "", duration: "4" });
     } catch (error: any) {
       toast.error(error.message || "Failed to save care service");
     }
@@ -170,7 +180,7 @@ const CareTypes = () => {
           className="gap-2"
           onClick={() => {
             setSelectedCareType(null);
-            setFormData({ code: "", category: "", name: "", description: "", keywords: "", price: "35.00" });
+            setFormData({ code: "", category: "", name: "", description: "", keywords: "", price: "35.00", duration: "4" });
             setIsDialogOpen(true);
           }}
         >
@@ -328,6 +338,18 @@ const CareTypes = () => {
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   placeholder="35.00"
+                />
+              </div>
+              <div>
+                <Label htmlFor="duration">Duration (hours)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                  placeholder="4"
                 />
               </div>
               <div>

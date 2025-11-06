@@ -62,6 +62,7 @@ export type Database = {
           code: string
           created_at: string | null
           description: string | null
+          duration_hours: number | null
           id: string
           is_active: boolean | null
           keywords: string | null
@@ -74,6 +75,7 @@ export type Database = {
           code: string
           created_at?: string | null
           description?: string | null
+          duration_hours?: number | null
           id?: string
           is_active?: boolean | null
           keywords?: string | null
@@ -86,6 +88,7 @@ export type Database = {
           code?: string
           created_at?: string | null
           description?: string | null
+          duration_hours?: number | null
           id?: string
           is_active?: boolean | null
           keywords?: string | null
