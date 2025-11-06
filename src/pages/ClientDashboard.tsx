@@ -162,7 +162,20 @@ const ClientDashboard = () => {
       // Fetch care types
       const { data: careTypesData } = await supabase
         .from("client_care_needs")
-        .select("*, care_types:care_need_code(*)")
+        .select(`
+          id,
+          care_need_code,
+          priority,
+          notes,
+          care_types:care_need_code(
+            name,
+            code,
+            category,
+            description,
+            keywords,
+            price
+          )
+        `)
         .eq("client_id", clientData.id)
         .order("priority", { ascending: false });
 
