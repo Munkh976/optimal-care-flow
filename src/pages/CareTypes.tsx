@@ -128,7 +128,8 @@ const CareTypes = () => {
     const matchesSearch = searchQuery === "" ||
       careType.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       careType.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      careType.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      careType.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      careType.keywords?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = filterStatus === "all" || 
       (filterStatus === "active" && careType.is_active) ||
@@ -199,7 +200,7 @@ const CareTypes = () => {
                 <TableHead>Category</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Keywords</TableHead>
+                <TableHead>Includes</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -220,7 +221,7 @@ const CareTypes = () => {
                     </TableCell>
                     <TableCell>{careType.name}</TableCell>
                     <TableCell className="max-w-xs truncate">{careType.description || "-"}</TableCell>
-                    <TableCell className="max-w-xs truncate text-muted-foreground text-sm">{(careType as any).keywords || "-"}</TableCell>
+                    <TableCell className="max-w-xs truncate text-muted-foreground text-sm">{careType.keywords || "-"}</TableCell>
                     <TableCell>
                       <Badge variant={careType.is_active ? "default" : "secondary"}>
                         {careType.is_active ? "Active" : "Inactive"}
@@ -286,12 +287,10 @@ const CareTypes = () => {
                   <SelectContent>
                     <SelectItem value="Activities of Daily Living (ADL)">Activities of Daily Living (ADL)</SelectItem>
                     <SelectItem value="Instrumental Activities of Daily Living (IADL)">Instrumental Activities of Daily Living (IADL)</SelectItem>
-                    <SelectItem value="Mobility & Safety">Mobility & Safety</SelectItem>
-                    <SelectItem value="Cognitive Support">Cognitive Support</SelectItem>
-                    <SelectItem value="Emotional & Social Support">Emotional & Social Support</SelectItem>
-                    <SelectItem value="Health Monitoring & Care">Health Monitoring & Care</SelectItem>
-                    <SelectItem value="Transportation">Transportation</SelectItem>
-                    <SelectItem value="Specialized Care">Specialized Care</SelectItem>
+                  <SelectItem value="Health Monitoring & Care">Health Monitoring & Care</SelectItem>
+                  <SelectItem value="Cognitive & Emotional Support">Cognitive & Emotional Support</SelectItem>
+                  <SelectItem value="Safety & Transportation">Safety & Transportation</SelectItem>
+                  <SelectItem value="Specialized Care">Specialized Care</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -314,12 +313,13 @@ const CareTypes = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="keywords">Keywords</Label>
-                <Input
+                <Label htmlFor="keywords">Includes (what's covered)</Label>
+                <Textarea
                   id="keywords"
                   value={formData.keywords}
                   onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
-                  placeholder="e.g., bathing, shower, hygiene"
+                  placeholder="e.g., Showering, hair care, shaving, choosing clothes, getting dressed"
+                  rows={3}
                 />
               </div>
             </div>
@@ -362,7 +362,7 @@ const CareTypes = () => {
                 <p>{viewCareType.description || "-"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground">Keywords</Label>
+                <Label className="text-muted-foreground">Includes</Label>
                 <p className="text-sm">{viewCareType.keywords || "-"}</p>
               </div>
               <div>
