@@ -144,9 +144,9 @@ const Clients = () => {
           phone
         ),
         client_care_needs(
-          care_type_code,
+          care_need_code,
           priority,
-          care_types:care_type_code(code, name, category)
+          care_types:care_need_code(code, name, category)
         )
       `)
       .eq("agency_id", userId)
@@ -223,7 +223,7 @@ const Clients = () => {
       zip_code: client.zip_code || "",
       date_of_birth: client.date_of_birth || "",
       medical_conditions: client.medical_conditions || [],
-      care_need_codes: client.client_care_needs?.map((cn: any) => cn.care_type_code) || [],
+      care_need_codes: client.client_care_needs?.map((cn: any) => cn.care_need_code) || [],
       emergency_contact_name: client.emergency_contact_name || "",
       emergency_contact_phone: client.emergency_contact_phone || "",
       notes: client.notes || "",

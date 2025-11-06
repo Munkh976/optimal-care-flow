@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 interface CareType {
   id: string;
-  care_type_code: string;
+  care_need_code: string;
   care_types: {
     name: string;
     code: string;
@@ -449,7 +449,7 @@ export const OrdersManagement = ({
                     onValueChange={async (value) => {
                       setSelectedCareNeed(value);
                       try {
-                        const selected = availableCareTypes.find(n => n.care_type_code === value);
+                        const selected = availableCareTypes.find(n => n.care_need_code === value);
                         const typeName = selected?.care_types?.name || "";
                         
                         // Use the selected care type code directly
@@ -469,7 +469,7 @@ export const OrdersManagement = ({
                     </SelectTrigger>
                     <SelectContent>
                       {availableCareTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.care_type_code}>
+                        <SelectItem key={type.id} value={type.care_need_code}>
                           <div>
                             <div className="font-medium">{type.care_types.name}</div>
                             <div className="text-xs text-muted-foreground">{type.care_types.category}</div>

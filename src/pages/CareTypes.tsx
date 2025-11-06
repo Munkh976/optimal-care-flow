@@ -128,8 +128,7 @@ const CareTypes = () => {
     const matchesSearch = searchQuery === "" ||
       careType.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       careType.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      careType.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      careType.keywords?.toLowerCase().includes(searchQuery.toLowerCase());
+      careType.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = filterStatus === "all" || 
       (filterStatus === "active" && careType.is_active) ||
@@ -221,7 +220,7 @@ const CareTypes = () => {
                     </TableCell>
                     <TableCell>{careType.name}</TableCell>
                     <TableCell className="max-w-xs truncate">{careType.description || "-"}</TableCell>
-                    <TableCell className="max-w-xs truncate text-muted-foreground text-sm">{careType.keywords || "-"}</TableCell>
+                    <TableCell className="max-w-xs truncate text-muted-foreground text-sm">{(careType as any).keywords || "-"}</TableCell>
                     <TableCell>
                       <Badge variant={careType.is_active ? "default" : "secondary"}>
                         {careType.is_active ? "Active" : "Inactive"}

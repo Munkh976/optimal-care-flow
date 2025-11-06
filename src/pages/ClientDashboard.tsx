@@ -32,7 +32,7 @@ interface ClientProfile {
 
 interface CareType {
   id: string;
-  care_type_code: string;
+  care_need_code: string;
   priority: number;
   notes: string | null;
   care_types: {
@@ -160,7 +160,7 @@ const ClientDashboard = () => {
       // Fetch care types
       const { data: careTypesData } = await supabase
         .from("client_care_needs")
-        .select("*, care_types:care_type_code(*)")
+        .select("*, care_types:care_need_code(*)")
         .eq("client_id", clientData.id)
         .order("priority", { ascending: false });
 
