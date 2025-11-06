@@ -89,7 +89,7 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
           care_need_code,
           priority,
           notes,
-          care_types:care_need_code (
+          care_types!client_care_needs_care_need_code_fkey (
             id,
             code,
             name,

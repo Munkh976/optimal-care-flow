@@ -146,7 +146,7 @@ const Clients = () => {
         client_care_needs(
           care_need_code,
           priority,
-          care_types:care_need_code(code, name, category)
+          care_types!client_care_needs_care_need_code_fkey(code, name, category)
         )
       `)
       .eq("agency_id", userId)
@@ -456,7 +456,7 @@ const Clients = () => {
         condition.toLowerCase().includes(searchQuery.toLowerCase())
       ) ||
       client.client_care_needs?.some((cn: any) => 
-        cn.care_needs?.name.toLowerCase().includes(searchQuery.toLowerCase())
+        cn.care_types?.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
     const matchesPhone = searchPhone === "" || 
@@ -698,7 +698,7 @@ const Clients = () => {
                           <div className="flex flex-wrap gap-1">
                             {client.client_care_needs.slice(0, 2).map((cn: any, idx: number) => (
                               <Badge key={idx} variant="outline" className="text-xs">
-                                {cn.care_needs?.name || cn.care_need_code}
+                                {cn.care_types?.name || cn.care_need_code}
                               </Badge>
                             ))}
                             {client.client_care_needs.length > 2 && (
