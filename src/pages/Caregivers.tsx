@@ -235,55 +235,30 @@ const Caregivers = () => {
       setIsAddDialogOpen(false);
       if (user) fetchCaregivers(user.id);
     } else {
-      // Create auth user and profile first
+      // Create user via edge function
       const tempPassword = Math.random().toString(36).slice(-12) + "Aa1!";
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: formData.email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: {
-          full_name: `${formData.first_name} ${formData.last_name}`,
+      
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: formData.email,
+          password: tempPassword,
+          firstName: formData.first_name,
+          lastName: formData.last_name,
+          phone: formData.phone,
+          userType: 'caregiver',
+          userData: caregiverData,
         }
       });
 
-      if (authError) {
-        toast.error("Failed to create user account: " + authError.message);
+      if (error || !data?.success) {
+        toast.error(data?.error || "Failed to create caregiver");
         return;
       }
-
-      // Profile is created automatically by trigger
-      // Wait a moment for the trigger to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Update profile with phone
-      await supabase
-        .from("profiles")
-        .update({ phone: formData.phone })
-        .eq("id", authData.user.id);
-
-      // Create caregiver record linked to profile
-      const { data: newCaregiver, error } = await supabase.from("caregivers").insert({
-        ...caregiverData,
-        user_id: authData.user.id,
-        agency_id: user.id,
-      } as any).select().single();
-
-      if (error) {
-        toast.error("Failed to add caregiver");
-        return;
-      }
-
-      // Add caregiver role
-      await supabase.from("user_roles").insert({
-        user_id: authData.user.id,
-        role: 'caregiver',
-        agency_id: user.id,
-      });
 
       // Add caregiver skills
-      if (formData.care_type_codes.length > 0 && newCaregiver) {
+      if (formData.care_type_codes.length > 0 && data.recordId) {
         const skillsData = formData.care_type_codes.map((code) => ({
-          caregiver_id: newCaregiver.id,
+          caregiver_id: data.recordId,
           care_type_code: code,
         }));
         await supabase.from("caregiver_skills").insert(skillsData);

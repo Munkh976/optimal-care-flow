@@ -310,62 +310,30 @@ const Clients = () => {
       setIsAddDialogOpen(false);
       if (user) fetchClients(user.id);
     } else {
-      // Create auth user and profile first
+      // Create user via edge function
       const tempPassword = Math.random().toString(36).slice(-12) + "Aa1!";
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: tempPassword,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: `${formData.first_name} ${formData.last_name}`,
-          }
+      
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: formData.email,
+          password: tempPassword,
+          firstName: formData.first_name,
+          lastName: formData.last_name,
+          phone: formData.phone,
+          userType: 'client',
+          userData: clientData,
         }
       });
 
-      if (authError) {
-        toast.error("Failed to create user account: " + authError.message);
+      if (error || !data?.success) {
+        toast.error(data?.error || "Failed to create client");
         return;
       }
-
-      if (!authData.user) {
-        toast.error("Failed to create user account");
-        return;
-      }
-
-      // Profile is created automatically by trigger
-      // Wait a moment for the trigger to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Update profile with phone
-      await supabase
-        .from("profiles")
-        .update({ phone: formData.phone })
-        .eq("id", authData.user.id);
-
-      // Create client record linked to profile
-      const { data: newClient, error } = await supabase.from("clients").insert({
-        ...clientData,
-        user_id: authData.user.id,
-        agency_id: user.id,
-      }).select().single();
-
-      if (error) {
-        toast.error("Failed to add client");
-        return;
-      }
-
-      // Add client role
-      await supabase.from("user_roles").insert({
-        user_id: authData.user.id,
-        role: 'client',
-        agency_id: user.id,
-      });
 
       // Add care needs
-      if (formData.care_need_codes.length > 0 && newClient) {
+      if (formData.care_need_codes.length > 0 && data.recordId) {
         const careNeedsData = formData.care_need_codes.map((code, idx) => ({
-          client_id: newClient.id,
+          client_id: data.recordId,
           care_need_code: code,
           priority: idx + 1,
         }));
@@ -373,7 +341,7 @@ const Clients = () => {
         await supabase.from("client_care_needs").insert(careNeedsData);
       }
 
-      toast.success(`Client added successfully. Temporary password: ${tempPassword}`);
+      toast.success("Client added successfully");
       setIsAddDialogOpen(false);
       if (user) fetchClients(user.id);
     }
