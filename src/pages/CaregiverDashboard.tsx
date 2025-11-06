@@ -8,6 +8,8 @@ import { Calendar, Clock, MapPin, Briefcase, DollarSign, LogOut, AlertCircle, Ho
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
+
 interface Assignment {
   id: string;
   status: string;
@@ -61,6 +63,7 @@ const CaregiverDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [caregiverId, setCaregiverId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview'>('overview');
+  const [selectedShift, setSelectedShift] = useState<any>(null);
   useEffect(() => {
     checkAuthAndFetch();
   }, []);
@@ -328,7 +331,11 @@ const CaregiverDashboard = () => {
             ) : (
               <div className="space-y-3">
                 {assignments.map((assignment) => (
-                  <Card key={assignment.id} className="border-l-4 border-primary hover:shadow-md transition-shadow">
+                  <Card 
+                    key={assignment.id} 
+                    className="border-l-4 border-primary hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => setSelectedShift(assignment.shifts)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 space-y-2">
@@ -412,6 +419,12 @@ const CaregiverDashboard = () => {
           </Card>
         </div>
       </div>
+
+      <ShiftDetailsDialog
+        shift={selectedShift}
+        open={!!selectedShift}
+        onOpenChange={(open) => !open && setSelectedShift(null)}
+      />
     </div>
   );
 };

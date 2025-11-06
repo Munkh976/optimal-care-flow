@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Calendar, Clock, MapPin, DollarSign, ArrowLeft, Filter, Search } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
 
 interface OpenShift {
   id: string;
@@ -34,6 +35,7 @@ const AvailableShifts = () => {
   const [caregiverId, setCaregiverId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDate, setFilterDate] = useState("");
+  const [selectedShift, setSelectedShift] = useState<any>(null);
 
   useEffect(() => {
     fetchCaregiverAndShifts();
@@ -220,7 +222,11 @@ const AvailableShifts = () => {
         ) : (
           <div className="grid gap-4">
             {filteredShifts.map((shift) => (
-              <Card key={shift.id} className="hover:shadow-lg transition-shadow">
+              <Card 
+                key={shift.id} 
+                className="hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => setSelectedShift(shift)}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
@@ -238,7 +244,12 @@ const AvailableShifts = () => {
                         {getCareTypeLabel(shift.care_type_code)}
                       </Badge>
                     </div>
-                    <Button onClick={() => handlePickUpShift(shift.id)}>
+                    <Button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePickUpShift(shift.id);
+                      }}
+                    >
                       Pick Up Shift
                     </Button>
                   </div>
@@ -277,6 +288,12 @@ const AvailableShifts = () => {
           </div>
         )}
       </div>
+
+      <ShiftDetailsDialog
+        shift={selectedShift}
+        open={!!selectedShift}
+        onOpenChange={(open) => !open && setSelectedShift(null)}
+      />
     </div>
   );
 };
