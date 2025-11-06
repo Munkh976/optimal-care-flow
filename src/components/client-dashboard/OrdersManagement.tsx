@@ -125,37 +125,10 @@ export const OrdersManagement = ({
         return;
       }
 
-      // Get care need mapping to care type codes
-      const { data: careNeed, error: careNeedError } = await supabase
-        .from("care_needs")
-        .select("related_care_type_codes")
-        .eq("code", selectedCareNeed)
-        .single();
-      if (careNeedError) console.warn("care_needs lookup issue:", careNeedError);
+      // Zipcode-only rule: skip skill mapping and AI matching
+      let relatedCareTypeCodes: string[] = [];
 
-      let relatedCareTypeCodes: string[] = careNeed?.related_care_type_codes || [];
-      console.log("🔍 Care need codes:", relatedCareTypeCodes);
-
-      // Fallbacks: use already selected care type codes or treat selectedNeed as a care type code
-      if (relatedCareTypeCodes.length === 0 && selectedCareTypeCodes.length > 0) {
-        relatedCareTypeCodes = selectedCareTypeCodes;
-      }
-      if (relatedCareTypeCodes.length === 0) {
-        const { data: ct } = await supabase
-          .from("care_types")
-          .select("code")
-          .eq("code", selectedCareNeed)
-          .maybeSingle();
-        if (ct?.code) relatedCareTypeCodes = [ct.code];
-      }
-
-      if (relatedCareTypeCodes.length === 0) {
-        setAvailableCaregivers([]);
-        toast.info("No care type mapping found for the selected need");
-        return;
-      }
-
-      // Get caregivers with skills matching ANY of the related care type codes
+      // Zipcode-only rule: fetch all active caregivers (no agency or skills filter)
       const { data: caregivers, error } = await supabase
         .from("caregivers")
         .select(`
@@ -164,12 +137,9 @@ export const OrdersManagement = ({
           last_name,
           hourly_rate,
           performance_rating,
-          service_zipcodes,
-          caregiver_skills!inner(care_type_code)
+          service_zipcodes
         `)
-        .eq("agency_id", clientProfile.agency_id)
-        .eq("is_active", true)
-        .in("caregiver_skills.care_type_code", relatedCareTypeCodes);
+        .eq("is_active", true);
 
       if (error) throw error;
 
@@ -188,7 +158,7 @@ export const OrdersManagement = ({
       setAvailableCaregivers(filteredCaregivers);
 
       if (filteredCaregivers.length === 0) {
-        toast.info("No caregivers available in your area with the required skills");
+        toast.info("No caregivers available in your area");
       } else {
         toast.success(`Found ${filteredCaregivers.length} matching caregiver(s)`);
       }
