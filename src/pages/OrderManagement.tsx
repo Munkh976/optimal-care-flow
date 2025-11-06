@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package, Zap } from "lucide-react";
+import { Activity, LogOut, Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package, Zap, Star, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addWeeks, addMonths, addYears, subWeeks, subMonths, subYears } from "date-fns";
@@ -55,25 +56,22 @@ const OrderManagement = () => {
   const [view, setView] = useState<"week" | "month" | "year">("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   
-  const [formData, setFormData] = useState({
+  const [step, setStep] = useState(1);
+  const [bookingData, setBookingData] = useState({
+    primaryService: null as any,
+    additionalService: null as any,
     client_id: "",
-    duration_weeks: "1",
-    shifts: [] as Array<{
-      selected_days: string[];
-      time_slot: string;
-      start_time: string;
-      care_type: string;
-      notes: string;
-    }>,
+    duration: 4,
+    day: null as number | null,
+    repeat: "once" as "once" | "weekly" | "biweekly" | "monthly",
+    caregiver: null as any,
+    time: "",
+    startDate: "",
+    rate: 35,
   });
 
-  const [currentShift, setCurrentShift] = useState({
-    selected_days: [] as string[],
-    time_slot: "2",
-    start_time: "09:00",
-    care_type: "",
-    notes: "",
-  });
+  const [availableCaregivers, setAvailableCaregivers] = useState<any[]>([]);
+  const [loadingCaregivers, setLoadingCaregivers] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -183,171 +181,108 @@ const OrderManagement = () => {
   };
 
   const handleSaveOrder = async (status: "draft" | "submitted") => {
-    const { client_id, duration_weeks, shifts } = formData;
-
-    if (!client_id || shifts.length === 0) {
-      toast.error("Please select a client and add at least one shift");
+    if (!bookingData.client_id || !bookingData.primaryService || !bookingData.caregiver ||
+        !bookingData.time || bookingData.day === null || !bookingData.startDate) {
+      toast.error("Please complete all required fields");
       return;
     }
 
-    // Calculate start and end dates (next Monday onwards)
-    const now = new Date();
-    const daysUntilMonday = (8 - now.getDay()) % 7 || 7;
-    const startDate = new Date(now);
-    startDate.setDate(startDate.getDate() + daysUntilMonday);
-    startDate.setHours(0, 0, 0, 0);
-    
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + (parseInt(duration_weeks) * 7) - 1);
-
-    // Generate sequential order number if creating new order
-    let orderNumber = selectedOrder?.order_number;
-    if (!orderNumber) {
-      const { data: newOrderNumber, error: fnError } = await supabase
-        .rpc('generate_order_number');
+    try {
+      const start = bookingData.startDate;
+      let end = new Date(start);
       
-      if (fnError) {
-        console.error('Error generating order number:', fnError);
-        toast.error('Failed to generate order number');
-        return;
-      }
-      orderNumber = newOrderNumber;
-    }
-    
-    // Collect all unique days across all shifts
-    const allDays = new Set<string>();
-    shifts.forEach(shift => shift.selected_days.forEach(day => allDays.add(day)));
-    const daysOfWeek = Array.from(allDays).join(",");
-
-    // Create or update order
-    let orderId = selectedOrder?.id;
-
-    if (selectedOrder) {
-      const { error: updateError } = await supabase
-        .from("client_orders")
-        .update({
-          start_date: startDate.toISOString().split("T")[0],
-          end_date: endDate.toISOString().split("T")[0],
-          frequency: "weekly",
-          days_of_week: daysOfWeek,
-          notes: `${shifts.length} shift configurations`,
-          status,
-        })
-        .eq("id", selectedOrder.id);
-
-      if (updateError) {
-        toast.error("Failed to update order");
-        console.error(updateError);
-        return;
+      if (bookingData.repeat === 'weekly') {
+        end.setMonth(end.getMonth() + 3);
+      } else if (bookingData.repeat === 'biweekly') {
+        end.setMonth(end.getMonth() + 6);
+      } else if (bookingData.repeat === 'monthly') {
+        end.setMonth(end.getMonth() + 12);
+      } else {
+        end = new Date(start);
       }
 
-      // Delete existing shifts for this order
-      await supabase.from("shifts").delete().eq("order_id", selectedOrder.id);
-    } else {
-      const { data: orderData, error: orderError } = await supabase
+      const { data: newOrderNumber, error: fnError } = await supabase.rpc('generate_order_number');
+      if (fnError) throw fnError;
+
+      const { data: newOrder, error: orderError } = await supabase
         .from("client_orders")
         .insert({
+          client_id: bookingData.client_id,
           agency_id: user.id,
-          client_id,
-          order_number: orderNumber,
-          start_date: startDate.toISOString().split("T")[0],
-          end_date: endDate.toISOString().split("T")[0],
-          frequency: "weekly",
-          days_of_week: daysOfWeek,
-          notes: `${shifts.length} shift configurations`,
+          order_number: newOrderNumber,
+          start_date: start,
+          end_date: end.toISOString().split('T')[0],
+          frequency: bookingData.repeat,
           status,
         })
         .select()
         .single();
 
-      if (orderError || !orderData) {
-        toast.error("Failed to create order");
-        console.error(orderError);
-        return;
-      }
-      orderId = orderData.id;
-    }
+      if (orderError) throw orderError;
 
-    // Generate shifts for each shift configuration, for each week
-    const generatedShifts = [];
-    const dayMap: { [key: string]: number } = {
-      Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0,
-    };
+      const shiftsToCreate = [];
+      const [timeValue, period] = bookingData.time.split(' ');
+      let [hours] = timeValue.split(':').map(Number);
+      
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      
+      const startTimeHours = hours;
+      const endTimeHours = hours + bookingData.duration;
+      const startTime = `${String(startTimeHours).padStart(2, '0')}:00`;
+      const endTime = `${String(endTimeHours % 24).padStart(2, '0')}:00`;
 
-    for (const shiftConfig of shifts) {
-      for (let week = 0; week < parseInt(duration_weeks); week++) {
-        for (const day of shiftConfig.selected_days) {
-          const shiftDate = new Date(startDate);
-          const targetDay = dayMap[day];
-          const currentDay = shiftDate.getDay();
-          const daysToAdd = (targetDay - currentDay + 7) % 7;
-          shiftDate.setDate(shiftDate.getDate() + daysToAdd + (week * 7));
-
-          const [hours, minutes] = shiftConfig.start_time.split(":");
-          const endTimeObj = new Date();
-          endTimeObj.setHours(parseInt(hours) + parseInt(shiftConfig.time_slot), parseInt(minutes), 0);
-
-          generatedShifts.push({
-            shift_date: shiftDate.toISOString().split("T")[0],
-            start_time: shiftConfig.start_time,
-            end_time: `${String(endTimeObj.getHours()).padStart(2, "0")}:${String(endTimeObj.getMinutes()).padStart(2, "0")}`,
-            care_type_code: shiftConfig.care_type,
-            duration_hours: parseInt(shiftConfig.time_slot),
-            notes: shiftConfig.notes,
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        if (d.getDay() === bookingData.day) {
+          const shiftDate = d.toISOString().split('T')[0];
+          shiftsToCreate.push({
+            client_id: bookingData.client_id,
+            agency_id: user.id,
+            caregiver_id: bookingData.caregiver.id,
+            order_id: newOrder.id,
+            shift_date: shiftDate,
+            start_time: startTime,
+            end_time: endTime,
+            duration_hours: bookingData.duration,
+            care_type_code: bookingData.primaryService.code,
+            status: 'open',
+            special_notes: bookingData.additionalService
+              ? `Includes ${bookingData.additionalService.name}`
+              : null,
+            order_title: bookingData.primaryService.name
           });
         }
       }
+
+      const { error: shiftsError } = await supabase.from("shifts").insert(shiftsToCreate);
+      if (shiftsError) throw shiftsError;
+
+      toast.success(status === "draft" ? "Order saved as draft" : "Order submitted successfully");
+      handleCloseDialog();
+      if (user) fetchOrders(user.id);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create order");
+      console.error(error);
     }
-
-    // Create shifts
-    const shiftInserts = generatedShifts.map((shift) => {
-      const careTypeName = careTypes.find(ct => ct.code === shift.care_type)?.name || shift.care_type;
-      return {
-        agency_id: user.id,
-        client_id,
-        order_id: orderId,
-        shift_date: shift.shift_date,
-        start_time: shift.start_time,
-        end_time: shift.end_time,
-        care_type_code: shift.care_type,
-        duration_hours: shift.duration_hours,
-        status: "open" as any,
-        order_title: careTypeName,
-        special_notes: shift.notes,
-      };
-    });
-
-    const { data: shiftData, error: shiftError } = await supabase
-      .from("shifts")
-      .insert(shiftInserts)
-      .select();
-
-    if (shiftError || !shiftData) {
-      toast.error("Failed to create shifts");
-      console.error(shiftError);
-      return;
-    }
-
-    toast.success(status === "draft" ? "Order saved as draft" : "Order submitted successfully");
-    handleCloseDialog();
-    if (user) fetchOrders(user.id);
   };
 
   const handleCloseDialog = () => {
     setIsAddDialogOpen(false);
     setSelectedOrder(null);
-    setFormData({
+    setStep(1);
+    setBookingData({
+      primaryService: null,
+      additionalService: null,
       client_id: "",
-      duration_weeks: "1",
-      shifts: [],
+      duration: 4,
+      day: null,
+      repeat: "once",
+      caregiver: null,
+      time: "",
+      startDate: "",
+      rate: 35,
     });
-    setCurrentShift({
-      selected_days: [],
-      time_slot: "2",
-      start_time: "09:00",
-      care_type: "",
-      notes: "",
-    });
+    setAvailableCaregivers([]);
   };
 
   const handleDeleteOrder = async (orderId: string) => {
@@ -438,109 +373,90 @@ const OrderManagement = () => {
     setFilteredOrders(filtered);
   }, [searchQuery, statusFilter, view, currentDate, orders]);
 
-  const handleAddShift = () => {
-    if (currentShift.selected_days.length === 0 || !currentShift.care_type) {
-      toast.error("Please select days and care type for the shift");
-      return;
-    }
-    
-    setFormData(prev => ({
-      ...prev,
-      shifts: [...prev.shifts, { ...currentShift }],
-    }));
-    
-    setCurrentShift({
-      selected_days: [],
-      time_slot: "2",
-      start_time: "09:00",
-      care_type: "",
-      notes: "",
-    });
-    
-    toast.success("Shift added to order");
-  };
+  const loadAvailableCaregivers = async () => {
+    if (!bookingData.client_id || bookingData.day === null) return;
 
-  const handleRemoveShift = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      shifts: prev.shifts.filter((_, i) => i !== index),
-    }));
-  };
+    setLoadingCaregivers(true);
+    try {
+      const { data: clientData } = await supabase
+        .from("clients")
+        .select("zip_code")
+        .eq("id", bookingData.client_id)
+        .single();
 
-  const handleOpenEditDialog = async (order: Order) => {
-    setSelectedOrder(order);
-    
-    // Calculate duration in weeks
-    const start = new Date(order.start_date);
-    const end = new Date(order.end_date);
-    const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const weeks = Math.ceil(diffDays / 7);
+      if (!clientData?.zip_code) {
+        toast.error("Client zip code not found");
+        return;
+      }
 
-    // Get all shifts to reconstruct shift configurations
-    const { data: shifts } = await supabase
-      .from("shifts")
-      .select("*")
-      .eq("order_id", order.id)
-      .order("shift_date");
+      const { data: caregivers } = await supabase
+        .from("caregivers")
+        .select(`
+          id, first_name, last_name, hourly_rate, performance_rating,
+          service_zipcodes,
+          caregiver_availability(day_of_week, start_time, end_time, is_available)
+        `)
+        .eq("is_active", true);
 
-    const reconstructedShifts: Array<{
-      selected_days: string[];
-      time_slot: string;
-      start_time: string;
-      care_type: string;
-      notes: string;
-    }> = [];
-
-    if (shifts && shifts.length > 0) {
-      // Group shifts by their configuration (time, care_type, duration)
-        const configMap = new Map<string, Set<string>>();
-        
-        shifts.forEach(shift => {
-          const key = `${shift.start_time}-${shift.care_type_code}-${shift.duration_hours}`;
-          if (!configMap.has(key)) {
-            configMap.set(key, new Set());
-          }
-          const shiftDate = new Date(shift.shift_date);
-          const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-          configMap.get(key)!.add(dayNames[shiftDate.getDay()]);
-        });
-
-        configMap.forEach((days, key) => {
-          const [start_time, care_type_code, duration] = key.split("-");
-          const firstShift = shifts.find(s => 
-            s.start_time === start_time && 
-            s.care_type_code === care_type_code && 
-            s.duration_hours?.toString() === duration
-          );
+      const filtered = (caregivers || [])
+        .filter((cg) => {
+          const serviceZipcodes = cg.service_zipcodes || [];
+          if (!serviceZipcodes.includes(clientData.zip_code)) return false;
           
-          reconstructedShifts.push({
-            selected_days: Array.from(days),
-            time_slot: duration,
-            start_time,
-            care_type: care_type_code,
-            notes: firstShift?.special_notes || "",
-          });
-        });
+          const daySlot = cg.caregiver_availability?.find(
+            (slot: any) => slot.day_of_week === bookingData.day && slot.is_available
+          );
+          return !!daySlot;
+        })
+        .sort((a, b) => (b.performance_rating || 0) - (a.performance_rating || 0));
+
+      setAvailableCaregivers(filtered);
+      if (filtered.length === 0) {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        toast.info(`No caregivers available on ${dayNames[bookingData.day]}`);
+      }
+    } catch (error: any) {
+      toast.error("Failed to fetch caregivers");
+    } finally {
+      setLoadingCaregivers(false);
     }
-
-    setFormData({
-      client_id: order.client_id,
-      duration_weeks: weeks.toString(),
-      shifts: reconstructedShifts,
-    });
-    setIsAddDialogOpen(true);
   };
 
-  const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  useEffect(() => {
+    if (step === 2 && bookingData.day !== null) {
+      loadAvailableCaregivers();
+    }
+  }, [step, bookingData.day]);
 
-  const toggleDay = (day: string) => {
-    setCurrentShift((prev) => ({
-      ...prev,
-      selected_days: prev.selected_days.includes(day)
-        ? prev.selected_days.filter((d) => d !== day)
-        : [...prev.selected_days, day],
-    }));
+  const getServiceIcon = (category: string) => {
+    const iconMap: Record<string, string> = {
+      'Activities of Daily Living (ADL)': '🛁',
+      'Instrumental Activities of Daily Living (IADL)': '🏠',
+      'Health Monitoring & Care': '❤️',
+      'Cognitive & Emotional Support': '🧠',
+      'Safety & Transportation': '🚗',
+      'Specialized Care': '⚕️',
+    };
+    return iconMap[category] || '💼';
   };
+
+  const timeSlots = {
+    morning: ['6:00', '7:00', '8:00', '9:00', '10:00'],
+    afternoon: ['12:00', '1:00', '2:00', '3:00', '4:00'],
+    evening: ['6:00', '7:00', '8:00'],
+  };
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  const primaryServices = careTypes.filter(
+    s => s.category === 'Activities of Daily Living (ADL)' ||
+         s.category === 'Health Monitoring & Care' ||
+         s.category === 'Instrumental Activities of Daily Living (IADL)'
+  );
+
+  const additionalServices = careTypes.filter(
+    s => bookingData.primaryService ? s.code !== bookingData.primaryService.code : true
+  );
 
 
   if (loading) {
@@ -807,7 +723,7 @@ const OrderManagement = () => {
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleOpenEditDialog(order);
+                                  toast.info("Edit feature coming soon");
                                 }}
                               >
                                 <Edit className="h-4 w-4" />
@@ -891,135 +807,152 @@ const OrderManagement = () => {
         </Card>
 
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{selectedOrder ? "Edit Order" : "Create Weekly Order"}</DialogTitle>
+              <div>
+                <DialogTitle>Create Care Order</DialogTitle>
+                <p className="text-sm text-muted-foreground mt-1">Step {step} of 3</p>
+              </div>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid gap-4">
-                <div>
-                  <Label>Client *</Label>
-                  <Select
-                    value={formData.client_id}
-                    onValueChange={(value) => setFormData({ ...formData, client_id: value })}
-                    disabled={!!selectedOrder}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients?.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.first_name} {client.last_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
 
-                <div>
-                  <Label>Duration (Weeks) *</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="52"
-                    value={formData.duration_weeks}
-                    onChange={(e) => setFormData({ ...formData, duration_weeks: e.target.value })}
-                    placeholder="Enter number of weeks (1-52)"
-                  />
-                </div>
+            {/* Progress Bar */}
+            <div className="mb-6">
+              <div className="flex items-center justify-center gap-4">
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                  step >= 1 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
+                }`}>1</div>
+                <div className={`h-1 w-16 transition-all ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                  step >= 2 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
+                }`}>2</div>
+                <div className={`h-1 w-16 transition-all ${step >= 3 ? 'bg-primary' : 'bg-muted'}`} />
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                  step >= 3 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
+                }`}>3</div>
+              </div>
+            </div>
 
-                {/* Added Shifts Display */}
-                {formData.shifts.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Added Shifts ({formData.shifts.length})</Label>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {formData.shifts.map((shift, index) => {
-                        const careTypeName = careTypes.find(ct => ct.code === shift.care_type)?.name || shift.care_type;
-                        return (
-                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md text-sm">
-                            <div className="flex-1">
-                              <div className="font-medium">{careTypeName}</div>
-                              <div className="text-muted-foreground">
-                                {shift.selected_days.join(", ")} • {shift.start_time} • {shift.time_slot}h
-                              </div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveShift(index)}
-                            >
-                              Remove
-                            </Button>
+            {/* Step 1: Select Service */}
+            {step === 1 && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h3 className="text-2xl font-bold mb-2">Select Primary Service</h3>
+                  <p className="text-sm text-muted-foreground">Choose the main care service</p>
+                </div>
+                
+                <div className="grid gap-3 max-h-[400px] overflow-y-auto">
+                  {primaryServices.map((service) => (
+                    <Card
+                      key={service.id}
+                      className={`cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${
+                        bookingData.primaryService?.id === service.id
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary'
+                          : 'hover:border-primary/50'
+                      }`}
+                      onClick={() => setBookingData(prev => ({ 
+                        ...prev, 
+                        primaryService: service,
+                        duration: service.duration_hours || 4,
+                        rate: service.price || 35
+                      }))}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl flex-shrink-0">
+                            {getServiceIcon(service.category)}
                           </div>
-                        );
-                      })}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <h4 className="font-semibold text-base">{service.name}</h4>
+                              <Badge variant="secondary" className="shrink-0">${service.price}/hr</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {service.description || service.keywords}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {bookingData.primaryService && (
+                  <div className="border-t pt-6">
+                    <h4 className="text-lg font-semibold mb-3">Add Another Service? (Optional)</h4>
+                    <div className="grid gap-3 max-h-[200px] overflow-y-auto">
+                      {additionalServices.slice(0, 5).map((service) => (
+                        <Card
+                          key={service.id}
+                          className={`cursor-pointer transition-all hover:shadow-md ${
+                            bookingData.additionalService?.id === service.id
+                              ? 'border-primary bg-primary/5 ring-2 ring-primary'
+                              : 'hover:border-primary/50'
+                          }`}
+                          onClick={() => {
+                            if (bookingData.additionalService?.id === service.id) {
+                              setBookingData(prev => ({ 
+                                ...prev, 
+                                additionalService: null,
+                                duration: prev.primaryService?.duration_hours || 4,
+                                rate: prev.primaryService?.price || 35
+                              }));
+                            } else {
+                              const totalRate = (bookingData.primaryService?.price || 35) + (service.price || 35);
+                              setBookingData(prev => ({ 
+                                ...prev, 
+                                additionalService: service,
+                                duration: 8,
+                                rate: totalRate / 2
+                              }));
+                            }
+                          }}
+                        >
+                          <CardContent className="p-3">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{service.name}</span>
+                              <Badge variant="secondary">${service.price}/hr</Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
                   </div>
                 )}
 
-                {/* Current Shift Builder */}
-                <div className="border-t pt-4 space-y-4">
-                  <Label className="text-base font-semibold">Add New Shift</Label>
-                  
-                  <div>
-                    <Label>Select Days *</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {dayOptions.map((day) => (
-                        <div key={day} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`current-${day}`}
-                            checked={currentShift.selected_days.includes(day)}
-                            onCheckedChange={() => toggleDay(day)}
-                          />
-                          <label htmlFor={`current-${day}`} className="text-sm cursor-pointer">
-                            {day}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
+                  <Button 
+                    onClick={() => setStep(2)}
+                    disabled={!bookingData.primaryService}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Start Time *</Label>
-                      <Input
-                        type="time"
-                        value={currentShift.start_time}
-                        onChange={(e) => setCurrentShift({ ...currentShift, start_time: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Duration *</Label>
-                      <Select
-                        value={currentShift.time_slot}
-                        onValueChange={(value) => setCurrentShift({ ...currentShift, time_slot: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="2">2 hours</SelectItem>
-                          <SelectItem value="3">3 hours</SelectItem>
-                          <SelectItem value="4">4 hours</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+            {/* Step 2: Schedule Details */}
+            {step === 2 && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h3 className="text-2xl font-bold mb-2">Schedule Details</h3>
+                  <p className="text-sm text-muted-foreground">Choose client, day, time, and caregiver</p>
+                </div>
 
+                <div className="space-y-4">
                   <div>
-                    <Label>Care Type *</Label>
+                    <Label>Select Client *</Label>
                     <Select
-                      value={currentShift.care_type}
-                      onValueChange={(value) => setCurrentShift({ ...currentShift, care_type: value })}
+                      value={bookingData.client_id}
+                      onValueChange={(value) => setBookingData(prev => ({ ...prev, client_id: value }))}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select care type" />
+                        <SelectValue placeholder="Choose a client" />
                       </SelectTrigger>
                       <SelectContent>
-                        {careTypes?.map((type) => (
-                          <SelectItem key={type.id} value={type.code}>
-                            {type.name}
+                        {clients.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.first_name} {client.last_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1027,45 +960,215 @@ const OrderManagement = () => {
                   </div>
 
                   <div>
-                    <Label>Notes</Label>
-                    <Textarea
-                      value={currentShift.notes}
-                      onChange={(e) => setCurrentShift({ ...currentShift, notes: e.target.value })}
-                      placeholder="Add any special instructions..."
-                      rows={2}
-                    />
+                    <Label>Select Day *</Label>
+                    <div className="grid grid-cols-7 gap-2">
+                      {dayNames.map((day, index) => (
+                        <Button
+                          key={day}
+                          variant={bookingData.day === index ? "default" : "outline"}
+                          onClick={() => setBookingData(prev => ({ ...prev, day: index, caregiver: null, time: '' }))}
+                          className="text-xs"
+                        >
+                          {day}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleAddShift}
-                    className="w-full"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Shift to Order
-                  </Button>
+                  {bookingData.day !== null && (
+                    <>
+                      <div>
+                        <Label>Select Caregiver *</Label>
+                        {loadingCaregivers ? (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                          </div>
+                        ) : availableCaregivers.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            No caregivers available on {dayNames[bookingData.day]}
+                          </div>
+                        ) : (
+                          <div className="grid gap-2 max-h-[250px] overflow-y-auto">
+                            {availableCaregivers.map((cg) => (
+                              <Card
+                                key={cg.id}
+                                className={`cursor-pointer transition-all ${
+                                  bookingData.caregiver?.id === cg.id
+                                    ? 'border-primary bg-primary/5 ring-2 ring-primary'
+                                    : 'hover:border-primary/50'
+                                }`}
+                                onClick={() => setBookingData(prev => ({ ...prev, caregiver: cg, time: '' }))}
+                              >
+                                <CardContent className="p-3">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
+                                        {cg.first_name[0]}{cg.last_name[0]}
+                                      </div>
+                                      <div>
+                                        <div className="font-medium">{cg.first_name} {cg.last_name}</div>
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                          <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                                          {cg.performance_rating || 5.0}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <Badge variant="secondary">${cg.hourly_rate}/hr</Badge>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {bookingData.caregiver && (
+                        <>
+                          <div>
+                            <Label>Select Time *</Label>
+                            <div className="space-y-3">
+                              {Object.entries(timeSlots).map(([period, slots]) => (
+                                <div key={period}>
+                                  <div className="text-sm font-medium capitalize mb-2">{period}</div>
+                                  <div className="grid grid-cols-5 gap-2">
+                                    {slots.map((time) => (
+                                      <Button
+                                        key={time}
+                                        variant={bookingData.time === `${time} ${period.toUpperCase()}` ? "default" : "outline"}
+                                        onClick={() => setBookingData(prev => ({ 
+                                          ...prev, 
+                                          time: `${time} ${period.toUpperCase()}`,
+                                          rate: prev.caregiver?.hourly_rate || 35
+                                        }))}
+                                        className="text-xs"
+                                      >
+                                        {time}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label>Schedule *</Label>
+                            <RadioGroup 
+                              value={bookingData.repeat}
+                              onValueChange={(value: any) => setBookingData(prev => ({ ...prev, repeat: value }))}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="once" id="once" />
+                                <Label htmlFor="once" className="cursor-pointer">One Time Only</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="weekly" id="weekly" />
+                                <Label htmlFor="weekly" className="cursor-pointer">Weekly (3 months)</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="biweekly" id="biweekly" />
+                                <Label htmlFor="biweekly" className="cursor-pointer">Bi-weekly (6 months)</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="monthly" id="monthly" />
+                                <Label htmlFor="monthly" className="cursor-pointer">Monthly (12 months)</Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+
+                          <div>
+                            <Label>Start Date *</Label>
+                            <Input
+                              type="date"
+                              value={bookingData.startDate}
+                              onChange={(e) => setBookingData(prev => ({ ...prev, startDate: e.target.value }))}
+                              min={new Date().toISOString().split('T')[0]}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="flex justify-between gap-2">
+                  <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
+                    <Button 
+                      onClick={() => setStep(3)}
+                      disabled={!bookingData.client_id || !bookingData.caregiver || !bookingData.time || !bookingData.startDate}
+                    >
+                      Review Order
+                    </Button>
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleCloseDialog}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => handleSaveOrder("draft")}
-                >
-                  Save as Draft
-                </Button>
-                <Button
-                  onClick={() => handleSaveOrder("submitted")}
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  Submit Order
-                </Button>
+            {/* Step 3: Confirmation */}
+            {step === 3 && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="text-center">
+                  <CheckCircle2 className="mx-auto h-16 w-16 text-primary mb-4" />
+                  <h3 className="text-2xl font-bold mb-2">Review Your Order</h3>
+                  <p className="text-sm text-muted-foreground">Please confirm the details below</p>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6 space-y-4">
+                    <div>
+                      <div className="text-sm text-muted-foreground">Client</div>
+                      <div className="font-medium">
+                        {clients.find(c => c.id === bookingData.client_id)?.first_name} {clients.find(c => c.id === bookingData.client_id)?.last_name}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Service</div>
+                      <div className="font-medium">{bookingData.primaryService?.name}</div>
+                      {bookingData.additionalService && (
+                        <div className="text-sm">+ {bookingData.additionalService.name}</div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Schedule</div>
+                      <div className="font-medium">
+                        {dayNames[bookingData.day!]} at {bookingData.time}
+                      </div>
+                      <div className="text-sm">{bookingData.repeat.charAt(0).toUpperCase() + bookingData.repeat.slice(1)}</div>
+                      <div className="text-sm">Starting {bookingData.startDate}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Caregiver</div>
+                      <div className="font-medium">
+                        {bookingData.caregiver?.first_name} {bookingData.caregiver?.last_name}
+                      </div>
+                    </div>
+                    <div className="border-t pt-4">
+                      <div className="text-sm text-muted-foreground">Total Cost per Visit</div>
+                      <div className="text-2xl font-bold text-primary">
+                        ${(bookingData.duration * bookingData.rate).toFixed(2)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">{bookingData.duration} hours @ ${bookingData.rate}/hr</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="flex justify-between gap-2">
+                  <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
+                    <Button variant="secondary" onClick={() => handleSaveOrder("draft")}>
+                      Save as Draft
+                    </Button>
+                    <Button onClick={() => handleSaveOrder("submitted")}>
+                      <Send className="mr-2 h-4 w-4" />
+                      Submit Order
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </DialogContent>
         </Dialog>
       </main>
