@@ -310,6 +310,18 @@ const Clients = () => {
       setIsAddDialogOpen(false);
       if (user) fetchClients(user.id);
     } else {
+      // Check if email already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', formData.email)
+        .maybeSingle();
+
+      if (existingUser) {
+        toast.error("A user with this email already exists");
+        return;
+      }
+
       // Create user via edge function
       const tempPassword = Math.random().toString(36).slice(-12) + "Aa1!";
       
@@ -326,7 +338,8 @@ const Clients = () => {
       });
 
       if (error || !data?.success) {
-        toast.error(data?.error || "Failed to create client");
+        const errorMsg = data?.error || error?.message || "Failed to create client";
+        toast.error(errorMsg);
         return;
       }
 

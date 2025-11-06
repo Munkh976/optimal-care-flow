@@ -235,6 +235,18 @@ const Caregivers = () => {
       setIsAddDialogOpen(false);
       if (user) fetchCaregivers(user.id);
     } else {
+      // Check if email already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', formData.email)
+        .maybeSingle();
+
+      if (existingUser) {
+        toast.error("A user with this email already exists");
+        return;
+      }
+
       // Create user via edge function
       const tempPassword = Math.random().toString(36).slice(-12) + "Aa1!";
       
@@ -251,7 +263,8 @@ const Caregivers = () => {
       });
 
       if (error || !data?.success) {
-        toast.error(data?.error || "Failed to create caregiver");
+        const errorMsg = data?.error || error?.message || "Failed to create caregiver";
+        toast.error(errorMsg);
         return;
       }
 
