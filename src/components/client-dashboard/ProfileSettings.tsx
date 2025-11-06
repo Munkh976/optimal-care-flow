@@ -176,37 +176,6 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
     }
   };
 
-  const handleUpdateCareNeedPriority = async (careNeedId: string, newPriority: number) => {
-    try {
-      const { error } = await supabase
-        .from("client_care_needs")
-        .update({ priority: newPriority })
-        .eq("id", careNeedId);
-
-      if (error) throw error;
-
-      toast.success("Priority updated");
-      fetchClientCareNeeds();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update priority");
-    }
-  };
-
-  const handleUpdateCareNeedNotes = async (careNeedId: string, notes: string) => {
-    try {
-      const { error } = await supabase
-        .from("client_care_needs")
-        .update({ notes })
-        .eq("id", careNeedId);
-
-      if (error) throw error;
-
-      toast.success("Notes updated");
-      fetchClientCareNeeds();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update notes");
-    }
-  };
 
   const handleSave = async () => {
     if (!formData || !clientProfile) return;
@@ -467,79 +436,22 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
           )}
 
           {clientCareNeeds.length > 0 ? (
-            <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
               {clientCareNeeds.map((clientNeed) => (
-                <Card key={clientNeed.id} className="p-4">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-semibold">{clientNeed.care_need?.name}</h4>
-                          <Badge variant="outline">{clientNeed.care_need?.category}</Badge>
-                        </div>
-                        {clientNeed.care_need?.description && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {clientNeed.care_need.description}
-                          </p>
-                        )}
-                      </div>
-                      {editMode && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveCareNeed(clientNeed.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Priority Level</Label>
-                        <Select
-                          value={clientNeed.priority.toString()}
-                          onValueChange={(value) =>
-                            handleUpdateCareNeedPriority(clientNeed.id, parseInt(value))
-                          }
-                          disabled={!editMode}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">High Priority</SelectItem>
-                            <SelectItem value="2">Medium Priority</SelectItem>
-                            <SelectItem value="3">Low Priority</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs">Specific Notes</Label>
-                      <Textarea
-                        value={clientNeed.notes || ""}
-                        onChange={(e) => {
-                          const updatedNeeds = clientCareNeeds.map(cn =>
-                            cn.id === clientNeed.id ? { ...cn, notes: e.target.value } : cn
-                          );
-                          setClientCareNeeds(updatedNeeds);
-                        }}
-                        onBlur={(e) => handleUpdateCareNeedNotes(clientNeed.id, e.target.value)}
-                        disabled={!editMode}
-                        placeholder="Add specific requirements or notes for this care need"
-                        rows={2}
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
-                </Card>
+                <Badge key={clientNeed.id} variant="default" className="px-3 py-2 text-sm">
+                  <span className="mr-2">{clientNeed.care_need?.name}</span>
+                  {editMode && (
+                    <X
+                      className="h-3 w-3 cursor-pointer hover:opacity-70"
+                      onClick={() => handleRemoveCareNeed(clientNeed.id)}
+                    />
+                  )}
+                </Badge>
               ))}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">
-              No care needs added yet. {editMode && "Select from the dropdown above to add."}
+              No care needs added yet. {editMode && "Click badges above to add."}
             </p>
           )}
         </CardContent>
