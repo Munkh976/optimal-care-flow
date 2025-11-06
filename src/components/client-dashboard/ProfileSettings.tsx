@@ -1,14 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Phone, Mail, MapPin, Heart, Bell, Lock } from "lucide-react";
+import { User, Phone, Mail, MapPin, Heart, Bell, Lock, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Client {
   id: string;
@@ -31,6 +39,22 @@ interface ProfileSettingsProps {
   onRefresh: () => void;
 }
 
+interface CareNeed {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  description: string | null;
+}
+
+interface ClientCareNeed {
+  id: string;
+  care_need_code: string;
+  priority: number;
+  notes: string | null;
+  care_need?: CareNeed;
+}
+
 export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: ProfileSettingsProps) => {
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState(clientProfile);
@@ -42,6 +66,143 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
     confirmPassword: "",
   });
   const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [clientCareNeeds, setClientCareNeeds] = useState<ClientCareNeed[]>([]);
+  const [availableCareNeeds, setAvailableCareNeeds] = useState<CareNeed[]>([]);
+  const [selectedCareNeed, setSelectedCareNeed] = useState<string>("");
+
+  useEffect(() => {
+    if (clientProfile?.id) {
+      fetchClientCareNeeds();
+      fetchAvailableCareNeeds();
+    }
+  }, [clientProfile?.id]);
+
+  const fetchClientCareNeeds = async () => {
+    if (!clientProfile?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("client_care_needs")
+        .select(`
+          id,
+          care_need_code,
+          priority,
+          notes,
+          care_needs:care_need_code (
+            id,
+            code,
+            name,
+            category,
+            description
+          )
+        `)
+        .eq("client_id", clientProfile.id)
+        .order("priority", { ascending: true });
+
+      if (error) throw error;
+      
+      const formattedData = data.map(item => ({
+        ...item,
+        care_need: Array.isArray(item.care_needs) ? item.care_needs[0] : item.care_needs
+      }));
+      
+      setClientCareNeeds(formattedData as any);
+    } catch (error: any) {
+      console.error("Error fetching client care needs:", error);
+    }
+  };
+
+  const fetchAvailableCareNeeds = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("care_needs")
+        .select("*")
+        .eq("is_active", true)
+        .order("category", { ascending: true });
+
+      if (error) throw error;
+      setAvailableCareNeeds(data || []);
+    } catch (error: any) {
+      console.error("Error fetching care needs:", error);
+    }
+  };
+
+  const handleAddCareNeed = async () => {
+    if (!selectedCareNeed || !clientProfile?.id) return;
+
+    // Check if already exists
+    const exists = clientCareNeeds.some(cn => cn.care_need_code === selectedCareNeed);
+    if (exists) {
+      toast.error("This care need is already added");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("client_care_needs")
+        .insert({
+          client_id: clientProfile.id,
+          care_need_code: selectedCareNeed,
+          priority: clientCareNeeds.length + 1,
+        });
+
+      if (error) throw error;
+
+      toast.success("Care need added successfully");
+      setSelectedCareNeed("");
+      fetchClientCareNeeds();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add care need");
+    }
+  };
+
+  const handleRemoveCareNeed = async (careNeedId: string) => {
+    try {
+      const { error } = await supabase
+        .from("client_care_needs")
+        .delete()
+        .eq("id", careNeedId);
+
+      if (error) throw error;
+
+      toast.success("Care need removed successfully");
+      fetchClientCareNeeds();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to remove care need");
+    }
+  };
+
+  const handleUpdateCareNeedPriority = async (careNeedId: string, newPriority: number) => {
+    try {
+      const { error } = await supabase
+        .from("client_care_needs")
+        .update({ priority: newPriority })
+        .eq("id", careNeedId);
+
+      if (error) throw error;
+
+      toast.success("Priority updated");
+      fetchClientCareNeeds();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update priority");
+    }
+  };
+
+  const handleUpdateCareNeedNotes = async (careNeedId: string, notes: string) => {
+    try {
+      const { error } = await supabase
+        .from("client_care_needs")
+        .update({ notes })
+        .eq("id", careNeedId);
+
+      if (error) throw error;
+
+      toast.success("Notes updated");
+      fetchClientCareNeeds();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update notes");
+    }
+  };
 
   const handleSave = async () => {
     if (!formData || !clientProfile) return;
@@ -249,6 +410,123 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
               placeholder="Enter emergency contact phone"
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Care Needs */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Heart className="h-5 w-5 text-primary" />
+                Care Needs
+              </CardTitle>
+              <CardDescription>Manage your specific care requirements</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {editMode && (
+            <div className="flex gap-2">
+              <Select value={selectedCareNeed} onValueChange={setSelectedCareNeed}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Select a care need to add" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCareNeeds.map((need) => (
+                    <SelectItem key={need.code} value={need.code}>
+                      {need.name} ({need.category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleAddCareNeed}
+                disabled={!selectedCareNeed}
+                size="icon"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          {clientCareNeeds.length > 0 ? (
+            <div className="space-y-3">
+              {clientCareNeeds.map((clientNeed) => (
+                <Card key={clientNeed.id} className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">{clientNeed.care_need?.name}</h4>
+                          <Badge variant="outline">{clientNeed.care_need?.category}</Badge>
+                        </div>
+                        {clientNeed.care_need?.description && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {clientNeed.care_need.description}
+                          </p>
+                        )}
+                      </div>
+                      {editMode && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveCareNeed(clientNeed.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Priority Level</Label>
+                        <Select
+                          value={clientNeed.priority.toString()}
+                          onValueChange={(value) =>
+                            handleUpdateCareNeedPriority(clientNeed.id, parseInt(value))
+                          }
+                          disabled={!editMode}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">High Priority</SelectItem>
+                            <SelectItem value="2">Medium Priority</SelectItem>
+                            <SelectItem value="3">Low Priority</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">Specific Notes</Label>
+                      <Textarea
+                        value={clientNeed.notes || ""}
+                        onChange={(e) => {
+                          const updatedNeeds = clientCareNeeds.map(cn =>
+                            cn.id === clientNeed.id ? { ...cn, notes: e.target.value } : cn
+                          );
+                          setClientCareNeeds(updatedNeeds);
+                        }}
+                        onBlur={(e) => handleUpdateCareNeedNotes(clientNeed.id, e.target.value)}
+                        disabled={!editMode}
+                        placeholder="Add specific requirements or notes for this care need"
+                        rows={2}
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No care needs added yet. {editMode && "Select from the dropdown above to add."}
+            </p>
+          )}
         </CardContent>
       </Card>
 
