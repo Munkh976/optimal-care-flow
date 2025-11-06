@@ -27,6 +27,7 @@ import OrderManagement from "./pages/OrderManagement";
 import NotFound from "./pages/NotFound";
 import AvailableShifts from "./pages/AvailableShifts";
 import CaregiverTimeOff from "./pages/CaregiverTimeOff";
+import CaregiverSettings from "./pages/CaregiverSettings";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => (
           <Route path="/order-management" element={<OrderManagement />} />
           <Route path="/available-shifts" element={<AvailableShifts />} />
           <Route path="/caregiver-time-off" element={<CaregiverTimeOff />} />
+          <Route path="/caregiver-settings" element={<CaregiverSettings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

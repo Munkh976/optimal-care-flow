@@ -306,10 +306,15 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_name: string
+          location_address: string | null
+          location_city: string | null
+          location_state: string | null
+          location_zip_code: string | null
           performance_rating: number | null
           phone: string
           reliability_score: number | null
           role: Database["public"]["Enums"]["caregiver_role"]
+          service_radius_miles: number | null
           state: string | null
           updated_at: string | null
           user_id: string | null
@@ -332,10 +337,15 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_name: string
+          location_address?: string | null
+          location_city?: string | null
+          location_state?: string | null
+          location_zip_code?: string | null
           performance_rating?: number | null
           phone: string
           reliability_score?: number | null
           role?: Database["public"]["Enums"]["caregiver_role"]
+          service_radius_miles?: number | null
           state?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -358,10 +368,15 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_name?: string
+          location_address?: string | null
+          location_city?: string | null
+          location_state?: string | null
+          location_zip_code?: string | null
           performance_rating?: number | null
           phone?: string
           reliability_score?: number | null
           role?: Database["public"]["Enums"]["caregiver_role"]
+          service_radius_miles?: number | null
           state?: string | null
           updated_at?: string | null
           user_id?: string | null

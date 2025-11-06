@@ -360,6 +360,20 @@ const CaregiverDashboard = () => {
               </Button>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold">⚙️ Settings</h3>
+                  <p className="text-sm text-muted-foreground">Update location & availability</p>
+                </div>
+              </div>
+              <Button className="w-full" onClick={() => navigate("/caregiver-settings")}>
+                Manage Settings
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

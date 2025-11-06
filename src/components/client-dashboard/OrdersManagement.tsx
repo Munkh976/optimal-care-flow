@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Plus, Trash2, ChevronLeft, ChevronRight, Package, Clock, CheckCircle2 } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Package, CheckCircle2, Edit, Users } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CareNeed {
   id: string;
@@ -30,12 +32,19 @@ interface Order {
   created_at: string;
 }
 
-interface CareNeedInput {
-  care_need_code: string;
-  selected_days: number[];
+interface Caregiver {
+  id: string;
+  first_name: string;
+  last_name: string;
+  hourly_rate: number;
+  performance_rating: number;
+  availability: any;
+}
+
+interface TimeSlot {
+  day_of_week: number;
   start_time: string;
-  duration: number;
-  notes: string;
+  end_time: string;
 }
 
 interface OrdersManagementProps {
@@ -54,10 +63,37 @@ export const OrdersManagement = ({
   onRefresh 
 }: OrdersManagementProps) => {
   const [step, setStep] = useState(1);
-  const [durationWeeks, setDurationWeeks] = useState(1);
-  const [startDate, setStartDate] = useState("");
-  const [careNeedInputs, setCareNeedInputs] = useState<CareNeedInput[]>([]);
   const [showOrderForm, setShowOrderForm] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  
+  // Step 1: Care Need Selection
+  const [selectedCareNeed, setSelectedCareNeed] = useState("");
+  
+  // Step 2: Date & Days Selection
+  const [startDate, setStartDate] = useState("");
+  const [durationWeeks, setDurationWeeks] = useState(1);
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  
+  // Step 3: Caregiver & Time Selection
+  const [availableCaregivers, setAvailableCaregivers] = useState<any[]>([]);
+  const [selectedCaregiver, setSelectedCaregiver] = useState("");
+  const [caregiverAvailability, setCaregiverAvailability] = useState<TimeSlot[]>([]);
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<{[key: number]: {start: string, end: string}}>({});
+  const [notes, setNotes] = useState("");
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  useEffect(() => {
+    if (step === 3 && selectedDays.length > 0) {
+      fetchAvailableCaregivers();
+    }
+  }, [step, selectedDays]);
+
+  useEffect(() => {
+    if (selectedCaregiver) {
+      fetchCaregiverAvailability();
+    }
+  }, [selectedCaregiver]);
 
   const getNextMonday = () => {
     const today = new Date();
@@ -68,159 +104,221 @@ export const OrdersManagement = ({
     return nextMonday.toISOString().split('T')[0];
   };
 
+  const fetchAvailableCaregivers = async () => {
+    if (!clientProfile) return;
+
+    try {
+      // Get caregivers with their skills matching the selected care need
+      const { data: caregivers, error } = await supabase
+        .from("caregivers")
+        .select(`
+          id,
+          first_name,
+          last_name,
+          hourly_rate,
+          performance_rating,
+          caregiver_skills!inner(care_type_code)
+        `)
+        .eq("agency_id", clientProfile.agency_id)
+        .eq("is_active", true)
+        .eq("caregiver_skills.care_type_code", selectedCareNeed);
+
+      if (error) throw error;
+
+      setAvailableCaregivers(caregivers || []);
+    } catch (error: any) {
+      toast.error("Failed to fetch caregivers");
+      console.error(error);
+    }
+  };
+
+  const fetchCaregiverAvailability = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("caregiver_availability")
+        .select("*")
+        .eq("caregiver_id", selectedCaregiver)
+        .in("day_of_week", selectedDays)
+        .eq("is_available", true)
+        .order("day_of_week");
+
+      if (error) throw error;
+      setCaregiverAvailability(data || []);
+    } catch (error: any) {
+      toast.error("Failed to fetch availability");
+      console.error(error);
+    }
+  };
+
   const handleSaveOrder = async (status: 'draft' | 'submitted') => {
     if (!clientProfile) {
       toast.error("Client profile not found");
       return;
     }
 
-    if (step === 1) {
-      if (!startDate || durationWeeks < 1 || durationWeeks > 52) {
-        toast.error("Please select a valid start date and duration");
+    // Validation based on step
+    if (step === 1 && !selectedCareNeed) {
+      toast.error("Please select a care need");
+      return;
+    }
+
+    if (step === 2) {
+      if (!startDate || selectedDays.length === 0) {
+        toast.error("Please select start date and days");
         return;
       }
+    }
 
+    if (step === 3 && status === 'submitted') {
+      if (!selectedCaregiver || Object.keys(selectedTimeSlots).length === 0) {
+        toast.error("Please select caregiver and time slots");
+        return;
+      }
+    }
+
+    try {
       const start = new Date(startDate);
       const end = new Date(start);
       end.setDate(start.getDate() + (durationWeeks * 7) - 1);
 
-      try {
-        if (currentOrder) {
-          const { data, error } = await supabase
-            .from("client_orders")
-            .update({
-              start_date: startDate,
-              end_date: end.toISOString().split('T')[0],
-              frequency: "weekly",
-              status: status,
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", currentOrder.id)
-            .select()
-            .single();
+      let orderId = editingOrderId;
 
-          if (error) throw error;
-          toast.success(status === 'draft' ? "Order saved as draft" : "Moving to care needs...");
-          if (status === 'submitted') setStep(2);
-        } else {
-          const orderNumber = `ORD-${Date.now()}`;
-          const { data: newOrder, error } = await supabase
-            .from("client_orders")
-            .insert({
-              client_id: clientProfile.id,
-              agency_id: clientProfile.agency_id,
-              order_number: orderNumber,
-              start_date: startDate,
-              end_date: end.toISOString().split('T')[0],
-              frequency: "weekly",
-              status: status
-            })
-            .select()
-            .single();
-
-          if (error) throw error;
-          toast.success(status === 'draft' ? "Order saved as draft" : "Moving to care needs...");
-          if (status === 'submitted') setStep(2);
-        }
-        onRefresh();
-      } catch (error: any) {
-        toast.error(error.message || "Failed to save order");
-      }
-    } else {
-      if (careNeedInputs.length === 0) {
-        toast.error("Please add at least one care need");
-        return;
-      }
-
-      try {
-        const shiftsToCreate = [];
-        for (const careNeed of careNeedInputs) {
-          const start = new Date(currentOrder!.start_date);
-          const end = new Date(currentOrder!.end_date);
-
-          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            const dayOfWeek = d.getDay();
-            if (careNeed.selected_days.includes(dayOfWeek)) {
-              const shiftDate = d.toISOString().split('T')[0];
-              const [hours, minutes] = careNeed.start_time.split(':');
-              const endDate = new Date(d);
-              endDate.setHours(parseInt(hours) + careNeed.duration, parseInt(minutes));
-              const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
-
-              shiftsToCreate.push({
-                client_id: clientProfile.id,
-                agency_id: user.id,
-                order_id: currentOrder!.id,
-                shift_date: shiftDate,
-                start_time: careNeed.start_time,
-                end_time: endTime,
-                duration_hours: careNeed.duration,
-                care_type_code: careNeed.care_need_code,
-                status: 'open',
-                special_notes: careNeed.notes,
-                order_title: `Care Need - ${careNeed.care_need_code}`
-              });
-            }
-          }
-        }
-
-        const { data: shifts, error: shiftsError } = await supabase
-          .from("shifts")
-          .insert(shiftsToCreate)
-          .select();
-
-        if (shiftsError) throw shiftsError;
-
-        const { error: updateError } = await supabase
+      // Create or update order
+      if (editingOrderId) {
+        const { error } = await supabase
           .from("client_orders")
-          .update({ status: status })
-          .eq("id", currentOrder!.id);
+          .update({
+            start_date: startDate,
+            end_date: end.toISOString().split('T')[0],
+            status: status,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", editingOrderId);
 
-        if (updateError) throw updateError;
+        if (error) throw error;
+      } else {
+        const orderNumber = `ORD-${Date.now()}`;
+        const { data: newOrder, error } = await supabase
+          .from("client_orders")
+          .insert({
+            client_id: clientProfile.id,
+            agency_id: clientProfile.agency_id,
+            order_number: orderNumber,
+            start_date: startDate,
+            end_date: end.toISOString().split('T')[0],
+            frequency: "weekly",
+            status: status
+          })
+          .select()
+          .single();
 
+        if (error) throw error;
+        orderId = newOrder.id;
+        setEditingOrderId(orderId);
+      }
+
+      // If submitted and on step 3, create shifts
+      if (status === 'submitted' && step === 3 && orderId) {
+        await createShifts(orderId);
         toast.success("Order submitted successfully!");
-        setCareNeedInputs([]);
-        setShowOrderForm(false);
-        setStep(1);
-        onRefresh();
-      } catch (error: any) {
-        toast.error(error.message || "Failed to save care needs");
+        resetForm();
+      } else {
+        toast.success(`Order saved as ${status}`);
+        if (status === 'submitted' && step < 3) {
+          setStep(step + 1);
+        }
+      }
+
+      onRefresh();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save order");
+    }
+  };
+
+  const createShifts = async (orderId: string) => {
+    const shiftsToCreate = [];
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setDate(start.getDate() + (durationWeeks * 7) - 1);
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dayOfWeek = d.getDay();
+      if (selectedDays.includes(dayOfWeek) && selectedTimeSlots[dayOfWeek]) {
+        const slot = selectedTimeSlots[dayOfWeek];
+        const shiftDate = d.toISOString().split('T')[0];
+
+        // Calculate duration
+        const [startHour, startMin] = slot.start.split(':').map(Number);
+        const [endHour, endMin] = slot.end.split(':').map(Number);
+        const durationHours = (endHour * 60 + endMin - startHour * 60 - startMin) / 60;
+
+        shiftsToCreate.push({
+          client_id: clientProfile!.id,
+          agency_id: clientProfile!.agency_id,
+          caregiver_id: selectedCaregiver,
+          order_id: orderId,
+          shift_date: shiftDate,
+          start_time: slot.start,
+          end_time: slot.end,
+          duration_hours: durationHours,
+          care_type_code: selectedCareNeed,
+          status: 'scheduled',
+          special_notes: notes,
+          order_title: `Care Service`
+        });
       }
     }
+
+    const { error } = await supabase
+      .from("shifts")
+      .insert(shiftsToCreate);
+
+    if (error) throw error;
   };
 
-  const handleAddCareNeed = () => {
-    setCareNeedInputs([...careNeedInputs, {
-      care_need_code: "",
-      selected_days: [],
-      start_time: "09:00",
-      duration: 2,
-      notes: ""
-    }]);
+  const resetForm = () => {
+    setShowOrderForm(false);
+    setEditingOrderId(null);
+    setStep(1);
+    setSelectedCareNeed("");
+    setStartDate("");
+    setDurationWeeks(1);
+    setSelectedDays([]);
+    setSelectedCaregiver("");
+    setSelectedTimeSlots({});
+    setNotes("");
   };
 
-  const handleRemoveCareNeed = (index: number) => {
-    setCareNeedInputs(careNeedInputs.filter((_, i) => i !== index));
+  const handleEditDraft = async (order: Order) => {
+    setEditingOrderId(order.id);
+    setStartDate(order.start_date);
+    
+    // Calculate duration from dates
+    const start = new Date(order.start_date);
+    const end = new Date(order.end_date);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    setDurationWeeks(Math.ceil(diffDays / 7));
+    
+    setShowOrderForm(true);
+    setStep(1);
   };
 
-  const updateCareNeedInput = (index: number, field: keyof CareNeedInput, value: any) => {
-    const updated = [...careNeedInputs];
-    updated[index] = { ...updated[index], [field]: value };
-    setCareNeedInputs(updated);
+  const toggleDay = (day: number) => {
+    setSelectedDays(prev => 
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
   };
 
-  const toggleDay = (inputIndex: number, day: number) => {
-    const updated = [...careNeedInputs];
-    const currentDays = updated[inputIndex].selected_days;
-    if (currentDays.includes(day)) {
-      updated[inputIndex].selected_days = currentDays.filter(d => d !== day);
-    } else {
-      updated[inputIndex].selected_days = [...currentDays, day].sort();
-    }
-    setCareNeedInputs(updated);
+  const updateTimeSlot = (day: number, type: 'start' | 'end', value: string) => {
+    setSelectedTimeSlots(prev => ({
+      ...prev,
+      [day]: {
+        start: type === 'start' ? value : (prev[day]?.start || '09:00'),
+        end: type === 'end' ? value : (prev[day]?.end || '17:00')
+      }
+    }));
   };
-
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, any> = {
@@ -235,7 +333,7 @@ export const OrdersManagement = ({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header with Create Button */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Orders Management</h2>
@@ -249,43 +347,86 @@ export const OrdersManagement = ({
         )}
       </div>
 
-      {/* Create Order Form */}
+      {/* Order Form */}
       {showOrderForm && (
         <Card className="border-primary/20 shadow-lg">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Create Weekly Order</CardTitle>
-                <CardDescription>Step {step} of 2</CardDescription>
+                <CardTitle>{editingOrderId ? 'Edit' : 'Create'} Care Order</CardTitle>
+                <CardDescription>Step {step} of 3</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => {
-                setShowOrderForm(false);
-                setStep(1);
-                setCareNeedInputs([]);
-              }}>
+              <Button variant="ghost" size="sm" onClick={resetForm}>
                 Cancel
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {/* Progress Indicator */}
+            {/* Progress */}
             <div className="mb-6">
               <div className="flex items-center justify-center gap-2 mb-4">
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full ${step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                  <Calendar className="h-5 w-5" />
+                  <Package className="h-5 w-5" />
                 </div>
                 <div className={`h-1 w-16 ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full ${step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                  <Package className="h-5 w-5" />
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div className={`h-1 w-16 ${step >= 3 ? 'bg-primary' : 'bg-muted'}`} />
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full ${step >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                  <Users className="h-5 w-5" />
                 </div>
               </div>
             </div>
 
-            {/* Step 1: Order Details */}
+            {/* Step 1: Select Care Need */}
             {step === 1 && (
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="start-date">Start Date (Monday)</Label>
+                  <Label>Select Your Care Need</Label>
+                  <Select value={selectedCareNeed} onValueChange={setSelectedCareNeed}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose from your care needs" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableCareNeeds.map((need) => (
+                        <SelectItem key={need.id} value={need.care_need_code}>
+                          <div>
+                            <div className="font-medium">{need.care_needs.name}</div>
+                            <div className="text-xs text-muted-foreground">{need.care_needs.category}</div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button variant="outline" onClick={() => handleSaveOrder('draft')} className="flex-1">
+                    Save Draft
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if (selectedCareNeed) {
+                        setStep(2);
+                      } else {
+                        toast.error("Please select a care need");
+                      }
+                    }} 
+                    className="flex-1"
+                    disabled={!selectedCareNeed}
+                  >
+                    Continue to Dates
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Select Dates & Days */}
+            {step === 2 && (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="start-date">Start Date</Label>
                   <Input
                     id="start-date"
                     type="date"
@@ -327,115 +468,150 @@ export const OrdersManagement = ({
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-4">
-                  <Button variant="outline" onClick={() => handleSaveOrder('draft')} className="flex-1">
-                    Save Draft
-                  </Button>
-                  <Button onClick={() => handleSaveOrder('submitted')} className="flex-1">
-                    Continue to Care Needs
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Care Needs */}
-            {step === 2 && (
-              <div className="space-y-6">
-                <Button onClick={handleAddCareNeed} variant="outline" className="w-full">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Care Need
-                </Button>
-
-                {careNeedInputs.map((input, index) => (
-                  <Card key={index}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">Care Need #{index + 1}</CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveCareNeed(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Care Need Type</Label>
-                        <Select
-                          value={input.care_need_code}
-                          onValueChange={(value) => updateCareNeedInput(index, 'care_need_code', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select care need" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableCareNeeds.map((need) => (
-                              <SelectItem key={need.id} value={need.care_need_code}>
-                                {need.care_needs.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Days of Week</Label>
-                        <div className="flex gap-2 flex-wrap">
-                          {dayNames.map((day, dayIndex) => (
-                            <Button
-                              key={dayIndex}
-                              type="button"
-                              variant={input.selected_days.includes(dayIndex) ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => toggleDay(index, dayIndex)}
-                            >
-                              {day}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Start Time</Label>
-                          <Input
-                            type="time"
-                            value={input.start_time}
-                            onChange={(e) => updateCareNeedInput(index, 'start_time', e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Duration (hours)</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="24"
-                            value={input.duration}
-                            onChange={(e) => updateCareNeedInput(index, 'duration', parseInt(e.target.value))}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Notes</Label>
-                        <Textarea
-                          value={input.notes}
-                          onChange={(e) => updateCareNeedInput(index, 'notes', e.target.value)}
-                          placeholder="Any special instructions..."
+                <div className="space-y-2">
+                  <Label>Select Days of Week</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {dayNames.map((day, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`day-${index}`}
+                          checked={selectedDays.includes(index)}
+                          onCheckedChange={() => toggleDay(index)}
                         />
+                        <Label htmlFor={`day-${index}`} className="cursor-pointer">
+                          {day}
+                        </Label>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                    ))}
+                  </div>
+                </div>
 
                 <div className="flex gap-3 pt-4">
                   <Button variant="outline" onClick={() => setStep(1)}>
                     <ChevronLeft className="mr-2 h-4 w-4" />
                     Back
                   </Button>
-                  <Button onClick={() => handleSaveOrder('draft')} variant="outline" className="flex-1">
+                  <Button variant="outline" onClick={() => handleSaveOrder('draft')} className="flex-1">
+                    Save Draft
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if (startDate && selectedDays.length > 0) {
+                        setStep(3);
+                      } else {
+                        toast.error("Please select start date and days");
+                      }
+                    }}
+                    className="flex-1"
+                    disabled={!startDate || selectedDays.length === 0}
+                  >
+                    View Available Caregivers
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Select Caregiver & Times */}
+            {step === 3 && (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Available Caregivers</Label>
+                  {availableCaregivers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No caregivers available for selected days</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableCaregivers.map((caregiver) => (
+                        <Card 
+                          key={caregiver.id}
+                          className={`cursor-pointer transition-colors ${selectedCaregiver === caregiver.id ? 'border-primary' : ''}`}
+                          onClick={() => setSelectedCaregiver(caregiver.id)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Avatar>
+                                  <AvatarFallback>
+                                    {caregiver.first_name[0]}{caregiver.last_name[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-medium">
+                                    {caregiver.first_name} {caregiver.last_name}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    ${caregiver.hourly_rate}/hr • Rating: {caregiver.performance_rating}/5
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {selectedCaregiver && caregiverAvailability.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Select Time Slots</Label>
+                    <div className="space-y-3">
+                      {selectedDays.map(day => {
+                        const availableSlot = caregiverAvailability.find(slot => slot.day_of_week === day);
+                        return availableSlot ? (
+                          <Card key={day}>
+                            <CardContent className="p-4">
+                              <div className="space-y-3">
+                                <div className="font-medium">{dayNames[day]}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  Available: {availableSlot.start_time} - {availableSlot.end_time}
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">Start Time</Label>
+                                    <Input
+                                      type="time"
+                                      value={selectedTimeSlots[day]?.start || availableSlot.start_time}
+                                      onChange={(e) => updateTimeSlot(day, 'start', e.target.value)}
+                                      min={availableSlot.start_time}
+                                      max={availableSlot.end_time}
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">End Time</Label>
+                                    <Input
+                                      type="time"
+                                      value={selectedTimeSlots[day]?.end || availableSlot.end_time}
+                                      onChange={(e) => updateTimeSlot(day, 'end', e.target.value)}
+                                      min={availableSlot.start_time}
+                                      max={availableSlot.end_time}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Additional Notes</Label>
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Any special instructions or requirements..."
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button variant="outline" onClick={() => setStep(2)}>
+                    <ChevronLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Button>
+                  <Button variant="outline" onClick={() => handleSaveOrder('draft')} className="flex-1">
                     Save Draft
                   </Button>
                   <Button onClick={() => handleSaveOrder('submitted')} className="flex-1">
@@ -462,32 +638,22 @@ export const OrdersManagement = ({
                     {new Date(currentOrder.start_date).toLocaleDateString()} - {new Date(currentOrder.end_date).toLocaleDateString()}
                   </CardDescription>
                 </div>
-                {getStatusBadge(currentOrder.status)}
+                <div className="flex gap-2">
+                  {getStatusBadge(currentOrder.status)}
+                  {currentOrder.status === 'draft' && (
+                    <Button variant="ghost" size="sm" onClick={() => handleEditDraft(currentOrder)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  <span>{currentOrder.frequency}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  <span>Created {new Date(currentOrder.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-            </CardContent>
           </Card>
         ) : (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <CardContent className="flex flex-col items-center justify-center py-12">
               <Package className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No orders yet</p>
-              <p className="text-sm text-muted-foreground mb-4">Create your first care order to get started</p>
-              <Button onClick={() => setShowOrderForm(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Order
-              </Button>
             </CardContent>
           </Card>
         )}
