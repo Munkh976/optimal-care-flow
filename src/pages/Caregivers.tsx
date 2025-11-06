@@ -204,6 +204,8 @@ const Caregivers = () => {
       employment_type: formData.employment_type,
       city: formData.city,
       state: formData.state,
+      address: formData.address,
+      zip_code: formData.zip_code,
     };
 
     if (isEditMode && editCaregiver) {
@@ -224,10 +226,16 @@ const Caregivers = () => {
         }
       }
 
-      // Update caregiver-specific data
+      // Update caregiver-specific data (including first_name, last_name, email, phone, address, zip_code)
       const { error } = await supabase
         .from("caregivers")
-        .update(caregiverData)
+        .update({
+          ...caregiverData,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          email: formData.email,
+          phone: formData.phone,
+        })
         .eq("id", editCaregiver.id);
 
       if (error) {

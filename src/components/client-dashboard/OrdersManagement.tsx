@@ -684,70 +684,128 @@ const updateTimeSlot = (day: number, type: 'start' | 'end', value: string) => {
                 </div>
 
                 {selectedCaregiver && caregiverAvailability.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Select Time Slots</Label>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Select days and times from the caregiver's availability
-                    </p>
-                    <div className="space-y-3">
-                      {caregiverAvailability.map(slot => (
-                        <Card key={slot.day_of_week}>
-                          <CardContent className="p-4">
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`day-${slot.day_of_week}`}
-                                  checked={!!selectedTimeSlots[slot.day_of_week]}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      updateTimeSlot(slot.day_of_week, 'start', slot.start_time);
-                                      updateTimeSlot(slot.day_of_week, 'end', slot.end_time);
-                                    } else {
-                                      const newSlots = {...selectedTimeSlots};
-                                      delete newSlots[slot.day_of_week];
-                                      setSelectedTimeSlots(newSlots);
-                                    }
-                                  }}
-                                />
-                                <Label htmlFor={`day-${slot.day_of_week}`} className="font-medium cursor-pointer">
-                                  {dayNames[slot.day_of_week]}
-                                </Label>
-                              </div>
-                              {selectedTimeSlots[slot.day_of_week] && (
-                                <>
-<div className="text-sm text-muted-foreground">
-  Available: {slot.start_time} - {slot.end_time} {careNeedDurationHours ? `(duration ${careNeedDurationHours}h)` : ''}
-</div>
-                                  <div className="grid grid-cols-2 gap-3">
-<div className="space-y-1">
-  <Label className="text-xs">Start Time</Label>
-  <Input
-    type="time"
-    value={selectedTimeSlots[slot.day_of_week]?.start || slot.start_time}
-    onChange={(e) => updateTimeSlot(slot.day_of_week, 'start', e.target.value)}
-    min={slot.start_time}
-    max={slot.end_time}
-  />
-</div>
-<div className="space-y-1">
-  <Label className="text-xs">End Time {careNeedDurationHours ? `(auto: ${careNeedDurationHours}h)` : ''}</Label>
-  <Input
-    type="time"
-    value={selectedTimeSlots[slot.day_of_week]?.end || slot.end_time}
-    onChange={(e) => updateTimeSlot(slot.day_of_week, 'end', e.target.value)}
-    min={slot.start_time}
-    max={slot.end_time}
-    readOnly={!!careNeedDurationHours}
-  />
-</div>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-lg font-semibold">Select Days & Time Slots</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Choose one or multiple days from the caregiver's availability. 
+                        {careNeedDurationHours && ` Shift duration: ${careNeedDurationHours} hours`}
+                      </p>
                     </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {caregiverAvailability.map(slot => {
+                        const isSelected = !!selectedTimeSlots[slot.day_of_week];
+                        const selectedSlot = selectedTimeSlots[slot.day_of_week];
+                        
+                        return (
+                          <Card 
+                            key={slot.day_of_week}
+                            className={`cursor-pointer transition-all ${
+                              isSelected 
+                                ? 'ring-2 ring-primary border-primary bg-primary/5' 
+                                : 'hover:border-primary/50'
+                            }`}
+                            onClick={() => {
+                              if (!isSelected) {
+                                updateTimeSlot(slot.day_of_week, 'start', slot.start_time);
+                              }
+                            }}
+                          >
+                            <CardContent className="p-4">
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <Checkbox
+                                      id={`day-${slot.day_of_week}`}
+                                      checked={isSelected}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          updateTimeSlot(slot.day_of_week, 'start', slot.start_time);
+                                        } else {
+                                          const newSlots = {...selectedTimeSlots};
+                                          delete newSlots[slot.day_of_week];
+                                          setSelectedTimeSlots(newSlots);
+                                        }
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <Label 
+                                      htmlFor={`day-${slot.day_of_week}`} 
+                                      className="text-base font-semibold cursor-pointer"
+                                    >
+                                      {dayNames[slot.day_of_week]}
+                                    </Label>
+                                  </div>
+                                  {isSelected && (
+                                    <Badge variant="default" className="text-xs">Selected</Badge>
+                                  )}
+                                </div>
+                                
+                                <div className="text-sm text-muted-foreground">
+                                  Available: {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                                </div>
+                                
+                                {isSelected && (
+                                  <div className="pt-2 border-t space-y-3" onClick={(e) => e.stopPropagation()}>
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-medium">Choose Start Time</Label>
+                                      <Input
+                                        type="time"
+                                        value={selectedSlot?.start || slot.start_time}
+                                        onChange={(e) => updateTimeSlot(slot.day_of_week, 'start', e.target.value)}
+                                        min={slot.start_time}
+                                        max={slot.end_time}
+                                        className="font-mono"
+                                      />
+                                    </div>
+                                    
+                                    {selectedSlot?.end && (
+                                      <div className="space-y-2">
+                                        <Label className="text-sm font-medium flex items-center gap-2">
+                                          End Time
+                                          {careNeedDurationHours && (
+                                            <Badge variant="secondary" className="text-xs">
+                                              Auto: {careNeedDurationHours}h
+                                            </Badge>
+                                          )}
+                                        </Label>
+                                        <Input
+                                          type="time"
+                                          value={selectedSlot.end}
+                                          readOnly={!!careNeedDurationHours}
+                                          className={`font-mono ${careNeedDurationHours ? 'bg-muted' : ''}`}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                    
+                    {Object.keys(selectedTimeSlots).length > 0 && (
+                      <Card className="bg-primary/5 border-primary/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-primary mt-0.5" />
+                            <div className="space-y-1 flex-1">
+                              <p className="font-medium text-sm">
+                                {Object.keys(selectedTimeSlots).length} {Object.keys(selectedTimeSlots).length === 1 ? 'day' : 'days'} selected
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {Object.entries(selectedTimeSlots).map(([day, slot]) => 
+                                  `${dayNames[parseInt(day)]}: ${slot.start} - ${slot.end}`
+                                ).join(' • ')}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
                 )}
 
