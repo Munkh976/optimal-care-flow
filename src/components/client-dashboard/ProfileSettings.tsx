@@ -4,10 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Phone, Mail, MapPin, Heart, Bell } from "lucide-react";
+import { User, Phone, Mail, MapPin, Heart, Bell, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 
 interface Client {
   id: string;
@@ -35,6 +36,12 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
   const [formData, setFormData] = useState(clientProfile);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(true);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
 
   const handleSave = async () => {
     if (!formData || !clientProfile) return;
@@ -43,6 +50,13 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
       const { error } = await supabase
         .from("clients")
         .update({
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zip_code,
           emergency_contact_name: formData.emergency_contact_name,
           emergency_contact_phone: formData.emergency_contact_phone,
           notes: formData.notes,
@@ -56,6 +70,36 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
       onRefresh();
     } catch (error: any) {
       toast.error(error.message || "Failed to update profile");
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      });
+
+      if (error) throw error;
+
+      toast.success("Password updated successfully");
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setShowPasswordSection(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update password");
     }
   };
 
@@ -102,11 +146,19 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>First Name</Label>
-              <Input value={clientProfile.first_name} disabled />
+              <Input
+                value={formData.first_name}
+                onChange={(e) => updateFormData('first_name', e.target.value)}
+                disabled={!editMode}
+              />
             </div>
             <div className="space-y-2">
               <Label>Last Name</Label>
-              <Input value={clientProfile.last_name} disabled />
+              <Input
+                value={formData.last_name}
+                onChange={(e) => updateFormData('last_name', e.target.value)}
+                disabled={!editMode}
+              />
             </div>
           </div>
           <div className="space-y-2">
@@ -115,7 +167,11 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
           </div>
           <div className="space-y-2">
             <Label>Phone</Label>
-            <Input value={clientProfile.phone} disabled />
+            <Input
+              value={formData.phone}
+              onChange={(e) => updateFormData('phone', e.target.value)}
+              disabled={!editMode}
+            />
           </div>
         </CardContent>
       </Card>
@@ -131,20 +187,36 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Street Address</Label>
-            <Input value={clientProfile.address} disabled />
+            <Input
+              value={formData.address}
+              onChange={(e) => updateFormData('address', e.target.value)}
+              disabled={!editMode}
+            />
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>City</Label>
-              <Input value={clientProfile.city} disabled />
+              <Input
+                value={formData.city}
+                onChange={(e) => updateFormData('city', e.target.value)}
+                disabled={!editMode}
+              />
             </div>
             <div className="space-y-2">
               <Label>State</Label>
-              <Input value={clientProfile.state} disabled />
+              <Input
+                value={formData.state}
+                onChange={(e) => updateFormData('state', e.target.value)}
+                disabled={!editMode}
+              />
             </div>
             <div className="space-y-2">
               <Label>ZIP Code</Label>
-              <Input value={clientProfile.zip_code} disabled />
+              <Input
+                value={formData.zip_code}
+                onChange={(e) => updateFormData('zip_code', e.target.value)}
+                disabled={!editMode}
+              />
             </div>
           </div>
         </CardContent>
@@ -213,6 +285,76 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
               rows={4}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Security & Password */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="h-5 w-5 text-primary" />
+            Security & Password
+          </CardTitle>
+          <CardDescription>Manage your account security</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!showPasswordSection ? (
+            <Button
+              variant="outline"
+              onClick={() => setShowPasswordSection(true)}
+            >
+              Change Password
+            </Button>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Current Password</Label>
+                <Input
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                  placeholder="Enter current password"
+                />
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <Label>New Password</Label>
+                <Input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  placeholder="Enter new password (min. 6 characters)"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Confirm New Password</Label>
+                <Input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  placeholder="Confirm new password"
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowPasswordSection(false);
+                    setPasswordData({
+                      currentPassword: "",
+                      newPassword: "",
+                      confirmPassword: "",
+                    });
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handlePasswordChange}>
+                  Update Password
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
