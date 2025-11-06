@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Lock, User } from "lucide-react";
+import { MapPin, Clock, Lock, User, Briefcase, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AvailabilityDialog } from "./AvailabilityDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { US_STATES } from "@/constants/usStates";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 interface Caregiver {
   id: string;
@@ -21,11 +22,27 @@ interface Caregiver {
   city: string | null;
   state: string | null;
   zip_code: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
   location_address: string | null;
   location_city: string | null;
   location_state: string | null;
   location_zip_code: string | null;
   service_radius_miles: number | null;
+}
+
+interface CaregiverSkill {
+  id: string;
+  care_type_code: string;
+  proficiency_level: string;
+  years_experience: number;
+  is_certified: boolean;
+}
+
+interface CareType {
+  code: string;
+  name: string;
+  category: string;
 }
 
 interface CaregiverProfileSettingsProps {
@@ -43,6 +60,49 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
     newPassword: "",
     confirmPassword: "",
   });
+  const [skills, setSkills] = useState<CaregiverSkill[]>([]);
+  const [careTypes, setCareTypes] = useState<CareType[]>([]);
+  const [editSkillsMode, setEditSkillsMode] = useState(false);
+  const [selectedCareType, setSelectedCareType] = useState("");
+  const [newSkillData, setNewSkillData] = useState({
+    proficiency_level: "intermediate",
+    years_experience: 0,
+    is_certified: false,
+  });
+
+  useEffect(() => {
+    fetchSkills();
+    fetchCareTypes();
+  }, [caregiverProfile?.id]);
+
+  const fetchSkills = async () => {
+    if (!caregiverProfile?.id) return;
+    
+    const { data, error } = await supabase
+      .from("caregiver_skills")
+      .select("*")
+      .eq("caregiver_id", caregiverProfile.id);
+
+    if (error) {
+      console.error("Error fetching skills:", error);
+      return;
+    }
+    setSkills(data || []);
+  };
+
+  const fetchCareTypes = async () => {
+    const { data, error } = await supabase
+      .from("care_types")
+      .select("code, name, category")
+      .eq("is_active", true)
+      .order("name");
+
+    if (error) {
+      console.error("Error fetching care types:", error);
+      return;
+    }
+    setCareTypes(data || []);
+  };
 
   const handleSave = async () => {
     if (!formData || !caregiverProfile) return;
@@ -51,6 +111,12 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
       const { error } = await supabase
         .from("caregivers")
         .update({
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zip_code,
+          emergency_contact_name: formData.emergency_contact_name,
+          emergency_contact_phone: formData.emergency_contact_phone,
           location_address: formData.location_address,
           location_city: formData.location_city,
           location_state: formData.location_state,
@@ -61,7 +127,7 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
 
       if (error) throw error;
 
-      toast.success("Location settings updated successfully");
+      toast.success("Profile updated successfully");
       setEditMode(false);
       onRefresh();
     } catch (error: any) {
@@ -71,6 +137,62 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
 
   const updateFormData = (field: string, value: any) => {
     setFormData(prev => prev ? { ...prev, [field]: value } : null);
+  };
+
+  const handleAddSkill = async () => {
+    if (!selectedCareType || !caregiverProfile?.id) {
+      toast.error("Please select a care type");
+      return;
+    }
+
+    const existingSkill = skills.find(s => s.care_type_code === selectedCareType);
+    if (existingSkill) {
+      toast.error("This skill is already added");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("caregiver_skills")
+        .insert({
+          caregiver_id: caregiverProfile.id,
+          care_type_code: selectedCareType,
+          proficiency_level: newSkillData.proficiency_level,
+          years_experience: newSkillData.years_experience,
+          is_certified: newSkillData.is_certified,
+        });
+
+      if (error) throw error;
+
+      toast.success("Skill added successfully");
+      setSelectedCareType("");
+      setNewSkillData({
+        proficiency_level: "intermediate",
+        years_experience: 0,
+        is_certified: false,
+      });
+      fetchSkills();
+    } catch (error: any) {
+      toast.error("Failed to add skill");
+      console.error(error);
+    }
+  };
+
+  const handleRemoveSkill = async (skillId: string) => {
+    try {
+      const { error } = await supabase
+        .from("caregiver_skills")
+        .delete()
+        .eq("id", skillId);
+
+      if (error) throw error;
+
+      toast.success("Skill removed successfully");
+      fetchSkills();
+    } catch (error: any) {
+      toast.error("Failed to remove skill");
+      console.error(error);
+    }
   };
 
   const handlePasswordChange = async () => {
@@ -144,6 +266,78 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
           <div className="space-y-2">
             <Label>Phone</Label>
             <Input value={caregiverProfile.phone} disabled />
+          </div>
+
+          <Separator className="my-4" />
+
+          <div className="space-y-2">
+            <Label>Address</Label>
+            <Input
+              value={formData?.address || ""}
+              onChange={(e) => updateFormData('address', e.target.value)}
+              disabled={!editMode}
+              placeholder="Street address"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>City</Label>
+              <Input
+                value={formData?.city || ""}
+                onChange={(e) => updateFormData('city', e.target.value)}
+                disabled={!editMode}
+                placeholder="City"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>State</Label>
+              <Select
+                value={formData?.state || ""}
+                onValueChange={(v) => updateFormData('state', v)}
+                disabled={!editMode}
+              >
+                <SelectTrigger disabled={!editMode}>
+                  <SelectValue placeholder="State" />
+                </SelectTrigger>
+                <SelectContent>
+                  {US_STATES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>ZIP Code</Label>
+              <Input
+                value={formData?.zip_code || ""}
+                onChange={(e) => updateFormData('zip_code', e.target.value)}
+                disabled={!editMode}
+                placeholder="ZIP"
+              />
+            </div>
+          </div>
+
+          <Separator className="my-4" />
+
+          <div className="space-y-2">
+            <Label>Emergency Contact Name</Label>
+            <Input
+              value={formData?.emergency_contact_name || ""}
+              onChange={(e) => updateFormData('emergency_contact_name', e.target.value)}
+              disabled={!editMode}
+              placeholder="Emergency contact name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Emergency Contact Phone</Label>
+            <Input
+              value={formData?.emergency_contact_phone || ""}
+              onChange={(e) => updateFormData('emergency_contact_phone', e.target.value)}
+              disabled={!editMode}
+              placeholder="Emergency contact phone"
+            />
           </div>
         </CardContent>
       </Card>
@@ -229,6 +423,128 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
               How far are you willing to travel for shifts?
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Skills & Certifications */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-primary" />
+                Skills & Certifications
+              </CardTitle>
+              <CardDescription>Manage your care type skills</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditSkillsMode(!editSkillsMode)}
+            >
+              {editSkillsMode ? "Done" : "Edit Skills"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {skills.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No skills added yet</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {skills.map((skill) => {
+                const careType = careTypes.find(ct => ct.code === skill.care_type_code);
+                return (
+                  <Badge key={skill.id} variant="secondary" className="text-sm py-1 px-3">
+                    {careType?.name || skill.care_type_code}
+                    {editSkillsMode && (
+                      <button
+                        onClick={() => handleRemoveSkill(skill.id)}
+                        className="ml-2 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
+
+          {editSkillsMode && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <Label>Add New Skill</Label>
+                <Select value={selectedCareType} onValueChange={setSelectedCareType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select care type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {careTypes.map((careType) => (
+                      <SelectItem key={careType.code} value={careType.code}>
+                        {careType.name} ({careType.category})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Proficiency</Label>
+                    <Select
+                      value={newSkillData.proficiency_level}
+                      onValueChange={(value) =>
+                        setNewSkillData((prev) => ({ ...prev, proficiency_level: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="beginner">Beginner</SelectItem>
+                        <SelectItem value="intermediate">Intermediate</SelectItem>
+                        <SelectItem value="advanced">Advanced</SelectItem>
+                        <SelectItem value="expert">Expert</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Years</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={newSkillData.years_experience}
+                      onChange={(e) =>
+                        setNewSkillData((prev) => ({
+                          ...prev,
+                          years_experience: parseInt(e.target.value) || 0,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Certified</Label>
+                    <Select
+                      value={newSkillData.is_certified ? "yes" : "no"}
+                      onValueChange={(value) =>
+                        setNewSkillData((prev) => ({ ...prev, is_certified: value === "yes" }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button onClick={handleAddSkill} className="w-full">
+                  Add Skill
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
