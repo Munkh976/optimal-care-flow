@@ -55,10 +55,10 @@ serve(async (req) => {
       });
     }
 
-    // Check if user has admin or agency_admin role
+    // Check if user has admin, agency_admin or manager role
     const { data: userRole } = await supabaseAdmin.rpc('get_user_role', { _user_id: user.id });
     
-    if (!userRole || (userRole !== 'system_admin' && userRole !== 'agency_admin')) {
+    if (!userRole || (userRole !== 'system_admin' && userRole !== 'agency_admin' && userRole !== 'manager')) {
       return new Response(JSON.stringify({ error: "Insufficient permissions" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

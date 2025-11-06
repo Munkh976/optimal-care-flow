@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface Caregiver {
   id: string;
+  user_id?: string | null;
   first_name: string;
   last_name: string;
   phone: string;
@@ -73,10 +74,15 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
   const [suggestedZipCodes, setSuggestedZipCodes] = useState<string[]>([]);
   const [loadingZipCodes, setLoadingZipCodes] = useState(false);
 
-  useEffect(() => {
-    fetchSkills();
-    fetchCareTypes();
-  }, [caregiverProfile?.id]);
+useEffect(() => {
+  fetchSkills();
+  fetchCareTypes();
+}, [caregiverProfile?.id]);
+
+// Keep local form state in sync with incoming profile
+useEffect(() => {
+  setFormData(caregiverProfile);
+}, [caregiverProfile]);
 
   const fetchSkills = async () => {
     if (!caregiverProfile?.id) return;
@@ -111,9 +117,14 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
     if (!formData || !caregiverProfile) return;
 
     try {
+      // Update caregiver record (including personal info + address/location)
       const { error } = await supabase
         .from("caregivers")
         .update({
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          email: formData.email,
+          phone: formData.phone,
           address: formData.address,
           city: formData.city,
           state: formData.state,
@@ -127,6 +138,19 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
         .eq("id", caregiverProfile.id);
 
       if (error) throw error;
+
+      // If linked user exists, update profiles for consistency
+      if (caregiverProfile.user_id) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            full_name: `${formData.first_name || ''} ${formData.last_name || ''}`.trim(),
+            email: formData.email || undefined,
+            phone: formData.phone || undefined,
+          })
+          .eq("id", caregiverProfile.user_id);
+        if (profileError) throw profileError;
+      }
 
       toast.success("Profile updated successfully");
       setEditMode(false);
@@ -291,29 +315,54 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
 
       {/* Personal Information */}
       <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>Your basic profile details</CardDescription>
-        </CardHeader>
+<CardHeader>
+  <div className="flex items-center justify-between">
+    <div>
+      <CardTitle>Personal Information</CardTitle>
+      <CardDescription>Your basic profile details</CardDescription>
+    </div>
+    {!editMode && (
+      <Button variant="outline" size="sm" onClick={() => setEditMode(true)}>
+        Edit
+      </Button>
+    )}
+  </div>
+</CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>First Name</Label>
-              <Input value={caregiverProfile.first_name} disabled />
-            </div>
-            <div className="space-y-2">
-              <Label>Last Name</Label>
-              <Input value={caregiverProfile.last_name} disabled />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input value={caregiverProfile.email} disabled />
-          </div>
-          <div className="space-y-2">
-            <Label>Phone</Label>
-            <Input value={caregiverProfile.phone} disabled />
-          </div>
+<div className="space-y-2">
+  <Label>First Name</Label>
+  <Input
+    value={formData?.first_name || ""}
+    onChange={(e) => updateFormData('first_name', e.target.value)}
+    disabled={!editMode}
+  />
+</div>
+<div className="space-y-2">
+  <Label>Last Name</Label>
+  <Input
+    value={formData?.last_name || ""}
+    onChange={(e) => updateFormData('last_name', e.target.value)}
+    disabled={!editMode}
+  />
+</div>
+</div>
+<div className="space-y-2">
+  <Label>Email</Label>
+  <Input
+    value={formData?.email || ""}
+    onChange={(e) => updateFormData('email', e.target.value)}
+    disabled={!editMode}
+  />
+</div>
+<div className="space-y-2">
+  <Label>Phone</Label>
+  <Input
+    value={formData?.phone || ""}
+    onChange={(e) => updateFormData('phone', e.target.value)}
+    disabled={!editMode}
+  />
+</div>
 
           <Separator className="my-4" />
 

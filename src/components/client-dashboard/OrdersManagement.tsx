@@ -77,10 +77,11 @@ export const OrdersManagement = ({
   const [caregiverAvailability, setCaregiverAvailability] = useState<TimeSlot[]>([]);
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<{[key: number]: {start: string, end: string}}>({});
   const [notes, setNotes] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [sortBy, setSortBy] = useState<"rating" | "price">("rating");
-  const [durationMonths, setDurationMonths] = useState(1);
-  const [durationWeeks, setDurationWeeks] = useState(1);
+const [startDate, setStartDate] = useState("");
+const [sortBy, setSortBy] = useState<"rating" | "price">("rating");
+const [durationMonths, setDurationMonths] = useState(1);
+const [durationWeeks, setDurationWeeks] = useState(1);
+const [careNeedDurationHours, setCareNeedDurationHours] = useState<number | null>(null);
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -358,8 +359,9 @@ export const OrdersManagement = ({
     setSelectedTimeSlots({});
     setNotes("");
     setDurationMonths(1);
-    setDurationWeeks(1);
-    setSortBy("rating");
+setDurationWeeks(1);
+setSortBy("rating");
+setCareNeedDurationHours(null);
   };
 
   const handleEditDraft = async (order: Order) => {
@@ -369,15 +371,28 @@ export const OrdersManagement = ({
     setStep(1);
   };
 
-  const updateTimeSlot = (day: number, type: 'start' | 'end', value: string) => {
-    setSelectedTimeSlots(prev => ({
-      ...prev,
-      [day]: {
-        start: type === 'start' ? value : (prev[day]?.start || '09:00'),
-        end: type === 'end' ? value : (prev[day]?.end || '17:00')
+const updateTimeSlot = (day: number, type: 'start' | 'end', value: string) => {
+  setSelectedTimeSlots(prev => {
+    const current = prev[day] || { start: '09:00', end: '17:00' };
+    let next = { ...current } as { start: string; end: string };
+
+    if (type === 'start') {
+      next.start = value;
+      // If care need has fixed duration, auto-set end time
+      if (careNeedDurationHours && !Number.isNaN(careNeedDurationHours)) {
+        const [sh, sm] = value.split(':').map(Number);
+        const minutes = sh * 60 + sm + Math.round(careNeedDurationHours * 60);
+        const eh = Math.floor(minutes / 60) % 24;
+        const em = minutes % 60;
+        next.end = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
       }
-    }));
-  };
+    } else {
+      next.end = value;
+    }
+
+    return { ...prev, [day]: next };
+  });
+};
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, any> = {
@@ -439,50 +454,52 @@ export const OrdersManagement = ({
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label>Select Your Care Need</Label>
-                  <Select 
-                    value={selectedCareNeed} 
-                    onValueChange={async (value) => {
-                      setSelectedCareNeed(value);
-                      try {
-                        // Try to load mapping from care_needs by code
-                        const { data: cn, error: cnErr } = await supabase
-                          .from("care_needs")
-                          .select("related_care_type_codes")
-                          .eq("code", value)
-                          .maybeSingle();
+<Select 
+  value={selectedCareNeed} 
+  onValueChange={async (value) => {
+    setSelectedCareNeed(value);
+    try {
+      // Load duration for the care need
+      const { data: cn1 } = await supabase
+        .from("care_needs")
+        .select("duration_hours, related_care_type_codes")
+        .eq("code", value)
+        .maybeSingle();
+      setCareNeedDurationHours(cn1?.duration_hours ?? null);
 
-                        if (cn && Array.isArray(cn.related_care_type_codes) && cn.related_care_type_codes.length > 0) {
-                          setSelectedCareTypeCodes(cn.related_care_type_codes);
-                          return;
-                        }
+      // Prefer explicit mapping
+      if (cn1 && Array.isArray(cn1.related_care_type_codes) && cn1.related_care_type_codes.length > 0) {
+        setSelectedCareTypeCodes(cn1.related_care_type_codes);
+        return;
+      }
 
-                        // Fallback: infer care types from the selected care need name
-                        const selected = availableCareNeeds.find(n => n.care_need_code === value);
-                        const needName = selected?.care_needs?.name || "";
-                        if (needName) {
-                          const { data: typesByName } = await supabase
-                            .from("care_types")
-                            .select("code, name")
-                            .ilike("name", `%${needName}%`);
-                          if (typesByName && typesByName.length > 0) {
-                            setSelectedCareTypeCodes(typesByName.map(t => t.code));
-                            return;
-                          }
-                        }
+      // Fallbacks
+      const selected = availableCareNeeds.find(n => n.care_need_code === value);
+      const needName = selected?.care_needs?.name || "";
+      if (needName) {
+        const { data: typesByName } = await supabase
+          .from("care_types")
+          .select("code, name")
+          .ilike("name", `%${needName}%`);
+        if (typesByName && typesByName.length > 0) {
+          setSelectedCareTypeCodes(typesByName.map(t => t.code));
+          return;
+        }
+      }
 
-                        // Last fallback: treat selected value as a care type code directly if it exists
-                        const { data: ct } = await supabase
-                          .from("care_types")
-                          .select("code")
-                          .eq("code", value)
-                          .maybeSingle();
-                        setSelectedCareTypeCodes(ct?.code ? [ct.code] : []);
-                      } catch (e) {
-                        console.warn("Care type mapping fallback used", e);
-                        setSelectedCareTypeCodes([]);
-                      }
-                    }}
-                  >
+      const { data: ct } = await supabase
+        .from("care_types")
+        .select("code")
+        .eq("code", value)
+        .maybeSingle();
+      setSelectedCareTypeCodes(ct?.code ? [ct.code] : []);
+    } catch (e) {
+      console.warn("Care type mapping fallback used", e);
+      setSelectedCareTypeCodes([]);
+      setCareNeedDurationHours(null);
+    }
+  }}
+>
                     <SelectTrigger>
                       <SelectValue placeholder="Choose from your care needs" />
                     </SelectTrigger>
@@ -698,30 +715,31 @@ export const OrdersManagement = ({
                               </div>
                               {selectedTimeSlots[slot.day_of_week] && (
                                 <>
-                                  <div className="text-sm text-muted-foreground">
-                                    Available: {slot.start_time} - {slot.end_time}
-                                  </div>
+<div className="text-sm text-muted-foreground">
+  Available: {slot.start_time} - {slot.end_time} {careNeedDurationHours ? `(duration ${careNeedDurationHours}h)` : ''}
+</div>
                                   <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1">
-                                      <Label className="text-xs">Start Time</Label>
-                                      <Input
-                                        type="time"
-                                        value={selectedTimeSlots[slot.day_of_week]?.start || slot.start_time}
-                                        onChange={(e) => updateTimeSlot(slot.day_of_week, 'start', e.target.value)}
-                                        min={slot.start_time}
-                                        max={slot.end_time}
-                                      />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label className="text-xs">End Time</Label>
-                                      <Input
-                                        type="time"
-                                        value={selectedTimeSlots[slot.day_of_week]?.end || slot.end_time}
-                                        onChange={(e) => updateTimeSlot(slot.day_of_week, 'end', e.target.value)}
-                                        min={slot.start_time}
-                                        max={slot.end_time}
-                                      />
-                                    </div>
+<div className="space-y-1">
+  <Label className="text-xs">Start Time</Label>
+  <Input
+    type="time"
+    value={selectedTimeSlots[slot.day_of_week]?.start || slot.start_time}
+    onChange={(e) => updateTimeSlot(slot.day_of_week, 'start', e.target.value)}
+    min={slot.start_time}
+    max={slot.end_time}
+  />
+</div>
+<div className="space-y-1">
+  <Label className="text-xs">End Time {careNeedDurationHours ? `(auto: ${careNeedDurationHours}h)` : ''}</Label>
+  <Input
+    type="time"
+    value={selectedTimeSlots[slot.day_of_week]?.end || slot.end_time}
+    onChange={(e) => updateTimeSlot(slot.day_of_week, 'end', e.target.value)}
+    min={slot.start_time}
+    max={slot.end_time}
+    readOnly={!!careNeedDurationHours}
+  />
+</div>
                                   </div>
                                 </>
                               )}
