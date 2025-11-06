@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Package, CheckCircle2, Edit, Users } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Package, CheckCircle2, Edit, Users, Star, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -77,6 +77,9 @@ export const OrdersManagement = ({
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<{[key: number]: {start: string, end: string}}>({});
   const [notes, setNotes] = useState("");
   const [startDate, setStartDate] = useState("");
+  const [sortBy, setSortBy] = useState<"rating" | "price">("rating");
+  const [durationMonths, setDurationMonths] = useState(1);
+  const [durationWeeks, setDurationWeeks] = useState(1);
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -84,7 +87,7 @@ export const OrdersManagement = ({
     if (step === 2 && selectedCareNeed) {
       fetchAvailableCaregivers();
     }
-  }, [step, selectedCareNeed]);
+  }, [step, selectedCareNeed, sortBy]);
 
   useEffect(() => {
     if (selectedCaregiver) {
@@ -118,7 +121,6 @@ export const OrdersManagement = ({
       }
 
       const clientZipCode = clientData?.zip_code;
-      console.log("🔍 Client zipcode:", clientZipCode);
       
       if (!clientZipCode) {
         toast.error("Client zip code not found. Please update your profile.");
@@ -143,19 +145,22 @@ export const OrdersManagement = ({
 
       if (error) throw error;
 
-      console.log("🔍 Caregivers before zipcode filter:", caregivers?.length, caregivers);
-
       // Filter by zipcode matching: client zipcode must be in caregiver's service_zipcodes
       const filteredCaregivers = (caregivers || []).filter((cg) => {
         const serviceZipcodes = cg.service_zipcodes || [];
-        const matches = serviceZipcodes.includes(clientZipCode);
-        console.log(`🔍 ${cg.first_name} ${cg.last_name}: service_zipcodes=`, serviceZipcodes, "includes", clientZipCode, "?", matches);
-        return matches;
+        return serviceZipcodes.includes(clientZipCode);
       });
-
-      console.log("🔍 Caregivers after zipcode filter:", filteredCaregivers.length, filteredCaregivers);
       
-      setAvailableCaregivers(filteredCaregivers);
+      // Sort by rating (default) or price
+      const sortedCaregivers = [...filteredCaregivers].sort((a, b) => {
+        if (sortBy === "rating") {
+          return (b.performance_rating || 0) - (a.performance_rating || 0);
+        } else {
+          return (a.hourly_rate || 0) - (b.hourly_rate || 0);
+        }
+      });
+      
+      setAvailableCaregivers(sortedCaregivers);
 
       if (filteredCaregivers.length === 0) {
         toast.info("No caregivers available in your area");
@@ -218,7 +223,9 @@ export const OrdersManagement = ({
       const selectedDays = Object.keys(selectedTimeSlots).map(Number);
       const start = new Date(startDate);
       const end = new Date(start);
-      end.setDate(start.getDate() + 6); // One week duration
+      // Calculate end date based on duration (months + weeks)
+      const totalWeeks = durationMonths * 4 + durationWeeks;
+      end.setDate(start.getDate() + (totalWeeks * 7) - 1);
 
       let orderId = editingOrderId;
 
@@ -277,12 +284,16 @@ export const OrdersManagement = ({
   const createShifts = async (orderId: string, selectedDays: number[]) => {
     const shiftsToCreate = [];
     const start = new Date(startDate);
+    
+    // Calculate end date based on duration (months or weeks)
     const end = new Date(start);
-    end.setDate(start.getDate() + 6); // One week
+    const totalWeeks = durationMonths * 4 + durationWeeks;
+    end.setDate(start.getDate() + (totalWeeks * 7) - 1);
 
     // Use the primary care type code (first one from the related codes)
     const primaryCareTypeCode = selectedCareTypeCodes[0] || selectedCareNeed;
 
+    // Generate shifts for each week in the duration
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dayOfWeek = d.getDay();
       if (selectedDays.includes(dayOfWeek) && selectedTimeSlots[dayOfWeek]) {
@@ -328,6 +339,9 @@ export const OrdersManagement = ({
     setSelectedCaregiver("");
     setSelectedTimeSlots({});
     setNotes("");
+    setDurationMonths(1);
+    setDurationWeeks(1);
+    setSortBy("rating");
   };
 
   const handleEditDraft = async (order: Order) => {
@@ -491,46 +505,106 @@ export const OrdersManagement = ({
             {/* Step 2: Select Caregiver & Times */}
             {step === 2 && (
               <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="start-date">Start Date</Label>
-                  <Input
-                    id="start-date"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    min={getNextMonday()}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="start-date">Start Date</Label>
+                    <Input
+                      id="start-date"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      min={getNextMonday()}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="duration-months">Duration (Months)</Label>
+                    <Input
+                      id="duration-months"
+                      type="number"
+                      min="0"
+                      max="12"
+                      value={durationMonths}
+                      onChange={(e) => setDurationMonths(Math.max(0, parseInt(e.target.value) || 0))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="duration-weeks">+ Weeks</Label>
+                    <Input
+                      id="duration-weeks"
+                      type="number"
+                      min="1"
+                      max="4"
+                      value={durationWeeks}
+                      onChange={(e) => setDurationWeeks(Math.max(1, parseInt(e.target.value) || 1))}
+                    />
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Total duration: {durationMonths > 0 ? `${durationMonths} month${durationMonths > 1 ? 's' : ''}` : ''} 
+                  {durationMonths > 0 && durationWeeks > 0 ? ' and ' : ''}
+                  {durationWeeks > 0 ? `${durationWeeks} week${durationWeeks > 1 ? 's' : ''}` : ''}
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Available Caregivers</Label>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Available Caregivers ({availableCaregivers.length})</Label>
+                    <Select value={sortBy} onValueChange={(value: "rating" | "price") => {
+                      setSortBy(value);
+                      fetchAvailableCaregivers();
+                    }}>
+                      <SelectTrigger className="w-[180px]">
+                        <ArrowUpDown className="mr-2 h-4 w-4" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="rating">Sort by Rating</SelectItem>
+                        <SelectItem value="price">Sort by Price</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   {availableCaregivers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No caregivers available in your area with required skills</p>
+                    <p className="text-sm text-muted-foreground">No caregivers available in your area</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto">
                       {availableCaregivers.map((caregiver) => (
                         <Card 
                           key={caregiver.id}
-                          className={`cursor-pointer transition-colors ${selectedCaregiver === caregiver.id ? 'border-primary' : ''}`}
+                          className={`cursor-pointer transition-all hover:shadow-md ${selectedCaregiver === caregiver.id ? 'border-primary border-2 bg-primary/5' : ''}`}
                           onClick={() => setSelectedCaregiver(caregiver.id)}
                         >
                           <CardContent className="p-4">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
-                                <Avatar>
-                                  <AvatarFallback>
+                                <Avatar className="h-12 w-12">
+                                  <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
                                     {caregiver.first_name[0]}{caregiver.last_name[0]}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium">
+                                  <div className="font-semibold text-base">
                                     {caregiver.first_name} {caregiver.last_name}
                                   </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    ${caregiver.hourly_rate}/hr • Rating: {caregiver.performance_rating}/5
+                                  <div className="flex items-center gap-3 mt-1">
+                                    <div className="flex items-center gap-1">
+                                      {[...Array(5)].map((_, i) => (
+                                        <Star 
+                                          key={i} 
+                                          className={`h-3 w-3 ${i < Math.floor(caregiver.performance_rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/30'}`}
+                                        />
+                                      ))}
+                                      <span className="text-sm text-muted-foreground ml-1">
+                                        {caregiver.performance_rating?.toFixed(1) || '0.0'}
+                                      </span>
+                                    </div>
+                                    <Badge variant="secondary" className="font-semibold">
+                                      ${caregiver.hourly_rate}/hr
+                                    </Badge>
                                   </div>
                                 </div>
                               </div>
+                              {selectedCaregiver === caregiver.id && (
+                                <CheckCircle2 className="h-5 w-5 text-primary" />
+                              )}
                             </div>
                           </CardContent>
                         </Card>
