@@ -110,6 +110,32 @@ export const OrdersManagement = ({
   const [availableCaregivers, setAvailableCaregivers] = useState<Caregiver[]>([]);
   const [loadingCaregivers, setLoadingCaregivers] = useState(false);
   
+  const [allCareTypes, setAllCareTypes] = useState<CareType[]>([]);
+  useEffect(() => {
+    const fetchCareTypes = async () => {
+      const { data, error } = await supabase
+        .from('care_types')
+        .select('id, code, name, category, description, keywords, price')
+        .eq('is_active', true);
+      if (!error && data) {
+        const mapped: CareType[] = (data as any[]).map((ct: any) => ({
+          id: ct.id,
+          care_need_code: ct.code,
+          care_types: {
+            name: ct.name,
+            code: ct.code,
+            category: ct.category,
+            keywords: ct.keywords,
+            description: ct.description,
+            price: ct.price,
+          },
+        }));
+        setAllCareTypes(mapped);
+      }
+    };
+    fetchCareTypes();
+  }, []);
+
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const primaryServices = availableCareTypes.filter(
@@ -118,10 +144,9 @@ export const OrdersManagement = ({
          s.care_types?.category === 'Instrumental Activities of Daily Living (IADL)'
   );
 
-  const additionalServices = availableCareTypes.filter(
-    s => s.care_types?.category === 'Cognitive & Emotional Support' ||
-         s.care_types?.category === 'Safety & Transportation'
-  );
+  const additionalServices = (
+    (availableCareTypes && availableCareTypes.length > 1) ? availableCareTypes : allCareTypes
+  ).filter((s) => bookingData.primaryService ? s.care_types.code !== bookingData.primaryService.care_types.code : true);
 
   const loadAvailableCaregivers = async () => {
     if (!clientProfile || bookingData.day === null) return;
