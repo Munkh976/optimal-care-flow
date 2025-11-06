@@ -21,6 +21,8 @@ const Auth = () => {
     const { data } = await supabase.rpc('get_user_role', { _user_id: userId });
     if (data === 'caregiver') {
       navigate('/caregiver-dashboard');
+    } else if (data === 'client') {
+      navigate('/client-dashboard');
     } else if (data === 'system_admin') {
       navigate('/system-admin-dashboard');
     } else if (data) {

@@ -92,7 +92,7 @@ const ClientDashboard = () => {
     const { data: clientData, error: clientError } = await supabase
       .from("clients")
       .select("*")
-      .eq("agency_id", userId)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (clientData) {

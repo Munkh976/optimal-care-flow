@@ -78,11 +78,11 @@ const CaregiverDashboard = () => {
     try {
       setLoading(true);
 
-      // Find caregiver by agency_id (which should be user.id)
+      // Find caregiver by user_id
       const { data: caregiverData, error: caregiverError } = await supabase
         .from("caregivers")
         .select("*")
-        .eq("agency_id", userId)
+        .eq("user_id", userId)
         .single();
 
       if (caregiverError) throw caregiverError;
@@ -108,14 +108,14 @@ const CaregiverDashboard = () => {
       if (assignmentsError) throw assignmentsError;
       setAssignments(assignmentsData || []);
 
-      // Fetch open shifts
+      // Fetch open shifts - using agency_id from caregiver's profile
       const { data: openShiftsData, error: openShiftsError } = await supabase
         .from("shifts")
         .select(`
           *,
           clients (first_name, last_name, city)
         `)
-        .eq("agency_id", userId)
+        .eq("agency_id", caregiverData.agency_id)
         .eq("status", "open")
         .gte("shift_date", format(new Date(), "yyyy-MM-dd"))
         .order("shift_date", { ascending: true })
@@ -337,12 +337,12 @@ const CaregiverDashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold">🔄 Trade Board</h3>
-                  <p className="text-sm text-muted-foreground">{openShifts.length} new shifts available that match your skills!</p>
+                  <h3 className="text-lg font-bold">💼 Available Shifts</h3>
+                  <p className="text-sm text-muted-foreground">{openShifts.length} open shifts ready to pick up!</p>
                 </div>
               </div>
-              <Button className="w-full" onClick={() => navigate("/shift-trades")}>
-                View Available Shifts
+              <Button className="w-full" onClick={() => navigate("/available-shifts")}>
+                Browse Available Shifts
               </Button>
             </CardContent>
           </Card>
@@ -351,12 +351,12 @@ const CaregiverDashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold">💰 Extra Hours</h3>
-                  <p className="text-sm text-muted-foreground">Pick up additional shifts to earn more!</p>
+                  <h3 className="text-lg font-bold">🏖️ Time Off</h3>
+                  <p className="text-sm text-muted-foreground">Request vacation or sick leave</p>
                 </div>
               </div>
-              <Button className="w-full" onClick={() => navigate("/unassigned-shifts")}>
-                Browse Shifts
+              <Button className="w-full" onClick={() => navigate("/caregiver-time-off")}>
+                Manage Time Off
               </Button>
             </CardContent>
           </Card>
