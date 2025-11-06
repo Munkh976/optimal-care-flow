@@ -4,10 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, Briefcase, DollarSign, LogOut, AlertCircle } from "lucide-react";
+import { Calendar, Clock, MapPin, Briefcase, DollarSign, LogOut, AlertCircle, Home, Settings } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 interface Assignment {
   id: string;
   status: string;
@@ -60,7 +60,7 @@ const CaregiverDashboard = () => {
   const [openShifts, setOpenShifts] = useState<OpenShift[]>([]);
   const [loading, setLoading] = useState(true);
   const [caregiverId, setCaregiverId] = useState<string | null>(null);
-
+  const [activeTab, setActiveTab] = useState<'overview'>('overview');
   useEffect(() => {
     checkAuthAndFetch();
   }, []);
@@ -83,9 +83,14 @@ const CaregiverDashboard = () => {
         .from("caregivers")
         .select("*")
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
       if (caregiverError) throw caregiverError;
+      if (!caregiverData) {
+        toast.error("Caregiver profile not found");
+        setLoading(false);
+        return;
+      }
       
       setProfile(caregiverData);
       setCaregiverId(caregiverData.id);
@@ -225,6 +230,37 @@ const CaregiverDashboard = () => {
           </div>
         </div>
       </header>
+
+      {/* Header Menus */}
+      <div className="border-b border-border/40">
+        <div className="container mx-auto px-4 py-3">
+          <Tabs value={activeTab} onValueChange={(v) => {
+            if (v === 'overview') setActiveTab('overview');
+            if (v === 'available') navigate('/available-shifts');
+            if (v === 'timeoff') navigate('/caregiver-time-off');
+            if (v === 'settings') navigate('/caregiver-settings');
+          }}>
+            <TabsList className="grid w-full grid-cols-4 gap-2">
+              <TabsTrigger value="overview" className="gap-2">
+                <Home className="w-4 h-4" />
+                <span className="hidden sm:inline">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="available" className="gap-2">
+                <Briefcase className="w-4 h-4" />
+                <span className="hidden sm:inline">Available Shifts</span>
+              </TabsTrigger>
+              <TabsTrigger value="timeoff" className="gap-2">
+                <Calendar className="w-4 h-4" />
+                <span className="hidden sm:inline">Time Off</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="gap-2">
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </div>
 
       <div className="container mx-auto px-4 py-6">
         {/* Stats Cards */}

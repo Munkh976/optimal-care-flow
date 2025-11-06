@@ -493,13 +493,44 @@ export const OrdersManagement = ({
                     value={selectedCareNeed} 
                     onValueChange={async (value) => {
                       setSelectedCareNeed(value);
-                      // Fetch the care need to get related care type codes
-                      const { data } = await supabase
-                        .from("care_needs")
-                        .select("related_care_type_codes")
-                        .eq("code", value)
-                        .single();
-                      setSelectedCareTypeCodes(data?.related_care_type_codes || []);
+                      try {
+                        // Try to load mapping from care_needs by code
+                        const { data: cn, error: cnErr } = await supabase
+                          .from("care_needs")
+                          .select("related_care_type_codes")
+                          .eq("code", value)
+                          .maybeSingle();
+
+                        if (cn && Array.isArray(cn.related_care_type_codes) && cn.related_care_type_codes.length > 0) {
+                          setSelectedCareTypeCodes(cn.related_care_type_codes);
+                          return;
+                        }
+
+                        // Fallback: infer care types from the selected care need name
+                        const selected = availableCareNeeds.find(n => n.care_need_code === value);
+                        const needName = selected?.care_needs?.name || "";
+                        if (needName) {
+                          const { data: typesByName } = await supabase
+                            .from("care_types")
+                            .select("code, name")
+                            .ilike("name", `%${needName}%`);
+                          if (typesByName && typesByName.length > 0) {
+                            setSelectedCareTypeCodes(typesByName.map(t => t.code));
+                            return;
+                          }
+                        }
+
+                        // Last fallback: treat selected value as a care type code directly if it exists
+                        const { data: ct } = await supabase
+                          .from("care_types")
+                          .select("code")
+                          .eq("code", value)
+                          .maybeSingle();
+                        setSelectedCareTypeCodes(ct?.code ? [ct.code] : []);
+                      } catch (e) {
+                        console.warn("Care type mapping fallback used", e);
+                        setSelectedCareTypeCodes([]);
+                      }
                     }}
                   >
                     <SelectTrigger>
