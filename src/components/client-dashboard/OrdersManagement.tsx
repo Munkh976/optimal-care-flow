@@ -68,6 +68,7 @@ export const OrdersManagement = ({
   
   // Step 1: Care Need Selection
   const [selectedCareNeed, setSelectedCareNeed] = useState("");
+  const [selectedCareTypeCodes, setSelectedCareTypeCodes] = useState<string[]>([]);
   
   // Step 2: Date & Days Selection
   const [startDate, setStartDate] = useState("");
@@ -108,7 +109,24 @@ export const OrdersManagement = ({
     if (!clientProfile) return;
 
     try {
-      // Get caregivers with their skills matching the selected care need
+      // First, get the care need to find related care type codes
+      const { data: careNeed, error: careNeedError } = await supabase
+        .from("care_needs")
+        .select("related_care_type_codes")
+        .eq("code", selectedCareNeed)
+        .single();
+
+      if (careNeedError) throw careNeedError;
+      
+      const relatedCareTypeCodes = careNeed?.related_care_type_codes || [];
+      
+      if (relatedCareTypeCodes.length === 0) {
+        setAvailableCaregivers([]);
+        return;
+      }
+
+      // Get caregivers with skills matching ANY of the related care type codes
+      // AND who are available on the selected days
       const { data: caregivers, error } = await supabase
         .from("caregivers")
         .select(`
@@ -117,15 +135,41 @@ export const OrdersManagement = ({
           last_name,
           hourly_rate,
           performance_rating,
+          city,
+          state,
           caregiver_skills!inner(care_type_code)
         `)
         .eq("agency_id", clientProfile.agency_id)
         .eq("is_active", true)
-        .eq("caregiver_skills.care_type_code", selectedCareNeed);
+        .in("caregiver_skills.care_type_code", relatedCareTypeCodes);
 
       if (error) throw error;
 
-      setAvailableCaregivers(caregivers || []);
+      // Further filter by availability for selected days
+      const caregiversWithAvailability = await Promise.all(
+        (caregivers || []).map(async (caregiver) => {
+          const { data: availability } = await supabase
+            .from("caregiver_availability")
+            .select("day_of_week")
+            .eq("caregiver_id", caregiver.id)
+            .in("day_of_week", selectedDays)
+            .eq("is_available", true);
+
+          // Check if caregiver has availability for ALL selected days
+          const hasAllDays = selectedDays.every(day => 
+            availability?.some(avail => avail.day_of_week === day)
+          );
+
+          return hasAllDays ? caregiver : null;
+        })
+      );
+
+      const filteredCaregivers = caregiversWithAvailability.filter(c => c !== null);
+      setAvailableCaregivers(filteredCaregivers);
+      
+      if (filteredCaregivers.length === 0) {
+        toast.info("No caregivers available for the selected days with required skills");
+      }
     } catch (error: any) {
       toast.error("Failed to fetch caregivers");
       console.error(error);
@@ -241,6 +285,9 @@ export const OrdersManagement = ({
     const end = new Date(start);
     end.setDate(start.getDate() + (durationWeeks * 7) - 1);
 
+    // Use the primary care type code (first one from the related codes)
+    const primaryCareTypeCode = selectedCareTypeCodes[0] || selectedCareNeed;
+
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dayOfWeek = d.getDay();
       if (selectedDays.includes(dayOfWeek) && selectedTimeSlots[dayOfWeek]) {
@@ -261,7 +308,7 @@ export const OrdersManagement = ({
           start_time: slot.start,
           end_time: slot.end,
           duration_hours: durationHours,
-          care_type_code: selectedCareNeed,
+          care_type_code: primaryCareTypeCode,
           status: 'scheduled',
           special_notes: notes,
           order_title: `Care Service`
@@ -281,6 +328,7 @@ export const OrdersManagement = ({
     setEditingOrderId(null);
     setStep(1);
     setSelectedCareNeed("");
+    setSelectedCareTypeCodes([]);
     setStartDate("");
     setDurationWeeks(1);
     setSelectedDays([]);
@@ -384,7 +432,19 @@ export const OrdersManagement = ({
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label>Select Your Care Need</Label>
-                  <Select value={selectedCareNeed} onValueChange={setSelectedCareNeed}>
+                  <Select 
+                    value={selectedCareNeed} 
+                    onValueChange={async (value) => {
+                      setSelectedCareNeed(value);
+                      // Fetch the care need to get related care type codes
+                      const { data } = await supabase
+                        .from("care_needs")
+                        .select("related_care_type_codes")
+                        .eq("code", value)
+                        .single();
+                      setSelectedCareTypeCodes(data?.related_care_type_codes || []);
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Choose from your care needs" />
                     </SelectTrigger>
