@@ -718,7 +718,8 @@ const Clients = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Contact</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Age</TableHead>
                     <TableHead>Care Needs</TableHead>
@@ -733,9 +734,10 @@ const Clients = () => {
                         {client.first_name} {client.last_name}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-sm">{client.phone}</span>
-                        </div>
+                        <span className="text-sm">{client.profiles?.email || client.email || '-'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm">{client.phone}</span>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
@@ -843,21 +845,22 @@ const Clients = () => {
                 />
               </div>
             </div>
-            {!isEditMode && (
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="client@example.com"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Required for creating a login account for the client
-                </p>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email {!isEditMode && '*'}</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="client@example.com"
+                disabled={isEditMode}
+              />
+              <p className="text-xs text-muted-foreground">
+                {isEditMode 
+                  ? "Email cannot be changed after account creation" 
+                  : "Required for creating a login account for the client"}
+              </p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone *</Label>
               <Input
