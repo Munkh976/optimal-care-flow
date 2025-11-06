@@ -1011,6 +1011,7 @@ export type Database = {
         | "scheduler"
         | "hr_staff"
         | "caregiver"
+        | "client"
       assignment_method:
         | "manual"
         | "ai_suggested"
@@ -1183,6 +1184,7 @@ export const Constants = {
         "scheduler",
         "hr_staff",
         "caregiver",
+        "client",
       ],
       assignment_method: [
         "manual",

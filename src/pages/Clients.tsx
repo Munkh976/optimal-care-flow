@@ -36,6 +36,7 @@ const Clients = () => {
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
+    email: "",
     phone: "",
     address: "",
     city: "",
@@ -136,6 +137,12 @@ const Clients = () => {
       .from("clients")
       .select(`
         *,
+        profiles!clients_user_id_fkey(
+          id,
+          full_name,
+          email,
+          phone
+        ),
         client_care_needs(
           care_need_code,
           priority,
@@ -182,6 +189,7 @@ const Clients = () => {
     setFormData({
       first_name: "",
       last_name: "",
+      email: "",
       phone: "",
       address: "",
       city: "",
@@ -207,6 +215,7 @@ const Clients = () => {
     setFormData({
       first_name: client.first_name || "",
       last_name: client.last_name || "",
+      email: client.profiles?.email || client.email || "",
       phone: client.phone || "",
       address: client.address || "",
       city: client.city || "",
@@ -233,6 +242,11 @@ const Clients = () => {
       return;
     }
 
+    if (!isEditMode && !formData.email) {
+      toast.error("Email is required for new clients");
+      return;
+    }
+
     const clientData = {
       first_name: formData.first_name,
       last_name: formData.last_name,
@@ -249,6 +263,23 @@ const Clients = () => {
     };
 
     if (isEditMode && editClient) {
+      // Update profile if it exists
+      if (editClient.user_id) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            full_name: `${formData.first_name} ${formData.last_name}`,
+            phone: formData.phone,
+          })
+          .eq("id", editClient.user_id);
+
+        if (profileError) {
+          toast.error("Failed to update profile");
+          return;
+        }
+      }
+
+      // Update client-specific data
       const { error } = await supabase
         .from("clients")
         .update(clientData)
@@ -279,8 +310,43 @@ const Clients = () => {
       setIsAddDialogOpen(false);
       if (user) fetchClients(user.id);
     } else {
+      // Create auth user and profile first
+      const tempPassword = Math.random().toString(36).slice(-12) + "Aa1!";
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: tempPassword,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: `${formData.first_name} ${formData.last_name}`,
+          }
+        }
+      });
+
+      if (authError) {
+        toast.error("Failed to create user account: " + authError.message);
+        return;
+      }
+
+      if (!authData.user) {
+        toast.error("Failed to create user account");
+        return;
+      }
+
+      // Profile is created automatically by trigger
+      // Wait a moment for the trigger to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Update profile with phone
+      await supabase
+        .from("profiles")
+        .update({ phone: formData.phone })
+        .eq("id", authData.user.id);
+
+      // Create client record linked to profile
       const { data: newClient, error } = await supabase.from("clients").insert({
         ...clientData,
+        user_id: authData.user.id,
         agency_id: user.id,
       }).select().single();
 
@@ -288,6 +354,13 @@ const Clients = () => {
         toast.error("Failed to add client");
         return;
       }
+
+      // Add client role
+      await supabase.from("user_roles").insert({
+        user_id: authData.user.id,
+        role: 'client',
+        agency_id: user.id,
+      });
 
       // Add care needs
       if (formData.care_need_codes.length > 0 && newClient) {
@@ -300,7 +373,7 @@ const Clients = () => {
         await supabase.from("client_care_needs").insert(careNeedsData);
       }
 
-      toast.success("Client added successfully");
+      toast.success(`Client added successfully. Temporary password: ${tempPassword}`);
       setIsAddDialogOpen(false);
       if (user) fetchClients(user.id);
     }
@@ -725,6 +798,21 @@ const Clients = () => {
                 />
               </div>
             </div>
+            {!isEditMode && (
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="client@example.com"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Required for creating a login account for the client
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="phone">Phone *</Label>
               <Input
