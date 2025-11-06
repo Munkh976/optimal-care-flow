@@ -86,6 +86,12 @@ const Caregivers = () => {
       .from("caregivers")
       .select(`
         *,
+        profiles!caregivers_user_id_fkey(
+          id,
+          full_name,
+          email,
+          phone
+        ),
         caregiver_skills(
           id,
           care_type_code,
@@ -95,14 +101,21 @@ const Caregivers = () => {
           care_types(code, name, category)
         )
       `)
-      .eq("agency_id", userId)
-      .order("first_name", { ascending: true });
+      .eq("agency_id", userId);
 
     if (error) {
       console.error("Error fetching caregivers:", error);
       toast.error("Failed to load caregivers");
     } else {
-      setCaregivers(data || []);
+      // Map data to include profile fields at caregiver level for backward compatibility
+      const mappedData = (data || []).map((caregiver: any) => ({
+        ...caregiver,
+        first_name: caregiver.profiles?.full_name?.split(' ')[0] || caregiver.first_name || '',
+        last_name: caregiver.profiles?.full_name?.split(' ').slice(1).join(' ') || caregiver.last_name || '',
+        email: caregiver.profiles?.email || caregiver.email || '',
+        phone: caregiver.profiles?.phone || caregiver.phone || '',
+      }));
+      setCaregivers(mappedData);
     }
     setLoading(false);
   };
@@ -169,10 +182,6 @@ const Caregivers = () => {
     }
 
     const caregiverData = {
-      first_name: formData.first_name,
-      last_name: formData.last_name,
-      email: formData.email,
-      phone: formData.phone,
       hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
       employment_type: formData.employment_type,
       city: formData.city,
@@ -180,6 +189,24 @@ const Caregivers = () => {
     };
 
     if (isEditMode && editCaregiver) {
+      // Update profile if user_id exists
+      if (editCaregiver.user_id) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            full_name: `${formData.first_name} ${formData.last_name}`,
+            email: formData.email,
+            phone: formData.phone,
+          })
+          .eq("id", editCaregiver.user_id);
+
+        if (profileError) {
+          toast.error("Failed to update profile");
+          return;
+        }
+      }
+
+      // Update caregiver-specific data
       const { error } = await supabase
         .from("caregivers")
         .update(caregiverData)
@@ -208,15 +235,50 @@ const Caregivers = () => {
       setIsAddDialogOpen(false);
       if (user) fetchCaregivers(user.id);
     } else {
+      // Create auth user and profile first
+      const tempPassword = Math.random().toString(36).slice(-12) + "Aa1!";
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: formData.email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: `${formData.first_name} ${formData.last_name}`,
+        }
+      });
+
+      if (authError) {
+        toast.error("Failed to create user account: " + authError.message);
+        return;
+      }
+
+      // Profile is created automatically by trigger
+      // Wait a moment for the trigger to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Update profile with phone
+      await supabase
+        .from("profiles")
+        .update({ phone: formData.phone })
+        .eq("id", authData.user.id);
+
+      // Create caregiver record linked to profile
       const { data: newCaregiver, error } = await supabase.from("caregivers").insert({
         ...caregiverData,
+        user_id: authData.user.id,
         agency_id: user.id,
-      }).select().single();
+      } as any).select().single();
 
       if (error) {
         toast.error("Failed to add caregiver");
         return;
       }
+
+      // Add caregiver role
+      await supabase.from("user_roles").insert({
+        user_id: authData.user.id,
+        role: 'caregiver',
+        agency_id: user.id,
+      });
 
       // Add caregiver skills
       if (formData.care_type_codes.length > 0 && newCaregiver) {

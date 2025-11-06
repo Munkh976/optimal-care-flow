@@ -312,6 +312,7 @@ export type Database = {
           role: Database["public"]["Enums"]["caregiver_role"]
           state: string | null
           updated_at: string | null
+          user_id: string | null
           zip_code: string | null
         }
         Insert: {
@@ -337,6 +338,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["caregiver_role"]
           state?: string | null
           updated_at?: string | null
+          user_id?: string | null
           zip_code?: string | null
         }
         Update: {
@@ -362,12 +364,20 @@ export type Database = {
           role?: Database["public"]["Enums"]["caregiver_role"]
           state?: string | null
           updated_at?: string | null
+          user_id?: string | null
           zip_code?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "caregivers_agency_id_fkey"
             columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "caregivers_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -480,6 +490,7 @@ export type Database = {
           city: string
           created_at: string | null
           date_of_birth: string | null
+          email: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           first_name: string
@@ -492,6 +503,7 @@ export type Database = {
           preferred_caregiver_id: string | null
           state: string
           updated_at: string | null
+          user_id: string | null
           zip_code: string
         }
         Insert: {
@@ -501,6 +513,7 @@ export type Database = {
           city: string
           created_at?: string | null
           date_of_birth?: string | null
+          email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           first_name: string
@@ -513,6 +526,7 @@ export type Database = {
           preferred_caregiver_id?: string | null
           state: string
           updated_at?: string | null
+          user_id?: string | null
           zip_code: string
         }
         Update: {
@@ -522,6 +536,7 @@ export type Database = {
           city?: string
           created_at?: string | null
           date_of_birth?: string | null
+          email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           first_name?: string
@@ -534,6 +549,7 @@ export type Database = {
           preferred_caregiver_id?: string | null
           state?: string
           updated_at?: string | null
+          user_id?: string | null
           zip_code?: string
         }
         Relationships: [
@@ -549,6 +565,13 @@ export type Database = {
             columns: ["preferred_caregiver_id"]
             isOneToOne: false
             referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -937,6 +960,37 @@ export type Database = {
         Returns: undefined
       }
       generate_order_number: { Args: never; Returns: string }
+      get_caregiver_with_profile: {
+        Args: { caregiver_uuid: string }
+        Returns: {
+          agency_id: string
+          email: string
+          full_name: string
+          hourly_rate: number
+          id: string
+          is_active: boolean
+          performance_rating: number
+          phone: string
+          role: Database["public"]["Enums"]["caregiver_role"]
+          user_id: string
+        }[]
+      }
+      get_client_with_profile: {
+        Args: { client_uuid: string }
+        Returns: {
+          address: string
+          agency_id: string
+          city: string
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean
+          medical_conditions: string[]
+          phone: string
+          state: string
+          user_id: string
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
