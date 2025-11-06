@@ -95,6 +95,7 @@ export const OrdersManagement = ({
   const [step, setStep] = useState(1);
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [bookingData, setBookingData] = useState<BookingData>({
     primaryService: null,
     additionalService: null,
@@ -135,6 +136,25 @@ export const OrdersManagement = ({
     };
     fetchCareTypes();
   }, []);
+
+  // Fetch all orders
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!clientProfile?.id) return;
+      
+      const { data, error } = await supabase
+        .from('client_orders')
+        .select('*')
+        .eq('client_id', clientProfile.id)
+        .in('status', ['active', 'submitted'])
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setAllOrders(data);
+      }
+    };
+    fetchOrders();
+  }, [clientProfile?.id]);
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -257,19 +277,17 @@ export const OrdersManagement = ({
 
   const handleSubmitBooking = async () => {
     if (!clientProfile || !bookingData.primaryService || !bookingData.caregiver || 
-        !bookingData.time || bookingData.day === null) {
+        !bookingData.time || bookingData.day === null || !bookingData.startDate) {
       toast.error("Please complete all required fields");
       return;
     }
 
     setLoading(true);
     try {
-      // Calculate dates based on repeat frequency
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() + ((bookingData.day - startDate.getDay() + 7) % 7 || 7));
-      const start = startDate.toISOString().split('T')[0];
+      // Use the user-selected start date
+      const start = bookingData.startDate;
       
-      let end = new Date(startDate);
+      let end = new Date(start);
       if (bookingData.repeat === 'weekly') {
         end.setMonth(end.getMonth() + 3); // 3 months for weekly
       } else if (bookingData.repeat === 'biweekly') {
@@ -277,7 +295,7 @@ export const OrdersManagement = ({
       } else if (bookingData.repeat === 'monthly') {
         end.setMonth(end.getMonth() + 12); // 12 months for monthly
       } else {
-        end = startDate; // one time only
+        end = new Date(start); // one time only
       }
 
       const orderNumber = `ORD-${Date.now()}`;
@@ -569,7 +587,7 @@ export const OrdersManagement = ({
 
                 {/* Day Selection */}
                 <div className="space-y-3">
-                  <Label className="text-base font-semibold">Select Day</Label>
+                  <Label className="text-base font-semibold">Select Day of Week</Label>
                   <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                     {dayNames.map((day, idx) => (
                       <Card
@@ -588,6 +606,25 @@ export const OrdersManagement = ({
                     ))}
                   </div>
                 </div>
+
+                {/* Start Date Selection */}
+                {bookingData.day !== null && (
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold">Start Date</Label>
+                    <Input
+                      type="date"
+                      value={bookingData.startDate}
+                      onChange={(e) => setBookingData(prev => ({ ...prev, startDate: e.target.value }))}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="text-base"
+                    />
+                    {bookingData.startDate && (
+                      <p className="text-sm text-muted-foreground">
+                        Starts on {new Date(bookingData.startDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Repeat Options */}
                 <div className="space-y-3">
@@ -882,34 +919,48 @@ export const OrdersManagement = ({
         </Card>
       )}
 
-      {/* Current Order Display */}
-      {currentOrder && !showOrderForm && (
+      {/* All Orders Display */}
+      {!showOrderForm && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Active Order: {currentOrder.order_number}
-                </CardTitle>
-                <CardDescription>
-                  {new Date(currentOrder.start_date).toLocaleDateString()} - {new Date(currentOrder.end_date).toLocaleDateString()}
-                </CardDescription>
-              </div>
-              {getStatusBadge(currentOrder.status)}
-            </div>
+            <CardTitle>Your Orders</CardTitle>
+            <CardDescription>{allOrders.length} active order{allOrders.length !== 1 ? 's' : ''}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-muted-foreground">Frequency</Label>
-                <p className="font-medium capitalize">{currentOrder.frequency}</p>
+            {allOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">No active orders</p>
+                <p className="text-sm text-muted-foreground">Create your first order to get started</p>
               </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Created</Label>
-                <p className="font-medium">{new Date(currentOrder.created_at).toLocaleDateString()}</p>
+            ) : (
+              <div className="space-y-4">
+                {allOrders.map((order) => (
+                  <Card key={order.id} className="bg-muted/30">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4" />
+                            <p className="font-semibold">{order.order_number}</p>
+                            {getStatusBadge(order.status)}
+                          </div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            <span>{new Date(order.start_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} - {new Date(order.end_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</span>
+                          </div>
+                          <div className="text-sm text-muted-foreground capitalize">
+                            <Clock className="h-4 w-4 inline mr-1" />
+                            {order.frequency}
+                          </div>
+                        </div>
+                        <Button variant="outline" size="sm">View Details</Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}
