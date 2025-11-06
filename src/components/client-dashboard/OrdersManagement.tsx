@@ -109,7 +109,7 @@ export const OrdersManagement = ({
   const [availableCaregivers, setAvailableCaregivers] = useState<Caregiver[]>([]);
   const [loadingCaregivers, setLoadingCaregivers] = useState(false);
   
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const primaryServices = availableCareTypes.filter(
     s => s.care_types?.category === 'Activities of Daily Living (ADL)' || 
@@ -639,61 +639,105 @@ export const OrdersManagement = ({
                                     <h4 className="font-semibold">{caregiver.first_name} {caregiver.last_name}</h4>
                                     <div className="flex items-center gap-2 text-sm">
                                       <Star className="h-4 w-4 fill-warning text-warning" />
-                                      <span>{caregiver.performance_rating.toFixed(1)}</span>
-                                      <span className="text-muted-foreground">•</span>
-                                      <span>${caregiver.hourly_rate}/hr</span>
+                                      <span>{caregiver.performance_rating.toFixed(1)} rating</span>
                                     </div>
                                   </div>
                                 </div>
 
-                                {daySlot && (
-                                  <div className="space-y-2">
-                                    <p className="text-xs font-medium text-muted-foreground uppercase">Morning</p>
-                                    <div className="grid grid-cols-3 gap-2">
-                                      {timeSlots.morning.map(time => (
-                                        <Button
-                                          key={time}
-                                          variant={bookingData.time === `${time} AM` && bookingData.caregiver?.id === caregiver.id ? 'default' : 'outline'}
-                                          size="sm"
-                                          className="text-xs"
-                                          onClick={() => selectTimeSlot(caregiver, time, 'AM')}
-                                        >
-                                          {time} AM
-                                        </Button>
-                                      ))}
-                                    </div>
+                                {daySlot && (() => {
+                                  // Parse caregiver availability times
+                                  const parseTime = (timeStr: string) => {
+                                    const [hours, minutes] = timeStr.split(':').map(Number);
+                                    return hours * 60 + minutes;
+                                  };
+                                  
+                                  const availabilityStart = parseTime(daySlot.start_time);
+                                  const availabilityEnd = parseTime(daySlot.end_time);
+                                  const serviceDuration = bookingData.duration * 60; // Convert hours to minutes
+                                  
+                                  // Filter time slots based on availability
+                                  const isTimeSlotAvailable = (time: string, period: string) => {
+                                    let hours = parseInt(time.split(':')[0]);
+                                    if (period === 'PM' && hours !== 12) hours += 12;
+                                    if (period === 'AM' && hours === 12) hours = 0;
                                     
-                                    <p className="text-xs font-medium text-muted-foreground uppercase mt-3">Afternoon</p>
-                                    <div className="grid grid-cols-3 gap-2">
-                                      {timeSlots.afternoon.map(time => (
-                                        <Button
-                                          key={time}
-                                          variant={bookingData.time === `${time} PM` && bookingData.caregiver?.id === caregiver.id ? 'default' : 'outline'}
-                                          size="sm"
-                                          className="text-xs"
-                                          onClick={() => selectTimeSlot(caregiver, time, 'PM')}
-                                        >
-                                          {time} PM
-                                        </Button>
-                                      ))}
-                                    </div>
+                                    const slotStart = hours * 60;
+                                    const slotEnd = slotStart + serviceDuration;
+                                    
+                                    return slotStart >= availabilityStart && slotEnd <= availabilityEnd;
+                                  };
+                                  
+                                  const availableMorning = timeSlots.morning.filter(time => isTimeSlotAvailable(time, 'AM'));
+                                  const availableAfternoon = timeSlots.afternoon.filter(time => isTimeSlotAvailable(time, 'PM'));
+                                  const availableEvening = timeSlots.evening.filter(time => isTimeSlotAvailable(time, 'PM'));
+                                  
+                                  return (
+                                    <div className="space-y-2">
+                                      {availableMorning.length > 0 && (
+                                        <>
+                                          <p className="text-xs font-medium text-muted-foreground uppercase">Morning</p>
+                                          <div className="grid grid-cols-3 gap-2">
+                                            {availableMorning.map(time => (
+                                              <Button
+                                                key={time}
+                                                variant={bookingData.time === `${time} AM` && bookingData.caregiver?.id === caregiver.id ? 'default' : 'outline'}
+                                                size="sm"
+                                                className="text-xs"
+                                                onClick={() => selectTimeSlot(caregiver, time, 'AM')}
+                                              >
+                                                {time} AM
+                                              </Button>
+                                            ))}
+                                          </div>
+                                        </>
+                                      )}
+                                      
+                                      {availableAfternoon.length > 0 && (
+                                        <>
+                                          <p className="text-xs font-medium text-muted-foreground uppercase mt-3">Afternoon</p>
+                                          <div className="grid grid-cols-3 gap-2">
+                                            {availableAfternoon.map(time => (
+                                              <Button
+                                                key={time}
+                                                variant={bookingData.time === `${time} PM` && bookingData.caregiver?.id === caregiver.id ? 'default' : 'outline'}
+                                                size="sm"
+                                                className="text-xs"
+                                                onClick={() => selectTimeSlot(caregiver, time, 'PM')}
+                                              >
+                                                {time} PM
+                                              </Button>
+                                            ))}
+                                          </div>
+                                        </>
+                                      )}
 
-                                    <p className="text-xs font-medium text-muted-foreground uppercase mt-3">Evening</p>
-                                    <div className="grid grid-cols-3 gap-2">
-                                      {timeSlots.evening.map(time => (
-                                        <Button
-                                          key={time}
-                                          variant={bookingData.time === `${time} PM` && bookingData.caregiver?.id === caregiver.id ? 'default' : 'outline'}
-                                          size="sm"
-                                          className="text-xs"
-                                          onClick={() => selectTimeSlot(caregiver, time, 'PM')}
-                                        >
-                                          {time} PM
-                                        </Button>
-                                      ))}
+                                      {availableEvening.length > 0 && (
+                                        <>
+                                          <p className="text-xs font-medium text-muted-foreground uppercase mt-3">Evening</p>
+                                          <div className="grid grid-cols-3 gap-2">
+                                            {availableEvening.map(time => (
+                                              <Button
+                                                key={time}
+                                                variant={bookingData.time === `${time} PM` && bookingData.caregiver?.id === caregiver.id ? 'default' : 'outline'}
+                                                size="sm"
+                                                className="text-xs"
+                                                onClick={() => selectTimeSlot(caregiver, time, 'PM')}
+                                              >
+                                                {time} PM
+                                              </Button>
+                                            ))}
+                                          </div>
+                                        </>
+                                      )}
+                                      
+                                      {availableMorning.length === 0 && availableAfternoon.length === 0 && availableEvening.length === 0 && (
+                                        <p className="text-sm text-muted-foreground text-center py-4">
+                                          No available time slots for {bookingData.duration}hr service
+                                        </p>
+                                      )}
                                     </div>
-                                  </div>
-                                )}
+                                  );
+                                })()}
                               </CardContent>
                             </Card>
                           );
