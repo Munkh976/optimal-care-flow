@@ -19,6 +19,7 @@ import CaregiverRegistration from "./pages/CaregiverRegistration";
 import CaregiverApprovals from "./pages/CaregiverApprovals";
 import Users from "./pages/Users";
 import AddUser from "./pages/AddUser";
+import EditUser from "./pages/EditUser";
 import SystemAdminDashboard from "./pages/SystemAdminDashboard";
 import CareTypes from "./pages/CareTypes";
 import CareNeeds from "./pages/CareNeeds";
@@ -50,6 +51,7 @@ const App = () => (
           <Route path="/client-dashboard" element={<ClientDashboard />} />
           <Route path="/users" element={<Users />} />
           <Route path="/users/add" element={<AddUser />} />
+          <Route path="/users/edit/:id" element={<EditUser />} />
           <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
           <Route path="/care-types" element={<CareTypes />} />
           <Route path="/care-needs" element={<CareNeeds />} />

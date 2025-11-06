@@ -19,6 +19,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
 import { UserPlus, Loader2, Search, Edit, Key, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,6 +56,12 @@ const Users = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetchUsers();
@@ -98,6 +123,71 @@ const Users = () => {
     } catch (error: any) {
       toast.error("Failed to fetch users");
       console.error(error);
+    }
+  };
+
+  const canManageUser = (targetRole: string) => {
+    if (userRole === 'system_admin') return true;
+    if (userRole === 'agency_admin') {
+      return targetRole !== 'system_admin';
+    }
+    return false;
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedUser || !newPassword) return;
+
+    setResetting(true);
+    try {
+      // Use admin API to update user password
+      const { error } = await supabase.auth.admin.updateUserById(
+        selectedUser.id,
+        { password: newPassword }
+      );
+
+      if (error) throw error;
+
+      toast.success("Password reset successfully!");
+      setResetPasswordDialogOpen(false);
+      setNewPassword("");
+      setSelectedUser(null);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reset password");
+      console.error(error);
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    setDeleting(true);
+    try {
+      // Delete user roles first
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", selectedUser.id);
+
+      if (roleError) throw roleError;
+
+      // Delete user using admin API
+      const { error: deleteError } = await supabase.auth.admin.deleteUser(
+        selectedUser.id
+      );
+
+      if (deleteError) throw deleteError;
+
+      toast.success("User deleted successfully!");
+      setDeleteDialogOpen(false);
+      setSelectedUser(null);
+      await fetchUsers();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete user");
+      console.error(error);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -211,6 +301,7 @@ const Users = () => {
                           size="sm"
                           className="text-primary hover:text-primary"
                           onClick={() => navigate(`/users/edit/${user.id}`)}
+                          disabled={!canManageUser(user.role || '')}
                         >
                           <Edit className="h-4 w-4 mr-1" />
                           Edit Role
@@ -219,6 +310,11 @@ const Users = () => {
                           variant="ghost"
                           size="sm"
                           className="text-orange-600 hover:text-orange-600"
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setResetPasswordDialogOpen(true);
+                          }}
+                          disabled={!canManageUser(user.role || '')}
                         >
                           <Key className="h-4 w-4 mr-1" />
                           Reset Password
@@ -227,7 +323,11 @@ const Users = () => {
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive"
-                          onClick={() => toast.info("Delete functionality coming soon")}
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setDeleteDialogOpen(true);
+                          }}
+                          disabled={!canManageUser(user.role || '')}
                         >
                           <Trash2 className="h-4 w-4 mr-1" />
                           Delete
@@ -242,6 +342,84 @@ const Users = () => {
         </div>
       </div>
 
+      {/* Reset Password Dialog */}
+      <Dialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">
+                Minimum 6 characters required
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResetPasswordDialogOpen(false);
+                setNewPassword("");
+                setSelectedUser(null);
+              }}
+              disabled={resetting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleResetPassword}
+              disabled={resetting || newPassword.length < 6}
+            >
+              {resetting ? "Resetting..." : "Reset Password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the user account for{" "}
+              <span className="font-semibold">{selectedUser?.email}</span>.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setSelectedUser(null);
+              }}
+              disabled={deleting}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Delete User"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };
