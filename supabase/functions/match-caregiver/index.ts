@@ -32,6 +32,8 @@ serve(async (req) => {
           care_requirements,
           address,
           city,
+          state,
+          zip_code,
           preferred_caregiver_id
         )
       `)
@@ -57,10 +59,12 @@ serve(async (req) => {
 Consider these factors:
 1. Skills match (certifications, required skills)
 2. Client care requirements vs caregiver capabilities
-3. Location proximity
+3. Location match - CRITICAL: Check if client zip code is in caregiver's service_zipcodes array
 4. Performance rating and reliability
 5. Preferred caregiver status
 6. Availability and work hours
+
+IMPORTANT: Caregivers should only be matched if the client's zip code is in their service_zipcodes list. If not in the list, give a low match score (below 40).
 
 Return a JSON array of caregiver matches with scores from 0-100, reasoning, and key factors.`;
 
@@ -74,7 +78,8 @@ Shift Details:
 - Client: ${shift.clients?.first_name} ${shift.clients?.last_name}
 - Client Conditions: ${shift.clients?.medical_conditions?.join(', ') || 'None'}
 - Client Requirements: ${shift.clients?.care_requirements?.join(', ') || 'None'}
-- Location: ${shift.clients?.city || 'Unknown'}
+- Client Location: ${shift.clients?.city || 'Unknown'}, ${shift.clients?.state || 'Unknown'}
+- Client Zip Code: ${shift.clients?.zip_code || 'Not specified'}
 - Preferred Caregiver: ${shift.clients?.preferred_caregiver_id || 'None'}
 
 Available Caregivers:
@@ -85,11 +90,11 @@ ${i + 1}. ${c.first_name} ${c.last_name} (ID: ${c.id})
    - Certifications: ${c.certifications?.join(', ') || 'None'}
    - Performance Rating: ${c.performance_rating}/5.0
    - Reliability Score: ${c.reliability_score}/100
-   - Location: ${c.city || 'Unknown'}
+   - Service Zip Codes: ${c.service_zipcodes?.join(', ') || 'Not specified'}
    - Hourly Rate: $${c.hourly_rate || 'N/A'}
 `).join('\n')}
 
-Calculate match scores for each caregiver.`;
+Calculate match scores for each caregiver. Remember to heavily weight whether the client's zip code (${shift.clients?.zip_code}) is in the caregiver's service zip codes list.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

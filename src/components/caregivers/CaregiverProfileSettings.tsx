@@ -29,6 +29,7 @@ interface Caregiver {
   location_state: string | null;
   location_zip_code: string | null;
   service_radius_miles: number | null;
+  service_zipcodes: string[] | null;
 }
 
 interface CaregiverSkill {
@@ -69,6 +70,7 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
     years_experience: 0,
     is_certified: false,
   });
+  const [newZipCode, setNewZipCode] = useState("");
 
   useEffect(() => {
     fetchSkills();
@@ -121,7 +123,7 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
           location_city: formData.location_city,
           location_state: formData.location_state,
           location_zip_code: formData.location_zip_code,
-          service_radius_miles: formData.service_radius_miles,
+          service_zipcodes: formData.service_zipcodes || [],
         })
         .eq("id", caregiverProfile.id);
 
@@ -223,6 +225,35 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
     } catch (error: any) {
       toast.error(error.message || "Failed to update password");
     }
+  };
+
+  const handleAddZipCode = () => {
+    const trimmedZip = newZipCode.trim();
+    if (!trimmedZip) {
+      toast.error("Please enter a zip code");
+      return;
+    }
+    if (!/^\d{5}$/.test(trimmedZip)) {
+      toast.error("Please enter a valid 5-digit zip code");
+      return;
+    }
+    const currentZips = formData.service_zipcodes || [];
+    if (currentZips.includes(trimmedZip)) {
+      toast.error("This zip code is already added");
+      return;
+    }
+    setFormData({
+      ...formData,
+      service_zipcodes: [...currentZips, trimmedZip]
+    });
+    setNewZipCode("");
+  };
+
+  const handleRemoveZipCode = (zipCode: string) => {
+    setFormData({
+      ...formData,
+      service_zipcodes: (formData.service_zipcodes || []).filter((z: string) => z !== zipCode)
+    });
   };
 
   if (!caregiverProfile || !formData) {
@@ -410,17 +441,57 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Service Radius (miles)</Label>
-            <Input
-              type="number"
-              min="1"
-              max="100"
-              value={formData.service_radius_miles || 10}
-              onChange={(e) => updateFormData('service_radius_miles', parseInt(e.target.value))}
-              disabled={!editMode}
-            />
-            <p className="text-xs text-muted-foreground">
-              How far are you willing to travel for shifts?
+            <Label>Service Zip Codes</Label>
+            {editMode ? (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter zip code (e.g., 12345)"
+                    value={newZipCode}
+                    onChange={(e) => setNewZipCode(e.target.value)}
+                    maxLength={5}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAddZipCode}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+                {formData.service_zipcodes && formData.service_zipcodes.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.service_zipcodes.map((zipCode: string, index: number) => (
+                      <Badge key={index} variant="secondary" className="gap-1">
+                        {zipCode}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveZipCode(zipCode)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {formData.service_zipcodes && formData.service_zipcodes.length > 0 ? (
+                  formData.service_zipcodes.map((zipCode: string, index: number) => (
+                    <Badge key={index} variant="secondary">
+                      {zipCode}
+                    </Badge>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No zip codes added yet</p>
+                )}
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground">
+              Add zip codes where you provide services
             </p>
           </div>
         </CardContent>

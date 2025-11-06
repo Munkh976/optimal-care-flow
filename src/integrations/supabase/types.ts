@@ -315,6 +315,7 @@ export type Database = {
           reliability_score: number | null
           role: Database["public"]["Enums"]["caregiver_role"]
           service_radius_miles: number | null
+          service_zipcodes: string[] | null
           state: string | null
           updated_at: string | null
           user_id: string | null
@@ -346,6 +347,7 @@ export type Database = {
           reliability_score?: number | null
           role?: Database["public"]["Enums"]["caregiver_role"]
           service_radius_miles?: number | null
+          service_zipcodes?: string[] | null
           state?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -377,6 +379,7 @@ export type Database = {
           reliability_score?: number | null
           role?: Database["public"]["Enums"]["caregiver_role"]
           service_radius_miles?: number | null
+          service_zipcodes?: string[] | null
           state?: string | null
           updated_at?: string | null
           user_id?: string | null

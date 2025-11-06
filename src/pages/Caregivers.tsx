@@ -43,6 +43,8 @@ const Caregivers = () => {
     employment_type: "full_time",
     city: "",
     state: "",
+    address: "",
+    zip_code: "",
     care_type_codes: [] as string[],
   });
   const [showResetPassword, setShowResetPassword] = useState(false);
@@ -158,6 +160,8 @@ const Caregivers = () => {
       employment_type: "full_time",
       city: "",
       state: "",
+      address: "",
+      zip_code: "",
       care_type_codes: [],
     });
     setShowResetPassword(false);
@@ -178,6 +182,8 @@ const Caregivers = () => {
       employment_type: caregiver.employment_type || "full_time",
       city: caregiver.city || "",
       state: caregiver.state || "",
+      address: caregiver.address || "",
+      zip_code: caregiver.zip_code || "",
       care_type_codes: caregiver.caregiver_skills?.map((s: any) => s.care_type_code) || [],
     });
     setShowResetPassword(false);
@@ -527,7 +533,16 @@ const Caregivers = () => {
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Street Address</Label>
+                    <Input
+                      id="address"
+                      value={formData.address || ''}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      placeholder="123 Main St"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="city">City</Label>
                       <Input
@@ -553,6 +568,16 @@ const Caregivers = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="zip_code">Zip Code</Label>
+                      <Input
+                        id="zip_code"
+                        value={formData.zip_code || ''}
+                        onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                        placeholder="12345"
+                        maxLength={5}
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
