@@ -3,12 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock } from "lucide-react";
+import { MapPin, Clock, Lock, User } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AvailabilityDialog } from "./AvailabilityDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { US_STATES } from "@/constants/usStates";
+import { Separator } from "@/components/ui/separator";
 
 interface Caregiver {
   id: string;
@@ -36,6 +37,12 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
   const [editMode, setEditMode] = useState(false);
   const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
   const [formData, setFormData] = useState(caregiverProfile);
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
 
   const handleSave = async () => {
     if (!formData || !caregiverProfile) return;
@@ -64,6 +71,36 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
 
   const updateFormData = (field: string, value: any) => {
     setFormData(prev => prev ? { ...prev, [field]: value } : null);
+  };
+
+  const handlePasswordChange = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      });
+
+      if (error) throw error;
+
+      toast.success("Password updated successfully");
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setShowPasswordSection(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update password");
+    }
   };
 
   if (!caregiverProfile || !formData) {
@@ -208,6 +245,75 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
           <Button onClick={() => setShowAvailabilityDialog(true)}>
             Manage Availability
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Password & Security */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="h-5 w-5 text-primary" />
+            Password & Security
+          </CardTitle>
+          <CardDescription>Update your password and security settings</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!showPasswordSection ? (
+            <Button 
+              variant="outline" 
+              onClick={() => setShowPasswordSection(true)}
+            >
+              Change Password
+            </Button>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Current Password</Label>
+                <Input
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                  placeholder="Enter current password"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>New Password</Label>
+                <Input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                  placeholder="Enter new password"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Confirm New Password</Label>
+                <Input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  placeholder="Confirm new password"
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowPasswordSection(false);
+                    setPasswordData({
+                      currentPassword: "",
+                      newPassword: "",
+                      confirmPassword: "",
+                    });
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handlePasswordChange}>
+                  Update Password
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
