@@ -4,11 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, Briefcase, DollarSign, LogOut, AlertCircle, Home, Settings } from "lucide-react";
-import { format } from "date-fns";
+import { Calendar, Clock, LogOut, AlertCircle, Home, Settings, DollarSign, Briefcase } from "lucide-react";
 import { toast } from "sonner";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
+import { ShiftList } from "@/components/caregivers/ShiftList";
 
 interface Assignment {
   id: string;
@@ -31,21 +31,6 @@ interface Assignment {
   };
 }
 
-interface OpenShift {
-  id: string;
-  shift_date: string;
-  start_time: string;
-  end_time: string;
-  duration_hours: number;
-  care_type_code: string;
-  ai_match_score: number | null;
-  clients: {
-    first_name: string;
-    last_name: string;
-    city: string;
-  };
-}
-
 interface CaregiverProfile {
   id: string;
   first_name: string;
@@ -58,15 +43,14 @@ interface CaregiverProfile {
 const CaregiverDashboard = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<CaregiverProfile | null>(null);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [openShifts, setOpenShifts] = useState<OpenShift[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [caregiverId, setCaregiverId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview'>('overview');
-  const [selectedShift, setSelectedShift] = useState<any>(null);
-  const [shiftView, setShiftView] = useState<'upcoming' | 'week' | 'history'>('upcoming');
+  const [upcomingShifts, setUpcomingShifts] = useState<Assignment[]>([]);
   const [weekShifts, setWeekShifts] = useState<Assignment[]>([]);
   const [historyShifts, setHistoryShifts] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview'>('overview');
+  const [shiftView, setShiftView] = useState<'upcoming' | 'week' | 'history'>('upcoming');
+  const [selectedShift, setSelectedShift] = useState<any>(null);
+
   useEffect(() => {
     checkAuthAndFetch();
   }, []);
@@ -99,9 +83,8 @@ const CaregiverDashboard = () => {
       }
       
       setProfile(caregiverData);
-      setCaregiverId(caregiverData.id);
 
-      // Fetch all assignments
+      // Fetch all assignments with shifts
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("shift_assignments")
         .select(`
@@ -118,10 +101,13 @@ const CaregiverDashboard = () => {
       const now = new Date();
       const startOfWeek = new Date(now);
       startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      
       const endOfWeek = new Date(startOfWeek);
       endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
 
-      // Sort and filter assignments
+      // Sort all assignments by date
       const allAssignments = (assignmentsData || []).sort((a, b) => {
         const dateA = new Date(a.shifts?.shift_date || '');
         const dateB = new Date(b.shifts?.shift_date || '');
@@ -144,25 +130,9 @@ const CaregiverDashboard = () => {
         return shiftDate < now;
       }).reverse(); // Most recent first
 
-      setAssignments(upcoming);
+      setUpcomingShifts(upcoming);
       setWeekShifts(thisWeek);
       setHistoryShifts(history);
-
-      // Fetch open shifts - using agency_id from caregiver's profile
-      const { data: openShiftsData, error: openShiftsError } = await supabase
-        .from("shifts")
-        .select(`
-          *,
-          clients (first_name, last_name, city)
-        `)
-        .eq("agency_id", caregiverData.agency_id)
-        .eq("status", "open")
-        .gte("shift_date", format(new Date(), "yyyy-MM-dd"))
-        .order("shift_date", { ascending: true })
-        .limit(3);
-
-      if (openShiftsError) throw openShiftsError;
-      setOpenShifts(openShiftsData || []);
 
     } catch (error) {
       console.error("Error:", error);
@@ -172,67 +142,14 @@ const CaregiverDashboard = () => {
     }
   };
 
-  const handlePickUpShift = async (shiftId: string) => {
-    if (!caregiverId) return;
-
-    try {
-      const { error: assignError } = await supabase
-        .from("shift_assignments")
-        .insert({
-          shift_id: shiftId,
-          caregiver_id: caregiverId,
-          status: "scheduled",
-          assignment_method: "picked_up"
-        });
-
-      if (assignError) throw assignError;
-
-      const { error: updateError } = await supabase
-        .from("shifts")
-        .update({ status: "assigned" })
-        .eq("id", shiftId);
-
-      if (updateError) throw updateError;
-
-      toast.success("Shift picked up successfully!");
-      checkAuthAndFetch();
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Failed to pick up shift");
-    }
-  };
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out successfully");
     navigate("/auth");
   };
 
-  const getStatusColor = (status: string) => {
-    const colors = {
-      scheduled: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-      confirmed: "bg-green-500/10 text-green-600 border-green-500/20",
-      in_progress: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-      completed: "bg-gray-500/10 text-gray-600 border-gray-500/20"
-    };
-    return colors[status as keyof typeof colors] || "bg-muted";
-  };
-
-  const getCareTypeColor = (type: string) => {
-    const colors = {
-      personal_care: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-      companionship: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-      medication: "bg-green-500/10 text-green-600 border-green-500/20",
-      mobility: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-      dementia_care: "bg-pink-500/10 text-pink-600 border-pink-500/20",
-      hospice: "bg-gray-500/10 text-gray-600 border-gray-500/20",
-      skilled_nursing: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20"
-    };
-    return colors[type as keyof typeof colors] || "bg-muted";
-  };
-
-  // Calculate weekly hours and earnings
-  const weeklyHours = assignments.reduce((sum, a) => sum + (a.shifts?.duration_hours || 0), 0);
+  // Calculate weekly hours and earnings from this week's shifts
+  const weeklyHours = weekShifts.reduce((sum, a) => sum + (a.shifts?.duration_hours || 0), 0);
   const weeklyEarnings = profile ? weeklyHours * profile.hourly_rate : 0;
   const minHoursRequired = 35; // Default full-time minimum
 
@@ -266,7 +183,7 @@ const CaregiverDashboard = () => {
         </div>
       </header>
 
-      {/* Header Menus */}
+      {/* Navigation Tabs */}
       <div className="border-b border-border/40">
         <div className="container mx-auto px-4 py-3">
           <Tabs value={activeTab} onValueChange={(v) => {
@@ -327,10 +244,7 @@ const CaregiverDashboard = () => {
                 </div>
                 <DollarSign className="w-8 h-8 text-green-500" />
               </div>
-              <Button size="sm" className="w-full bg-primary hover:bg-primary/90">
-                <DollarSign className="w-4 h-4 mr-2" />
-                Get Instant Pay
-              </Button>
+              <p className="text-xs text-muted-foreground">Based on {weeklyHours} hours at ${profile?.hourly_rate}/hr</p>
             </CardContent>
           </Card>
 
@@ -353,189 +267,63 @@ const CaregiverDashboard = () => {
         {/* Shifts View with Tabs */}
         <Card className="mb-6">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Your Shifts</h2>
-              <Tabs value={shiftView} onValueChange={(v) => setShiftView(v as any)}>
+            <Tabs value={shiftView} onValueChange={(v) => setShiftView(v as any)}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Your Shifts</h2>
                 <TabsList>
-                  <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                  <TabsTrigger value="week">This Week</TabsTrigger>
-                  <TabsTrigger value="history">History</TabsTrigger>
+                  <TabsTrigger value="upcoming">
+                    Upcoming ({upcomingShifts.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="week">
+                    This Week ({weekShifts.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="history">
+                    History ({historyShifts.length})
+                  </TabsTrigger>
                 </TabsList>
-              </Tabs>
-            </div>
+              </div>
 
-            {shiftView === 'upcoming' && (
-              <>
-                {assignments.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 bg-cyan-500/5 rounded-lg border border-cyan-500/20">
-                    <AlertCircle className="w-12 h-12 text-cyan-500 mb-4" />
-                    <p className="text-lg font-medium text-cyan-600">No upcoming shifts scheduled</p>
-                    <p className="text-sm text-muted-foreground">Check the trade board for available shifts!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {assignments.map((assignment) => (
-                      <Card 
-                        key={assignment.id} 
-                        className="border-l-4 border-primary hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => setSelectedShift(assignment.shifts)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <p className="font-semibold text-lg">
-                                  {assignment.shifts?.clients?.first_name} {assignment.shifts?.clients?.last_name}
-                                </p>
-                                <Badge className={getStatusColor(assignment.status)}>
-                                  {assignment.status}
-                                </Badge>
-                                <Badge className={getCareTypeColor(assignment.shifts?.care_type_code)}>
-                                  {assignment.shifts?.care_type_code.replace(/_/g, " ")}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                  <Calendar className="w-4 h-4" />
-                                  <span>{format(new Date(assignment.shifts?.shift_date), "MMM d, yyyy")}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-4 h-4" />
-                                  <span>{assignment.shifts?.start_time.slice(0, 5)} - {assignment.shifts?.end_time.slice(0, 5)}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="w-4 h-4" />
-                                  <span>{assignment.shifts?.clients?.city}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
+              <TabsContent value="upcoming">
+                <ShiftList
+                  shifts={upcomingShifts}
+                  onShiftClick={setSelectedShift}
+                  emptyMessage="No upcoming shifts scheduled"
+                  emptyIcon={<AlertCircle className="w-12 h-12 text-cyan-500 mb-2" />}
+                  borderColor="border-primary"
+                />
+              </TabsContent>
 
-            {shiftView === 'week' && (
-              <>
-                {weekShifts.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 bg-blue-500/5 rounded-lg border border-blue-500/20">
-                    <Calendar className="w-12 h-12 text-blue-500 mb-4" />
-                    <p className="text-lg font-medium text-blue-600">No shifts this week</p>
-                    <p className="text-sm text-muted-foreground">Your schedule is clear for this week</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {weekShifts.map((assignment) => (
-                      <Card 
-                        key={assignment.id} 
-                        className="border-l-4 border-blue-500 hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => setSelectedShift(assignment.shifts)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <p className="font-semibold text-lg">
-                                  {assignment.shifts?.clients?.first_name} {assignment.shifts?.clients?.last_name}
-                                </p>
-                                <Badge className={getStatusColor(assignment.status)}>
-                                  {assignment.status}
-                                </Badge>
-                                <Badge className={getCareTypeColor(assignment.shifts?.care_type_code)}>
-                                  {assignment.shifts?.care_type_code.replace(/_/g, " ")}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                  <Calendar className="w-4 h-4" />
-                                  <span>{format(new Date(assignment.shifts?.shift_date), "EEE, MMM d")}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-4 h-4" />
-                                  <span>{assignment.shifts?.start_time.slice(0, 5)} - {assignment.shifts?.end_time.slice(0, 5)}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="w-4 h-4" />
-                                  <span>{assignment.shifts?.clients?.city}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
+              <TabsContent value="week">
+                <ShiftList
+                  shifts={weekShifts}
+                  onShiftClick={setSelectedShift}
+                  emptyMessage="No shifts this week"
+                  emptyIcon={<Calendar className="w-12 h-12 text-blue-500 mb-2" />}
+                  borderColor="border-blue-500"
+                />
+              </TabsContent>
 
-            {shiftView === 'history' && (
-              <>
-                {historyShifts.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 bg-gray-500/5 rounded-lg border border-gray-500/20">
-                    <Clock className="w-12 h-12 text-gray-500 mb-4" />
-                    <p className="text-lg font-medium text-gray-600">No shift history</p>
-                    <p className="text-sm text-muted-foreground">Completed shifts will appear here</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {historyShifts.map((assignment) => (
-                      <Card 
-                        key={assignment.id} 
-                        className="border-l-4 border-gray-400 hover:shadow-md transition-shadow cursor-pointer opacity-80"
-                        onClick={() => setSelectedShift(assignment.shifts)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <p className="font-semibold text-lg">
-                                  {assignment.shifts?.clients?.first_name} {assignment.shifts?.clients?.last_name}
-                                </p>
-                                <Badge className={getStatusColor(assignment.status)}>
-                                  {assignment.status}
-                                </Badge>
-                                <Badge className={getCareTypeColor(assignment.shifts?.care_type_code)}>
-                                  {assignment.shifts?.care_type_code.replace(/_/g, " ")}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                  <Calendar className="w-4 h-4" />
-                                  <span>{format(new Date(assignment.shifts?.shift_date), "MMM d, yyyy")}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-4 h-4" />
-                                  <span>{assignment.shifts?.start_time.slice(0, 5)} - {assignment.shifts?.end_time.slice(0, 5)}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="w-4 h-4" />
-                                  <span>{assignment.shifts?.clients?.city}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
+              <TabsContent value="history">
+                <ShiftList
+                  shifts={historyShifts}
+                  onShiftClick={setSelectedShift}
+                  emptyMessage="No shift history"
+                  emptyIcon={<Clock className="w-12 h-12 text-gray-500 mb-2" />}
+                  borderColor="border-gray-400"
+                />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
-        {/* Trade Board & Extra Hours */}
-        <div className="grid md:grid-cols-2 gap-6">
+        {/* Quick Actions */}
+        <div className="grid md:grid-cols-3 gap-6">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-bold">💼 Available Shifts</h3>
-                  <p className="text-sm text-muted-foreground">{openShifts.length} open shifts ready to pick up!</p>
+                  <p className="text-sm text-muted-foreground">Pick up extra hours</p>
                 </div>
               </div>
               <Button className="w-full" onClick={() => navigate("/available-shifts")}>
