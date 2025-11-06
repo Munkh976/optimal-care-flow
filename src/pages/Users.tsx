@@ -139,13 +139,30 @@ const Users = () => {
 
     setResetting(true);
     try {
-      // Use admin API to update user password
-      const { error } = await supabase.auth.admin.updateUserById(
-        selectedUser.id,
-        { password: newPassword }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No session found");
+
+      // Call edge function to reset password
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: selectedUser.id,
+            newPassword: newPassword,
+          }),
+        }
       );
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to reset password");
+      }
 
       toast.success("Password reset successfully!");
       setResetPasswordDialogOpen(false);
@@ -164,20 +181,29 @@ const Users = () => {
 
     setDeleting(true);
     try {
-      // Delete user roles first
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", selectedUser.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No session found");
 
-      if (roleError) throw roleError;
-
-      // Delete user using admin API
-      const { error: deleteError } = await supabase.auth.admin.deleteUser(
-        selectedUser.id
+      // Call edge function to delete user
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-delete-user`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: selectedUser.id,
+          }),
+        }
       );
 
-      if (deleteError) throw deleteError;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to delete user");
+      }
 
       toast.success("User deleted successfully!");
       setDeleteDialogOpen(false);
