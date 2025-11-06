@@ -22,7 +22,6 @@ import AddUser from "./pages/AddUser";
 import EditUser from "./pages/EditUser";
 import SystemAdminDashboard from "./pages/SystemAdminDashboard";
 import CareTypes from "./pages/CareTypes";
-import CareNeeds from "./pages/CareNeeds";
 import OrderManagement from "./pages/OrderManagement";
 import NotFound from "./pages/NotFound";
 import AvailableShifts from "./pages/AvailableShifts";
@@ -57,7 +56,6 @@ const App = () => (
           <Route path="/users/edit/:id" element={<EditUser />} />
           <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
           <Route path="/care-types" element={<CareTypes />} />
-          <Route path="/care-needs" element={<CareNeeds />} />
           <Route path="/order-management" element={<OrderManagement />} />
           <Route path="/available-shifts" element={<AvailableShifts />} />
           <Route path="/caregiver-time-off" element={<CaregiverTimeOff />} />

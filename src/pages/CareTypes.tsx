@@ -29,6 +29,7 @@ const CareTypes = () => {
     category: "",
     name: "",
     description: "",
+    keywords: "",
   });
 
   const { data: careTypes, isLoading } = useQuery({
@@ -51,6 +52,7 @@ const CareTypes = () => {
       category: careType.category,
       name: careType.name,
       description: careType.description || "",
+      keywords: careType.keywords || "",
     });
     setIsDialogOpen(true);
   };
@@ -92,11 +94,12 @@ const CareTypes = () => {
             category: formData.category,
             name: formData.name,
             description: formData.description,
+            keywords: formData.keywords,
           })
           .eq("id", selectedCareType.id);
 
         if (error) throw error;
-        toast.success("Care type updated successfully");
+        toast.success("Care service updated successfully");
       } else {
         const { error } = await supabase
           .from("care_types")
@@ -105,18 +108,19 @@ const CareTypes = () => {
             category: formData.category,
             name: formData.name,
             description: formData.description,
+            keywords: formData.keywords,
           });
 
         if (error) throw error;
-        toast.success("Care type created successfully");
+        toast.success("Care service created successfully");
       }
       
       queryClient.invalidateQueries({ queryKey: ["care-types"] });
       setIsDialogOpen(false);
       setSelectedCareType(null);
-      setFormData({ code: "", category: "", name: "", description: "" });
+      setFormData({ code: "", category: "", name: "", description: "", keywords: "" });
     } catch (error: any) {
-      toast.error(error.message || "Failed to save care type");
+      toast.error(error.message || "Failed to save care service");
     }
   };
 
@@ -124,7 +128,8 @@ const CareTypes = () => {
     const matchesSearch = searchQuery === "" ||
       careType.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       careType.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      careType.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      careType.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      careType.keywords?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = filterStatus === "all" || 
       (filterStatus === "active" && careType.is_active) ||
@@ -148,19 +153,19 @@ const CareTypes = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
-          <h2 className="text-3xl font-bold mb-2">Care Types</h2>
-          <p className="text-muted-foreground">Manage standardized care service types (NHATS)</p>
+          <h2 className="text-3xl font-bold mb-2">Care Services</h2>
+          <p className="text-muted-foreground">Manage standardized care service catalog</p>
         </div>
         <Button
           className="gap-2"
           onClick={() => {
             setSelectedCareType(null);
-            setFormData({ code: "", category: "", name: "", description: "" });
+            setFormData({ code: "", category: "", name: "", description: "", keywords: "" });
             setIsDialogOpen(true);
           }}
         >
           <Plus className="h-4 w-4" />
-          Add Care Type
+          Add Care Service
         </Button>
       </div>
 
@@ -169,7 +174,7 @@ const CareTypes = () => {
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, code or description..."
+              placeholder="Search by name, code, description or keywords..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -195,6 +200,7 @@ const CareTypes = () => {
                 <TableHead>Category</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead>Keywords</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -202,8 +208,8 @@ const CareTypes = () => {
             <TableBody>
               {filteredCareTypes?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No care types found
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No care services found
                   </TableCell>
                 </TableRow>
               ) : (
@@ -215,6 +221,7 @@ const CareTypes = () => {
                     </TableCell>
                     <TableCell>{careType.name}</TableCell>
                     <TableCell className="max-w-xs truncate">{careType.description || "-"}</TableCell>
+                    <TableCell className="max-w-xs truncate text-muted-foreground text-sm">{careType.keywords || "-"}</TableCell>
                     <TableCell>
                       <Badge variant={careType.is_active ? "default" : "secondary"}>
                         {careType.is_active ? "Active" : "Inactive"}
@@ -257,7 +264,7 @@ const CareTypes = () => {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{selectedCareType ? "Edit Care Type" : "Add New Care Type"}</DialogTitle>
+            <DialogTitle>{selectedCareType ? "Edit Care Service" : "Add New Care Service"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-4">
@@ -267,7 +274,7 @@ const CareTypes = () => {
                   id="code"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="e.g., CT001"
+                  placeholder="e.g., CS001"
                   disabled={!!selectedCareType}
                 />
               </div>
@@ -278,26 +285,24 @@ const CareTypes = () => {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ADL">ADL - Activities of Daily Living</SelectItem>
-                    <SelectItem value="IADL">IADL - Instrumental Activities</SelectItem>
-                    <SelectItem value="Mobility">Mobility</SelectItem>
-                    <SelectItem value="Cognitive">Cognitive</SelectItem>
-                    <SelectItem value="Emotional">Emotional</SelectItem>
-                    <SelectItem value="Social">Social</SelectItem>
-                    <SelectItem value="Health">Health</SelectItem>
-                    <SelectItem value="Household">Household</SelectItem>
-                    <SelectItem value="Transport">Transport</SelectItem>
-                    <SelectItem value="Specialized">Specialized</SelectItem>
+                    <SelectItem value="Activities of Daily Living (ADL)">Activities of Daily Living (ADL)</SelectItem>
+                    <SelectItem value="Instrumental Activities of Daily Living (IADL)">Instrumental Activities of Daily Living (IADL)</SelectItem>
+                    <SelectItem value="Mobility & Safety">Mobility & Safety</SelectItem>
+                    <SelectItem value="Cognitive Support">Cognitive Support</SelectItem>
+                    <SelectItem value="Emotional & Social Support">Emotional & Social Support</SelectItem>
+                    <SelectItem value="Health Monitoring & Care">Health Monitoring & Care</SelectItem>
+                    <SelectItem value="Transportation">Transportation</SelectItem>
+                    <SelectItem value="Specialized Care">Specialized Care</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">Service Name</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Enter care type name"
+                  placeholder="Enter service name"
                 />
               </div>
               <div>
@@ -307,6 +312,15 @@ const CareTypes = () => {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Enter description"
+                />
+              </div>
+              <div>
+                <Label htmlFor="keywords">Keywords</Label>
+                <Input
+                  id="keywords"
+                  value={formData.keywords}
+                  onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+                  placeholder="e.g., bathing, shower, hygiene"
                 />
               </div>
             </div>
@@ -326,7 +340,7 @@ const CareTypes = () => {
       <Dialog open={!!viewCareType} onOpenChange={() => setViewCareType(null)}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Care Type Details</DialogTitle>
+            <DialogTitle>Care Service Details</DialogTitle>
           </DialogHeader>
           {viewCareType && (
             <div className="space-y-4">
@@ -341,12 +355,16 @@ const CareTypes = () => {
                 </div>
               </div>
               <div>
-                <Label className="text-muted-foreground">Name</Label>
+                <Label className="text-muted-foreground">Service Name</Label>
                 <p className="text-lg font-medium">{viewCareType.name}</p>
               </div>
               <div>
                 <Label className="text-muted-foreground">Description</Label>
                 <p>{viewCareType.description || "-"}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Keywords</Label>
+                <p className="text-sm">{viewCareType.keywords || "-"}</p>
               </div>
               <div>
                 <Label className="text-muted-foreground">Status</Label>
@@ -365,9 +383,9 @@ const CareTypes = () => {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Care Type</AlertDialogTitle>
+            <AlertDialogTitle>Delete Care Service</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this care type? This action cannot be undone.
+              Are you sure you want to delete this care service? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

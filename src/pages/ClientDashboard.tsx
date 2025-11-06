@@ -30,12 +30,12 @@ interface ClientProfile {
   notes: string | null;
 }
 
-interface CareNeed {
+interface CareType {
   id: string;
-  care_need_code: string;
+  care_type_code: string;
   priority: number;
   notes: string | null;
-  care_needs: {
+  care_types: {
     name: string;
     code: string;
     category: string;
@@ -60,7 +60,7 @@ const ClientDashboard = () => {
   const [user, setUser] = useState<any>(null);
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
-  const [availableCareNeeds, setAvailableCareNeeds] = useState<CareNeed[]>([]);
+  const [availableCareTypes, setAvailableCareTypes] = useState<CareType[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [stats, setStats] = useState({
     activeOrders: 0,
@@ -157,14 +157,14 @@ const ClientDashboard = () => {
       
       setCurrentOrder(currentOrderData || null);
       
-      // Fetch care needs
-      const { data: careNeedsData } = await supabase
+      // Fetch care types
+      const { data: careTypesData } = await supabase
         .from("client_care_needs")
-        .select("*, care_needs(*)")
+        .select("*, care_types:care_type_code(*)")
         .eq("client_id", clientData.id)
         .order("priority", { ascending: false });
 
-      setAvailableCareNeeds(careNeedsData || []);
+      setAvailableCareTypes(careTypesData || []);
     } else {
       toast.error("Client profile not found. Please contact your agency.");
     }
@@ -245,7 +245,7 @@ const ClientDashboard = () => {
             <OrdersManagement
               clientProfile={clientProfile}
               user={user}
-              availableCareNeeds={availableCareNeeds}
+              availableCareTypes={availableCareTypes}
               currentOrder={currentOrder}
               onRefresh={() => fetchClientData(user.id)}
             />

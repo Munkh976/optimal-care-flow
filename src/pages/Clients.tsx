@@ -32,7 +32,7 @@ const Clients = () => {
   const [editClient, setEditClient] = useState<any>(null);
   const [viewClient, setViewClient] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [careNeeds, setCareNeeds] = useState<any[]>([]);
+  const [careTypes, setCareTypes] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -104,7 +104,7 @@ const Clients = () => {
     };
 
     checkAuth();
-    fetchCareNeeds();
+    fetchCareTypes();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
@@ -117,18 +117,18 @@ const Clients = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const fetchCareNeeds = async () => {
+  const fetchCareTypes = async () => {
     const { data, error } = await supabase
-      .from("care_needs")
+      .from("care_types")
       .select("*")
       .eq("is_active", true)
       .order("category", { ascending: true })
       .order("name", { ascending: true });
 
     if (error) {
-      console.error("Error fetching care needs:", error);
+      console.error("Error fetching care types:", error);
     } else {
-      setCareNeeds(data || []);
+      setCareTypes(data || []);
     }
   };
 
@@ -144,9 +144,9 @@ const Clients = () => {
           phone
         ),
         client_care_needs(
-          care_need_code,
+          care_type_code,
           priority,
-          care_needs(code, name, category)
+          care_types:care_type_code(code, name, category)
         )
       `)
       .eq("agency_id", userId)
@@ -223,7 +223,7 @@ const Clients = () => {
       zip_code: client.zip_code || "",
       date_of_birth: client.date_of_birth || "",
       medical_conditions: client.medical_conditions || [],
-      care_need_codes: client.client_care_needs?.map((cn: any) => cn.care_need_code) || [],
+      care_need_codes: client.client_care_needs?.map((cn: any) => cn.care_type_code) || [],
       emergency_contact_name: client.emergency_contact_name || "",
       emergency_contact_phone: client.emergency_contact_phone || "",
       notes: client.notes || "",
@@ -861,16 +861,16 @@ const Clients = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Care Needs</Label>
+              <Label>Care Services</Label>
               <ReactSelect
                 isMulti
-                options={Array.from(new Set(careNeeds.map(cn => cn.category))).map(category => ({
+                options={Array.from(new Set(careTypes.map(cn => cn.category))).map(category => ({
                   label: category,
-                  options: careNeeds
+                  options: careTypes
                     .filter(cn => cn.category === category)
                     .map(cn => ({ value: cn.code, label: cn.name }))
                 }))}
-                value={careNeeds
+                value={careTypes
                   .filter(cn => formData.care_need_codes.includes(cn.code))
                   .map(cn => ({ value: cn.code, label: cn.name }))}
                 onChange={(selected) => setFormData({ 

@@ -40,7 +40,7 @@ interface ProfileSettingsProps {
   onRefresh: () => void;
 }
 
-interface CareNeed {
+interface CareType {
   id: string;
   code: string;
   name: string;
@@ -48,12 +48,12 @@ interface CareNeed {
   description: string | null;
 }
 
-interface ClientCareNeed {
+interface ClientCareType {
   id: string;
-  care_need_code: string;
+  care_type_code: string;
   priority: number;
   notes: string | null;
-  care_need?: CareNeed;
+  care_type?: CareType;
 }
 
 export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: ProfileSettingsProps) => {
@@ -67,18 +67,18 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
     confirmPassword: "",
   });
   const [showPasswordSection, setShowPasswordSection] = useState(false);
-  const [clientCareNeeds, setClientCareNeeds] = useState<ClientCareNeed[]>([]);
-  const [availableCareNeeds, setAvailableCareNeeds] = useState<CareNeed[]>([]);
-  const [selectedCareNeeds, setSelectedCareNeeds] = useState<string[]>([]);
+  const [clientCareTypes, setClientCareTypes] = useState<ClientCareType[]>([]);
+  const [availableCareTypes, setAvailableCareTypes] = useState<CareType[]>([]);
+  const [selectedCareTypes, setSelectedCareTypes] = useState<string[]>([]);
 
   useEffect(() => {
     if (clientProfile?.id) {
-      fetchClientCareNeeds();
-      fetchAvailableCareNeeds();
+      fetchClientCareTypes();
+      fetchAvailableCareTypes();
     }
   }, [clientProfile?.id]);
 
-  const fetchClientCareNeeds = async () => {
+  const fetchClientCareTypes = async () => {
     if (!clientProfile?.id) return;
 
     try {
@@ -86,10 +86,10 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
         .from("client_care_needs")
         .select(`
           id,
-          care_need_code,
+          care_type_code,
           priority,
           notes,
-          care_needs:care_need_code (
+          care_types:care_type_code (
             id,
             code,
             name,
@@ -104,47 +104,47 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
       
       const formattedData = data.map(item => ({
         ...item,
-        care_need: Array.isArray(item.care_needs) ? item.care_needs[0] : item.care_needs
+        care_type: Array.isArray(item.care_types) ? item.care_types[0] : item.care_types
       }));
       
-      setClientCareNeeds(formattedData as any);
+      setClientCareTypes(formattedData as any);
     } catch (error: any) {
-      console.error("Error fetching client care needs:", error);
+      console.error("Error fetching client care types:", error);
     }
   };
 
-  const fetchAvailableCareNeeds = async () => {
+  const fetchAvailableCareTypes = async () => {
     try {
       const { data, error } = await supabase
-        .from("care_needs")
+        .from("care_types")
         .select("*")
         .eq("is_active", true)
         .order("category", { ascending: true });
 
       if (error) throw error;
-      setAvailableCareNeeds(data || []);
+      setAvailableCareTypes(data || []);
     } catch (error: any) {
-      console.error("Error fetching care needs:", error);
+      console.error("Error fetching care types:", error);
     }
   };
 
-  const handleAddCareNeeds = async () => {
-    if (!selectedCareNeeds.length || !clientProfile?.id) return;
+  const handleAddCareTypes = async () => {
+    if (!selectedCareTypes.length || !clientProfile?.id) return;
 
-    // Filter out already existing care needs
-    const existingCodes = clientCareNeeds.map(cn => cn.care_need_code);
-    const newCareNeeds = selectedCareNeeds.filter(code => !existingCodes.includes(code));
+    // Filter out already existing care types
+    const existingCodes = clientCareTypes.map(cn => cn.care_type_code);
+    const newCareTypes = selectedCareTypes.filter(code => !existingCodes.includes(code));
 
-    if (!newCareNeeds.length) {
-      toast.error("All selected care needs are already added");
+    if (!newCareTypes.length) {
+      toast.error("All selected care types are already added");
       return;
     }
 
     try {
-      const insertData = newCareNeeds.map((code, index) => ({
+      const insertData = newCareTypes.map((code, index) => ({
         client_id: clientProfile.id,
-        care_need_code: code,
-        priority: clientCareNeeds.length + index + 1,
+        care_type_code: code,
+        priority: clientCareTypes.length + index + 1,
       }));
 
       const { error } = await supabase
@@ -153,29 +153,29 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
 
       if (error) throw error;
 
-      toast.success(`${newCareNeeds.length} care need(s) added successfully`);
-      setSelectedCareNeeds([]);
-      await fetchClientCareNeeds();
+      toast.success(`${newCareTypes.length} care type(s) added successfully`);
+      setSelectedCareTypes([]);
+      await fetchClientCareTypes();
       onRefresh(); // Refresh parent data
     } catch (error: any) {
-      toast.error(error.message || "Failed to add care needs");
+      toast.error(error.message || "Failed to add care types");
     }
   };
 
-  const handleRemoveCareNeed = async (careNeedId: string) => {
+  const handleRemoveCareType = async (careTypeId: string) => {
     try {
       const { error } = await supabase
         .from("client_care_needs")
         .delete()
-        .eq("id", careNeedId);
+        .eq("id", careTypeId);
 
       if (error) throw error;
 
-      toast.success("Care need removed successfully");
-      await fetchClientCareNeeds();
+      toast.success("Care type removed successfully");
+      await fetchClientCareTypes();
       onRefresh(); // Refresh parent data
     } catch (error: any) {
-      toast.error(error.message || "Failed to remove care need");
+      toast.error(error.message || "Failed to remove care type");
     }
   };
 
@@ -419,20 +419,20 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
               <Label>Add Care Needs</Label>
               <ReactSelect
                 isMulti
-                options={availableCareNeeds
-                  .filter(need => !clientCareNeeds.some(cn => cn.care_need_code === need.code))
-                  .map(need => ({
-                    value: need.code,
-                    label: `${need.name} (${need.category})`
+                options={availableCareTypes
+                  .filter(type => !clientCareTypes.some(cn => cn.care_type_code === type.code))
+                  .map(type => ({
+                    value: type.code,
+                    label: `${type.name} (${type.category})`
                   }))}
-                value={selectedCareNeeds.map(code => {
-                  const need = availableCareNeeds.find(n => n.code === code);
-                  return need ? { value: code, label: `${need.name} (${need.category})` } : null;
+                value={selectedCareTypes.map(code => {
+                  const type = availableCareTypes.find(n => n.code === code);
+                  return type ? { value: code, label: `${type.name} (${type.category})` } : null;
                 }).filter(Boolean)}
                 onChange={(selected) => {
-                  setSelectedCareNeeds(selected ? selected.map(s => s.value) : []);
+                  setSelectedCareTypes(selected ? selected.map(s => s.value) : []);
                 }}
-                placeholder="Select care needs to add..."
+                placeholder="Select care services to add..."
                 className="react-select-container"
                 classNamePrefix="react-select"
                 styles={{
@@ -473,28 +473,28 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
                   }),
                 }}
               />
-              {selectedCareNeeds.length > 0 && (
+              {selectedCareTypes.length > 0 && (
                 <Button
-                  onClick={handleAddCareNeeds}
+                  onClick={handleAddCareTypes}
                   className="w-full"
                   size="sm"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add {selectedCareNeeds.length} Selected Care Need{selectedCareNeeds.length > 1 ? 's' : ''}
+                  Add {selectedCareTypes.length} Selected Care Service{selectedCareTypes.length > 1 ? 's' : ''}
                 </Button>
               )}
             </div>
           )}
 
-          {clientCareNeeds.length > 0 ? (
+          {clientCareTypes.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {clientCareNeeds.map((clientNeed) => (
-                <Badge key={clientNeed.id} variant="default" className="px-3 py-2 text-sm">
-                  <span className="mr-2">{clientNeed.care_need?.name}</span>
+              {clientCareTypes.map((clientType) => (
+                <Badge key={clientType.id} variant="default" className="px-3 py-2 text-sm">
+                  <span className="mr-2">{clientType.care_type?.name}</span>
                   {editMode && (
                     <X
                       className="h-3 w-3 cursor-pointer hover:opacity-70"
-                      onClick={() => handleRemoveCareNeed(clientNeed.id)}
+                      onClick={() => handleRemoveCareType(clientType.id)}
                     />
                   )}
                 </Badge>

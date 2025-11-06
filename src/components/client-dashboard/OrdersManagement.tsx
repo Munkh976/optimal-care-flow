@@ -12,10 +12,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 
-interface CareNeed {
+interface CareType {
   id: string;
-  care_need_code: string;
-  care_needs: {
+  care_type_code: string;
+  care_types: {
     name: string;
     code: string;
     category: string;
@@ -51,7 +51,7 @@ interface TimeSlot {
 interface OrdersManagementProps {
   clientProfile: { id: string; agency_id: string } | null;
   user: any;
-  availableCareNeeds: CareNeed[];
+  availableCareTypes: CareType[];
   currentOrder: Order | null;
   onRefresh: () => void;
 }
@@ -68,7 +68,7 @@ interface Shift {
 export const OrdersManagement = ({ 
   clientProfile, 
   user, 
-  availableCareNeeds, 
+  availableCareTypes, 
   currentOrder,
   onRefresh 
 }: OrdersManagementProps) => {
@@ -449,37 +449,14 @@ export const OrdersManagement = ({
                     onValueChange={async (value) => {
                       setSelectedCareNeed(value);
                       try {
-                        const { data: cn1 } = await supabase
-                          .from("care_needs")
-                          .select("duration_hours, related_care_type_codes")
-                          .eq("code", value)
-                          .maybeSingle();
-                        setCareNeedDurationHours(cn1?.duration_hours ?? null);
-
-                        if (cn1 && Array.isArray(cn1.related_care_type_codes) && cn1.related_care_type_codes.length > 0) {
-                          setSelectedCareTypeCodes(cn1.related_care_type_codes);
-                          return;
-                        }
-
-                        const selected = availableCareNeeds.find(n => n.care_need_code === value);
-                        const needName = selected?.care_needs?.name || "";
-                        if (needName) {
-                          const { data: typesByName } = await supabase
-                            .from("care_types")
-                            .select("code, name")
-                            .ilike("name", `%${needName}%`);
-                          if (typesByName && typesByName.length > 0) {
-                            setSelectedCareTypeCodes(typesByName.map(t => t.code));
-                            return;
-                          }
-                        }
-
-                        const { data: ct } = await supabase
-                          .from("care_types")
-                          .select("code")
-                          .eq("code", value)
-                          .maybeSingle();
-                        setSelectedCareTypeCodes(ct?.code ? [ct.code] : []);
+                        const selected = availableCareTypes.find(n => n.care_type_code === value);
+                        const typeName = selected?.care_types?.name || "";
+                        
+                        // Use the selected care type code directly
+                        setSelectedCareTypeCodes([value]);
+                        
+                        // Set a default duration if needed (can be adjusted)
+                        setCareNeedDurationHours(4); // Default 4 hours, can be customized per care type
                       } catch (e) {
                         console.warn("Care type mapping fallback used", e);
                         setSelectedCareTypeCodes([]);
@@ -491,11 +468,11 @@ export const OrdersManagement = ({
                       <SelectValue placeholder="Choose from your care needs" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableCareNeeds.map((need) => (
-                        <SelectItem key={need.id} value={need.care_need_code}>
+                      {availableCareTypes.map((type) => (
+                        <SelectItem key={type.id} value={type.care_type_code}>
                           <div>
-                            <div className="font-medium">{need.care_needs.name}</div>
-                            <div className="text-xs text-muted-foreground">{need.care_needs.category}</div>
+                            <div className="font-medium">{type.care_types.name}</div>
+                            <div className="text-xs text-muted-foreground">{type.care_types.category}</div>
                           </div>
                         </SelectItem>
                       ))}
