@@ -223,8 +223,9 @@ const Users = () => {
       user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       "";
     const matchesRole = roleFilter === "all" || user.role === roleFilter;
-    const isNotCaregiver = user.role !== 'caregiver'; // Exclude caregivers - they're managed in Caregivers page
-    return matchesSearch && matchesRole && isNotCaregiver;
+    // Exclude caregivers and clients - they're managed in their respective pages
+    const isStaffUser = user.role !== 'caregiver' && user.role !== 'client';
+    return matchesSearch && matchesRole && isStaffUser;
   });
 
   if (loading) {
