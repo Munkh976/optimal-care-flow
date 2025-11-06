@@ -70,7 +70,8 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
     years_experience: 0,
     is_certified: false,
   });
-  const [newZipCode, setNewZipCode] = useState("");
+  const [suggestedZipCodes, setSuggestedZipCodes] = useState<string[]>([]);
+  const [loadingZipCodes, setLoadingZipCodes] = useState(false);
 
   useEffect(() => {
     fetchSkills();
@@ -119,10 +120,8 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
           zip_code: formData.zip_code,
           emergency_contact_name: formData.emergency_contact_name,
           emergency_contact_phone: formData.emergency_contact_phone,
-          location_address: formData.location_address,
           location_city: formData.location_city,
           location_state: formData.location_state,
-          location_zip_code: formData.location_zip_code,
           service_zipcodes: formData.service_zipcodes || [],
         })
         .eq("id", caregiverProfile.id);
@@ -227,26 +226,43 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
     }
   };
 
-  const handleAddZipCode = () => {
-    const trimmedZip = newZipCode.trim();
-    if (!trimmedZip) {
-      toast.error("Please enter a zip code");
+  const fetchZipCodesForCity = async (city: string, state: string) => {
+    if (!city || !state) {
+      setSuggestedZipCodes([]);
       return;
     }
-    if (!/^\d{5}$/.test(trimmedZip)) {
-      toast.error("Please enter a valid 5-digit zip code");
-      return;
+
+    setLoadingZipCodes(true);
+    try {
+      const response = await fetch(`https://api.zippopotam.us/us/${state}/${encodeURIComponent(city)}`);
+      if (response.ok) {
+        const data = await response.json();
+        const zipcodes = data.places?.map((place: any) => place['post code']) || [];
+        setSuggestedZipCodes(zipcodes);
+      } else {
+        setSuggestedZipCodes([]);
+      }
+    } catch (error) {
+      console.error("Error fetching zip codes:", error);
+      setSuggestedZipCodes([]);
+    } finally {
+      setLoadingZipCodes(false);
     }
-    const currentZips = formData.service_zipcodes || [];
-    if (currentZips.includes(trimmedZip)) {
+  };
+
+  const handleAddZipCode = (zipCode: string) => {
+    if (!zipCode.trim()) return;
+
+    const currentZips = formData?.service_zipcodes || [];
+    if (currentZips.includes(zipCode)) {
       toast.error("This zip code is already added");
       return;
     }
+
     setFormData({
       ...formData,
-      service_zipcodes: [...currentZips, trimmedZip]
+      service_zipcodes: [...currentZips, zipCode]
     });
-    setNewZipCode("");
   };
 
   const handleRemoveZipCode = (zipCode: string) => {
@@ -392,30 +408,32 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Street Address</Label>
-            <Input
-              value={formData.location_address || ""}
-              onChange={(e) => updateFormData('location_address', e.target.value)}
-              disabled={!editMode}
-              placeholder="Enter your service location address"
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>City</Label>
               <Input
                 value={formData.location_city || ""}
-                onChange={(e) => updateFormData('location_city', e.target.value)}
+                onChange={(e) => {
+                  const newCity = e.target.value;
+                  updateFormData('location_city', newCity);
+                  if (newCity && formData.location_state) {
+                    fetchZipCodesForCity(newCity, formData.location_state);
+                  }
+                }}
                 disabled={!editMode}
-                placeholder="City"
+                placeholder="Enter city"
               />
             </div>
             <div className="space-y-2">
               <Label>State</Label>
               <Select
                 value={formData.location_state || ""}
-                onValueChange={(v) => updateFormData('location_state', v)}
+                onValueChange={(v) => {
+                  updateFormData('location_state', v);
+                  if (v && formData.location_city) {
+                    fetchZipCodesForCity(formData.location_city, v);
+                  }
+                }}
                 disabled={!editMode}
               >
                 <SelectTrigger className="w-full" disabled={!editMode}>
@@ -430,50 +448,72 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>ZIP Code</Label>
-              <Input
-                value={formData.location_zip_code || ""}
-                onChange={(e) => updateFormData('location_zip_code', e.target.value)}
-                disabled={!editMode}
-                placeholder="ZIP"
-              />
-            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Service Zip Codes</Label>
+
+          <div className="space-y-3">
+            <div>
+              <Label>Service Zip Codes</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Select zip codes where you provide services (based on your city/state above)
+              </p>
+            </div>
+
             {editMode ? (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Enter zip code (e.g., 12345)"
-                    value={newZipCode}
-                    onChange={(e) => setNewZipCode(e.target.value)}
-                    maxLength={5}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleAddZipCode}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Add
-                  </Button>
-                </div>
-                {formData.service_zipcodes && formData.service_zipcodes.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.service_zipcodes.map((zipCode: string, index: number) => (
-                      <Badge key={index} variant="secondary" className="gap-1">
-                        {zipCode}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveZipCode(zipCode)}
-                          className="ml-1 hover:text-destructive"
+              <div className="space-y-3">
+                {loadingZipCodes && (
+                  <p className="text-sm text-muted-foreground">Loading zip codes...</p>
+                )}
+                
+                {!loadingZipCodes && suggestedZipCodes.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium mb-2">
+                      Available zip codes for {formData.location_city}, {formData.location_state}:
+                    </p>
+                    <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-md max-h-40 overflow-y-auto">
+                      {suggestedZipCodes.map((zipCode) => (
+                        <Badge
+                          key={zipCode}
+                          variant={formData.service_zipcodes?.includes(zipCode) ? "default" : "outline"}
+                          className="cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => {
+                            if (formData.service_zipcodes?.includes(zipCode)) {
+                              handleRemoveZipCode(zipCode);
+                            } else {
+                              handleAddZipCode(zipCode);
+                            }
+                          }}
                         >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
+                          {zipCode}
+                          {formData.service_zipcodes?.includes(zipCode) && " ✓"}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {!loadingZipCodes && suggestedZipCodes.length === 0 && formData.location_city && formData.location_state && (
+                  <p className="text-sm text-muted-foreground">
+                    No zip codes found. Please check your city and state selection.
+                  </p>
+                )}
+                
+                {formData.service_zipcodes && formData.service_zipcodes.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium mb-2">Selected zip codes:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.service_zipcodes.map((zipCode: string, index: number) => (
+                        <Badge key={index} variant="secondary" className="gap-1">
+                          {zipCode}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveZipCode(zipCode)}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -490,9 +530,6 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
                 )}
               </div>
             )}
-            <p className="text-sm text-muted-foreground">
-              Add zip codes where you provide services
-            </p>
           </div>
         </CardContent>
       </Card>
