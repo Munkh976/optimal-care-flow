@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award, Search, Upload, Eye, Trash2, Edit, Clock } from "lucide-react";
+import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award, Search, Upload, Eye, Trash2, Edit, Clock, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import ReactSelect from "react-select";
 import { AvailabilityDialog } from "@/components/caregivers/AvailabilityDialog";
+import { US_STATES } from "@/constants/usStates";
+import { Separator } from "@/components/ui/separator";
 
 
 const Caregivers = () => {
@@ -43,6 +45,9 @@ const Caregivers = () => {
     state: "",
     care_type_codes: [] as string[],
   });
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -155,6 +160,9 @@ const Caregivers = () => {
       state: "",
       care_type_codes: [],
     });
+    setShowResetPassword(false);
+    setNewPassword("");
+    setConfirmPassword("");
     setIsAddDialogOpen(true);
   };
 
@@ -172,6 +180,9 @@ const Caregivers = () => {
       state: caregiver.state || "",
       care_type_codes: caregiver.caregiver_skills?.map((s: any) => s.care_type_code) || [],
     });
+    setShowResetPassword(false);
+    setNewPassword("");
+    setConfirmPassword("");
     setIsAddDialogOpen(true);
   };
 
@@ -231,6 +242,11 @@ const Caregivers = () => {
         await supabase.from("caregiver_skills").insert(skillsData);
       }
 
+      // Handle password reset if requested
+      if (showResetPassword && newPassword && editCaregiver.user_id) {
+        await handleResetPassword();
+      }
+
       toast.success("Caregiver updated successfully");
       setIsAddDialogOpen(false);
       if (user) fetchCaregivers(user.id);
@@ -280,6 +296,41 @@ const Caregivers = () => {
       toast.success("Caregiver added successfully");
       setIsAddDialogOpen(false);
       if (user) fetchCaregivers(user.id);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!editCaregiver?.user_id) {
+      toast.error("Cannot reset password: No user account found");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.functions.invoke('admin-reset-password', {
+        body: {
+          userId: editCaregiver.user_id,
+          newPassword: newPassword,
+        }
+      });
+
+      if (error) throw error;
+      
+      toast.success("Password reset successfully");
+      setShowResetPassword(false);
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reset password");
     }
   };
 
@@ -487,11 +538,21 @@ const Caregivers = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="state">State</Label>
-                      <Input
-                        id="state"
+                      <Select
                         value={formData.state}
-                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                      />
+                        onValueChange={(value) => setFormData({ ...formData, state: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {US_STATES.map((s) => (
+                            <SelectItem key={s.value} value={s.value}>
+                              {s.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -569,6 +630,73 @@ const Caregivers = () => {
                       }}
                     />
                   </div>
+
+                  {/* Password Reset Section - Only for Edit Mode */}
+                  {isEditMode && editCaregiver?.user_id && (
+                    <>
+                      <Separator className="my-4" />
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Lock className="h-5 w-5 text-primary" />
+                            <Label className="text-base font-semibold">Password Reset</Label>
+                          </div>
+                          {!showResetPassword && (
+                            <Button 
+                              type="button"
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setShowResetPassword(true)}
+                            >
+                              Reset Password
+                            </Button>
+                          )}
+                        </div>
+
+                        {showResetPassword && (
+                          <div className="space-y-3 bg-muted/30 p-4 rounded-lg border">
+                            <div className="space-y-2">
+                              <Label htmlFor="newPassword">New Password</Label>
+                              <Input
+                                id="newPassword"
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="Enter new password"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="confirmPassword">Confirm Password</Label>
+                              <Input
+                                id="confirmPassword"
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                placeholder="Confirm new password"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                type="button"
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setShowResetPassword(false);
+                                  setNewPassword("");
+                                  setConfirmPassword("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Password will be reset when you click "Update Caregiver"
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
