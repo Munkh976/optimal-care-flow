@@ -109,24 +109,61 @@ export const OrdersManagement = ({
     if (!clientProfile) return;
 
     try {
-      // First, get the care need to find related care type codes
+      // Fetch client location for matching
+      const { data: clientData, error: clientErr } = await supabase
+        .from("clients")
+        .select("city,state,zip_code")
+        .eq("id", clientProfile.id)
+        .single();
+      if (clientErr) console.warn("Could not load client location:", clientErr);
+
+      const normalizeState = (s?: string | null) => {
+        if (!s) return "";
+        const map: Record<string, string> = {
+          alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA", colorado: "CO",
+          connecticut: "CT", delaware: "DE", "district of columbia": "DC", florida: "FL", georgia: "GA",
+          hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA", kansas: "KS", kentucky: "KY",
+          louisiana: "LA", maine: "ME", maryland: "MD", massachusetts: "MA", michigan: "MI", minnesota: "MN",
+          mississippi: "MS", missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV", "new hampshire": "NH",
+          "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND",
+          ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC",
+          "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT", virginia: "VA",
+          washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY"
+        };
+        const key = s.trim().toLowerCase();
+        return (map[key] || s).toUpperCase();
+      };
+
+      // Get care need mapping to care type codes
       const { data: careNeed, error: careNeedError } = await supabase
         .from("care_needs")
         .select("related_care_type_codes")
         .eq("code", selectedCareNeed)
         .single();
+      if (careNeedError) console.warn("care_needs lookup issue:", careNeedError);
 
-      if (careNeedError) throw careNeedError;
-      
-      const relatedCareTypeCodes = careNeed?.related_care_type_codes || [];
-      
+      let relatedCareTypeCodes: string[] = careNeed?.related_care_type_codes || [];
+
+      // Fallbacks: use already selected care type codes or treat selectedNeed as a care type code
+      if (relatedCareTypeCodes.length === 0 && selectedCareTypeCodes.length > 0) {
+        relatedCareTypeCodes = selectedCareTypeCodes;
+      }
+      if (relatedCareTypeCodes.length === 0) {
+        const { data: ct } = await supabase
+          .from("care_types")
+          .select("code")
+          .eq("code", selectedCareNeed)
+          .maybeSingle();
+        if (ct?.code) relatedCareTypeCodes = [ct.code];
+      }
+
       if (relatedCareTypeCodes.length === 0) {
         setAvailableCaregivers([]);
+        toast.info("No care type mapping found for the selected need");
         return;
       }
 
       // Get caregivers with skills matching ANY of the related care type codes
-      // AND who are available on the selected days
       const { data: caregivers, error } = await supabase
         .from("caregivers")
         .select(`
@@ -137,6 +174,8 @@ export const OrdersManagement = ({
           performance_rating,
           city,
           state,
+          location_city,
+          location_state,
           caregiver_skills!inner(care_type_code)
         `)
         .eq("agency_id", clientProfile.agency_id)
@@ -155,7 +194,6 @@ export const OrdersManagement = ({
             .in("day_of_week", selectedDays)
             .eq("is_available", true);
 
-          // Check if caregiver has availability for ALL selected days
           const hasAllDays = selectedDays.every(day => 
             availability?.some(avail => avail.day_of_week === day)
           );
@@ -164,11 +202,24 @@ export const OrdersManagement = ({
         })
       );
 
-      const filteredCaregivers = caregiversWithAvailability.filter(c => c !== null);
+      // Location matching (normalize states; require same city and state)
+      const clientState = normalizeState(clientData?.state);
+      const clientCity = (clientData?.city || "").toLowerCase().trim();
+
+      const filteredCaregivers = caregiversWithAvailability
+        .filter((c): c is NonNullable<typeof c> => c !== null)
+        .filter((cg) => {
+          const cgState = normalizeState(cg.location_state || cg.state);
+          const cgCity = (cg.location_city || cg.city || "").toLowerCase().trim();
+          if (clientState && cgState && clientState !== cgState) return false;
+          if (clientCity && cgCity && clientCity !== cgCity) return false;
+          return true;
+        });
+
       setAvailableCaregivers(filteredCaregivers);
-      
+
       if (filteredCaregivers.length === 0) {
-        toast.info("No caregivers available for the selected days with required skills");
+        toast.info("No caregivers available after applying skills, days, and location filters");
       }
     } catch (error: any) {
       toast.error("Failed to fetch caregivers");
@@ -187,7 +238,13 @@ export const OrdersManagement = ({
         .order("day_of_week");
 
       if (error) throw error;
-      setCaregiverAvailability(data || []);
+      const normalize = (t: string) => (typeof t === "string" ? t.slice(0, 5) : t);
+      const normalized = (data || []).map((slot) => ({
+        ...slot,
+        start_time: normalize(slot.start_time as any),
+        end_time: normalize(slot.end_time as any),
+      }));
+      setCaregiverAvailability(normalized as any);
     } catch (error: any) {
       toast.error("Failed to fetch availability");
       console.error(error);

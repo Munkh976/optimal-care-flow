@@ -7,6 +7,8 @@ import { MapPin, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AvailabilityDialog } from "./AvailabilityDialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { US_STATES } from "@/constants/usStates";
 
 interface Caregiver {
   id: string;
@@ -149,12 +151,22 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
             </div>
             <div className="space-y-2">
               <Label>State</Label>
-              <Input
+              <Select
                 value={formData.location_state || ""}
-                onChange={(e) => updateFormData('location_state', e.target.value)}
+                onValueChange={(v) => updateFormData('location_state', v)}
                 disabled={!editMode}
-                placeholder="State"
-              />
+              >
+                <SelectTrigger className="w-full" disabled={!editMode}>
+                  <SelectValue placeholder="Select state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {US_STATES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>ZIP Code</Label>

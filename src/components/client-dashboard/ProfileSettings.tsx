@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ReactSelect from "react-select";
-
+import { US_STATES } from "@/constants/usStates";
 interface Client {
   id: string;
   first_name: string;
@@ -341,11 +341,22 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
             </div>
             <div className="space-y-2">
               <Label>State</Label>
-              <Input
+              <Select
                 value={formData.state}
-                onChange={(e) => updateFormData('state', e.target.value)}
+                onValueChange={(v) => updateFormData('state', v)}
                 disabled={!editMode}
-              />
+              >
+                <SelectTrigger className="w-full" disabled={!editMode}>
+                  <SelectValue placeholder="Select state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {US_STATES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>ZIP Code</Label>
