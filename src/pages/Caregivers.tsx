@@ -50,6 +50,7 @@ const Caregivers = () => {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetPasswordCaregiver, setResetPasswordCaregiver] = useState<any>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -306,7 +307,9 @@ const Caregivers = () => {
   };
 
   const handleResetPassword = async () => {
-    if (!editCaregiver?.user_id) {
+    const targetCaregiver = resetPasswordCaregiver || editCaregiver;
+    
+    if (!targetCaregiver?.user_id) {
       toast.error("Cannot reset password: No user account found");
       return;
     }
@@ -324,7 +327,7 @@ const Caregivers = () => {
     try {
       const { error } = await supabase.functions.invoke('admin-reset-password', {
         body: {
-          userId: editCaregiver.user_id,
+          userId: targetCaregiver.user_id,
           newPassword: newPassword,
         }
       });
@@ -335,6 +338,7 @@ const Caregivers = () => {
       setShowResetPassword(false);
       setNewPassword("");
       setConfirmPassword("");
+      setResetPasswordCaregiver(null);
     } catch (error: any) {
       toast.error(error.message || "Failed to reset password");
     }
@@ -894,6 +898,20 @@ const Caregivers = () => {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
+                          {caregiver.user_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setResetPasswordCaregiver(caregiver);
+                                setNewPassword("");
+                                setConfirmPassword("");
+                              }}
+                              title="Reset Password"
+                            >
+                              <Lock className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -999,6 +1017,56 @@ const Caregivers = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={!!resetPasswordCaregiver} onOpenChange={() => {
+        setResetPasswordCaregiver(null);
+        setNewPassword("");
+        setConfirmPassword("");
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Reset password for {resetPasswordCaregiver?.first_name} {resetPasswordCaregiver?.last_name}
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="reset-new-password">New Password</Label>
+              <Input
+                id="reset-new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password (min 6 characters)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reset-confirm-password">Confirm Password</Label>
+              <Input
+                id="reset-confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setResetPasswordCaregiver(null);
+              setNewPassword("");
+              setConfirmPassword("");
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleResetPassword}>
+              Reset Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Availability Dialog */}
       {availabilityCaregiver && (

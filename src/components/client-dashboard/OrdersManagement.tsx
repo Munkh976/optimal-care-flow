@@ -39,6 +39,7 @@ interface Caregiver {
   hourly_rate: number;
   performance_rating: number;
   availability: any;
+  caregiver_availability?: TimeSlot[];
 }
 
 interface TimeSlot {
@@ -130,7 +131,7 @@ export const OrdersManagement = ({
       // Zipcode-only rule: skip skill mapping and AI matching
       let relatedCareTypeCodes: string[] = [];
 
-      // Zipcode-only rule: fetch all active caregivers (no agency or skills filter)
+      // Zipcode-only rule: fetch all active caregivers with availability (no agency or skills filter)
       const { data: caregivers, error } = await supabase
         .from("caregivers")
         .select(`
@@ -139,17 +140,34 @@ export const OrdersManagement = ({
           last_name,
           hourly_rate,
           performance_rating,
-          service_zipcodes
+          service_zipcodes,
+          caregiver_availability(
+            day_of_week,
+            start_time,
+            end_time,
+            is_available
+          )
         `)
         .eq("is_active", true);
 
       if (error) throw error;
 
       // Filter by zipcode matching: client zipcode must be in caregiver's service_zipcodes
+      // Also normalize availability time formats
       const filteredCaregivers = (caregivers || []).filter((cg) => {
         const serviceZipcodes = cg.service_zipcodes || [];
         return serviceZipcodes.includes(clientZipCode);
-      });
+      }).map((cg) => ({
+        ...cg,
+        caregiver_availability: (cg.caregiver_availability || [])
+          .filter((slot: any) => slot.is_available)
+          .map((slot: any) => ({
+            ...slot,
+            start_time: typeof slot.start_time === "string" ? slot.start_time.slice(0, 5) : slot.start_time,
+            end_time: typeof slot.end_time === "string" ? slot.end_time.slice(0, 5) : slot.end_time,
+          }))
+          .sort((a: any, b: any) => a.day_of_week - b.day_of_week)
+      }));
       
       // Sort by rating (default) or price
       const sortedCaregivers = [...filteredCaregivers].sort((a, b) => {
@@ -562,18 +580,23 @@ export const OrdersManagement = ({
                       </SelectContent>
                     </Select>
                   </div>
-                  {availableCaregivers.length === 0 ? (
+                   {availableCaregivers.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No caregivers available in your area</p>
-                  ) : (
-                    <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                   ) : (
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                       {availableCaregivers.map((caregiver) => (
                         <Card 
                           key={caregiver.id}
-                          className={`cursor-pointer transition-all hover:shadow-md ${selectedCaregiver === caregiver.id ? 'border-primary border-2 bg-primary/5' : ''}`}
-                          onClick={() => setSelectedCaregiver(caregiver.id)}
+                          className={`transition-all hover:shadow-md ${selectedCaregiver === caregiver.id ? 'border-primary border-2 bg-primary/5' : ''}`}
                         >
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
+                          <CardContent className="p-4 space-y-3">
+                            <div 
+                              className="flex items-center justify-between cursor-pointer"
+                              onClick={() => {
+                                setSelectedCaregiver(caregiver.id);
+                                setCaregiverAvailability(caregiver.caregiver_availability || []);
+                              }}
+                            >
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-12 w-12">
                                   <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
@@ -606,11 +629,41 @@ export const OrdersManagement = ({
                                 <CheckCircle2 className="h-5 w-5 text-primary" />
                               )}
                             </div>
+                            
+                            {/* Weekly Availability Grid */}
+                            {caregiver.caregiver_availability && caregiver.caregiver_availability.length > 0 && (
+                              <div className="pt-2 border-t">
+                                <p className="text-xs text-muted-foreground mb-2 font-medium">Weekly Availability:</p>
+                                <div className="grid grid-cols-7 gap-1">
+                                  {dayNames.map((day, idx) => {
+                                    const slot = caregiver.caregiver_availability?.find((s: any) => s.day_of_week === idx);
+                                    return (
+                                      <div 
+                                        key={idx} 
+                                        className={`text-center p-1 rounded text-xs ${
+                                          slot 
+                                            ? 'bg-primary/10 text-primary border border-primary/20' 
+                                            : 'bg-muted text-muted-foreground'
+                                        }`}
+                                        title={slot ? `${day}: ${slot.start_time} - ${slot.end_time}` : `${day}: Not available`}
+                                      >
+                                        <div className="font-semibold">{day.slice(0, 3)}</div>
+                                        {slot && (
+                                          <div className="text-[10px] mt-0.5">
+                                            {slot.start_time.slice(0, 5)}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       ))}
                     </div>
-                  )}
+                   )}
                 </div>
 
                 {selectedCaregiver && caregiverAvailability.length > 0 && (
