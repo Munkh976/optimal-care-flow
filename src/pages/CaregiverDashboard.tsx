@@ -110,11 +110,18 @@ const CaregiverDashboard = () => {
         `)
         .eq("caregiver_id", caregiverData.id)
         .gte("shifts.shift_date", format(new Date(), "yyyy-MM-dd"))
-        .order("shifts.shift_date", { ascending: true })
         .limit(10);
 
       if (assignmentsError) throw assignmentsError;
-      setAssignments(assignmentsData || []);
+      
+      // Sort assignments by shift date on the client side
+      const sortedAssignments = (assignmentsData || []).sort((a, b) => {
+        const dateA = new Date(a.shifts?.shift_date || '');
+        const dateB = new Date(b.shifts?.shift_date || '');
+        return dateA.getTime() - dateB.getTime();
+      });
+      
+      setAssignments(sortedAssignments);
 
       // Fetch open shifts - using agency_id from caregiver's profile
       const { data: openShiftsData, error: openShiftsError } = await supabase

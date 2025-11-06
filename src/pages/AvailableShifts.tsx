@@ -134,6 +134,8 @@ const AvailableShifts = () => {
   };
 
   const filteredShifts = shifts.filter(shift => {
+    if (!shift.clients) return false;
+    
     const matchesSearch = 
       shift.clients.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       shift.clients.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
