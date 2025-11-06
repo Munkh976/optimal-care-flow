@@ -323,8 +323,8 @@ export const OrdersManagement = ({
             end_time: endTime,
             duration_hours: bookingData.duration,
             care_type_code: bookingData.primaryService.care_need_code,
-            status: 'scheduled',
-            special_notes: bookingData.additionalService 
+            status: 'open',
+            special_notes: bookingData.additionalService
               ? `Includes ${bookingData.additionalService.care_types.name}` 
               : null,
             order_title: bookingData.primaryService.care_types.name
