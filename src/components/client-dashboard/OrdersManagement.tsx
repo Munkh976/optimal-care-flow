@@ -118,6 +118,8 @@ export const OrdersManagement = ({
       }
 
       const clientZipCode = clientData?.zip_code;
+      console.log("🔍 Client zipcode:", clientZipCode);
+      
       if (!clientZipCode) {
         toast.error("Client zip code not found. Please update your profile.");
         return;
@@ -132,6 +134,7 @@ export const OrdersManagement = ({
       if (careNeedError) console.warn("care_needs lookup issue:", careNeedError);
 
       let relatedCareTypeCodes: string[] = careNeed?.related_care_type_codes || [];
+      console.log("🔍 Care need codes:", relatedCareTypeCodes);
 
       // Fallbacks: use already selected care type codes or treat selectedNeed as a care type code
       if (relatedCareTypeCodes.length === 0 && selectedCareTypeCodes.length > 0) {
@@ -170,16 +173,24 @@ export const OrdersManagement = ({
 
       if (error) throw error;
 
+      console.log("🔍 Caregivers before zipcode filter:", caregivers?.length, caregivers);
+
       // Filter by zipcode matching: client zipcode must be in caregiver's service_zipcodes
       const filteredCaregivers = (caregivers || []).filter((cg) => {
         const serviceZipcodes = cg.service_zipcodes || [];
-        return serviceZipcodes.includes(clientZipCode);
+        const matches = serviceZipcodes.includes(clientZipCode);
+        console.log(`🔍 ${cg.first_name} ${cg.last_name}: service_zipcodes=`, serviceZipcodes, "includes", clientZipCode, "?", matches);
+        return matches;
       });
 
+      console.log("🔍 Caregivers after zipcode filter:", filteredCaregivers.length, filteredCaregivers);
+      
       setAvailableCaregivers(filteredCaregivers);
 
       if (filteredCaregivers.length === 0) {
         toast.info("No caregivers available in your area with the required skills");
+      } else {
+        toast.success(`Found ${filteredCaregivers.length} matching caregiver(s)`);
       }
     } catch (error: any) {
       toast.error("Failed to fetch caregivers");
