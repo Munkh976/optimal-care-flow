@@ -30,6 +30,7 @@ const CareTypes = () => {
     name: "",
     description: "",
     keywords: "",
+    price: "",
   });
 
   const { data: careTypes, isLoading } = useQuery({
@@ -53,6 +54,7 @@ const CareTypes = () => {
       name: careType.name,
       description: careType.description || "",
       keywords: careType.keywords || "",
+      price: careType.price?.toString() || "35.00",
     });
     setIsDialogOpen(true);
   };
@@ -87,6 +89,12 @@ const CareTypes = () => {
 
   const handleSave = async () => {
     try {
+      const priceValue = parseFloat(formData.price);
+      if (isNaN(priceValue) || priceValue < 0) {
+        toast.error("Please enter a valid price");
+        return;
+      }
+
       if (selectedCareType) {
         const { error } = await supabase
           .from("care_types")
@@ -95,6 +103,7 @@ const CareTypes = () => {
             name: formData.name,
             description: formData.description,
             keywords: formData.keywords,
+            price: priceValue,
           })
           .eq("id", selectedCareType.id);
 
@@ -109,6 +118,7 @@ const CareTypes = () => {
             name: formData.name,
             description: formData.description,
             keywords: formData.keywords,
+            price: priceValue,
           });
 
         if (error) throw error;
@@ -118,7 +128,7 @@ const CareTypes = () => {
       queryClient.invalidateQueries({ queryKey: ["care-types"] });
       setIsDialogOpen(false);
       setSelectedCareType(null);
-      setFormData({ code: "", category: "", name: "", description: "", keywords: "" });
+      setFormData({ code: "", category: "", name: "", description: "", keywords: "", price: "" });
     } catch (error: any) {
       toast.error(error.message || "Failed to save care service");
     }
@@ -160,7 +170,7 @@ const CareTypes = () => {
           className="gap-2"
           onClick={() => {
             setSelectedCareType(null);
-            setFormData({ code: "", category: "", name: "", description: "", keywords: "" });
+            setFormData({ code: "", category: "", name: "", description: "", keywords: "", price: "35.00" });
             setIsDialogOpen(true);
           }}
         >
@@ -199,6 +209,7 @@ const CareTypes = () => {
                 <TableHead>Code</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Price</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Includes</TableHead>
                 <TableHead>Status</TableHead>
@@ -208,7 +219,7 @@ const CareTypes = () => {
             <TableBody>
               {filteredCareTypes?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No care services found
                   </TableCell>
                 </TableRow>
@@ -220,6 +231,10 @@ const CareTypes = () => {
                       <Badge variant="outline">{careType.category}</Badge>
                     </TableCell>
                     <TableCell>{careType.name}</TableCell>
+                    <TableCell>
+                      <span className="font-semibold text-primary">${careType.price?.toFixed(2) || '35.00'}</span>
+                      <span className="text-xs text-muted-foreground">/hr</span>
+                    </TableCell>
                     <TableCell className="max-w-xs truncate">{careType.description || "-"}</TableCell>
                     <TableCell className="max-w-xs truncate text-muted-foreground text-sm">{careType.keywords || "-"}</TableCell>
                     <TableCell>
@@ -304,6 +319,18 @@ const CareTypes = () => {
                 />
               </div>
               <div>
+                <Label htmlFor="price">Hourly Rate ($)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  placeholder="35.00"
+                />
+              </div>
+              <div>
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
@@ -356,6 +383,12 @@ const CareTypes = () => {
               <div>
                 <Label className="text-muted-foreground">Service Name</Label>
                 <p className="text-lg font-medium">{viewCareType.name}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Hourly Rate</Label>
+                <p className="text-lg font-semibold text-primary">
+                  ${viewCareType.price?.toFixed(2) || '35.00'}/hr
+                </p>
               </div>
               <div>
                 <Label className="text-muted-foreground">Description</Label>
