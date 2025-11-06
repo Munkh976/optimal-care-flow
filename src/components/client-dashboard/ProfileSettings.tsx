@@ -68,7 +68,7 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
   const [showPasswordSection, setShowPasswordSection] = useState(false);
   const [clientCareNeeds, setClientCareNeeds] = useState<ClientCareNeed[]>([]);
   const [availableCareNeeds, setAvailableCareNeeds] = useState<CareNeed[]>([]);
-  const [selectedCareNeed, setSelectedCareNeed] = useState<string>("");
+  const [selectedCareNeeds, setSelectedCareNeeds] = useState<string[]>([]);
 
   useEffect(() => {
     if (clientProfile?.id) {
@@ -127,32 +127,36 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
     }
   };
 
-  const handleAddCareNeed = async () => {
-    if (!selectedCareNeed || !clientProfile?.id) return;
+  const handleAddCareNeeds = async () => {
+    if (!selectedCareNeeds.length || !clientProfile?.id) return;
 
-    // Check if already exists
-    const exists = clientCareNeeds.some(cn => cn.care_need_code === selectedCareNeed);
-    if (exists) {
-      toast.error("This care need is already added");
+    // Filter out already existing care needs
+    const existingCodes = clientCareNeeds.map(cn => cn.care_need_code);
+    const newCareNeeds = selectedCareNeeds.filter(code => !existingCodes.includes(code));
+
+    if (!newCareNeeds.length) {
+      toast.error("All selected care needs are already added");
       return;
     }
 
     try {
+      const insertData = newCareNeeds.map((code, index) => ({
+        client_id: clientProfile.id,
+        care_need_code: code,
+        priority: clientCareNeeds.length + index + 1,
+      }));
+
       const { error } = await supabase
         .from("client_care_needs")
-        .insert({
-          client_id: clientProfile.id,
-          care_need_code: selectedCareNeed,
-          priority: clientCareNeeds.length + 1,
-        });
+        .insert(insertData);
 
       if (error) throw error;
 
-      toast.success("Care need added successfully");
-      setSelectedCareNeed("");
+      toast.success(`${newCareNeeds.length} care need(s) added successfully`);
+      setSelectedCareNeeds([]);
       fetchClientCareNeeds();
     } catch (error: any) {
-      toast.error(error.message || "Failed to add care need");
+      toast.error(error.message || "Failed to add care needs");
     }
   };
 
@@ -428,26 +432,37 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
         </CardHeader>
         <CardContent className="space-y-4">
           {editMode && (
-            <div className="flex gap-2">
-              <Select value={selectedCareNeed} onValueChange={setSelectedCareNeed}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Select a care need to add" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableCareNeeds.map((need) => (
-                    <SelectItem key={need.code} value={need.code}>
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {availableCareNeeds
+                  .filter(need => !clientCareNeeds.some(cn => cn.care_need_code === need.code))
+                  .map((need) => (
+                    <Badge
+                      key={need.code}
+                      variant={selectedCareNeeds.includes(need.code) ? "default" : "outline"}
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => {
+                        setSelectedCareNeeds(prev =>
+                          prev.includes(need.code)
+                            ? prev.filter(c => c !== need.code)
+                            : [...prev, need.code]
+                        );
+                      }}
+                    >
                       {need.name} ({need.category})
-                    </SelectItem>
+                    </Badge>
                   ))}
-                </SelectContent>
-              </Select>
-              <Button
-                onClick={handleAddCareNeed}
-                disabled={!selectedCareNeed}
-                size="icon"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+              </div>
+              {selectedCareNeeds.length > 0 && (
+                <Button
+                  onClick={handleAddCareNeeds}
+                  className="w-full"
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add {selectedCareNeeds.length} Selected Care Need{selectedCareNeeds.length > 1 ? 's' : ''}
+                </Button>
+              )}
             </div>
           )}
 
