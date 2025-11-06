@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import ReactSelect from "react-select";
 
 interface Client {
   id: string;
@@ -154,7 +155,8 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
 
       toast.success(`${newCareNeeds.length} care need(s) added successfully`);
       setSelectedCareNeeds([]);
-      fetchClientCareNeeds();
+      await fetchClientCareNeeds();
+      onRefresh(); // Refresh parent data
     } catch (error: any) {
       toast.error(error.message || "Failed to add care needs");
     }
@@ -170,7 +172,8 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
       if (error) throw error;
 
       toast.success("Care need removed successfully");
-      fetchClientCareNeeds();
+      await fetchClientCareNeeds();
+      onRefresh(); // Refresh parent data
     } catch (error: any) {
       toast.error(error.message || "Failed to remove care need");
     }
@@ -402,26 +405,63 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
         <CardContent className="space-y-4">
           {editMode && (
             <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {availableCareNeeds
+              <Label>Add Care Needs</Label>
+              <ReactSelect
+                isMulti
+                options={availableCareNeeds
                   .filter(need => !clientCareNeeds.some(cn => cn.care_need_code === need.code))
-                  .map((need) => (
-                    <Badge
-                      key={need.code}
-                      variant={selectedCareNeeds.includes(need.code) ? "default" : "outline"}
-                      className="cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => {
-                        setSelectedCareNeeds(prev =>
-                          prev.includes(need.code)
-                            ? prev.filter(c => c !== need.code)
-                            : [...prev, need.code]
-                        );
-                      }}
-                    >
-                      {need.name} ({need.category})
-                    </Badge>
-                  ))}
-              </div>
+                  .map(need => ({
+                    value: need.code,
+                    label: `${need.name} (${need.category})`
+                  }))}
+                value={selectedCareNeeds.map(code => {
+                  const need = availableCareNeeds.find(n => n.code === code);
+                  return need ? { value: code, label: `${need.name} (${need.category})` } : null;
+                }).filter(Boolean)}
+                onChange={(selected) => {
+                  setSelectedCareNeeds(selected ? selected.map(s => s.value) : []);
+                }}
+                placeholder="Select care needs to add..."
+                className="react-select-container"
+                classNamePrefix="react-select"
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    backgroundColor: 'hsl(var(--background))',
+                    borderColor: 'hsl(var(--input))',
+                    '&:hover': {
+                      borderColor: 'hsl(var(--input))'
+                    }
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    backgroundColor: 'hsl(var(--popover))',
+                    border: '1px solid hsl(var(--border))'
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    backgroundColor: state.isFocused ? 'hsl(var(--accent))' : 'transparent',
+                    color: 'hsl(var(--foreground))',
+                    cursor: 'pointer'
+                  }),
+                  multiValue: (base) => ({
+                    ...base,
+                    backgroundColor: 'hsl(var(--primary))',
+                  }),
+                  multiValueLabel: (base) => ({
+                    ...base,
+                    color: 'hsl(var(--primary-foreground))',
+                  }),
+                  multiValueRemove: (base) => ({
+                    ...base,
+                    color: 'hsl(var(--primary-foreground))',
+                    ':hover': {
+                      backgroundColor: 'hsl(var(--primary) / 0.8)',
+                      color: 'hsl(var(--primary-foreground))',
+                    },
+                  }),
+                }}
+              />
               {selectedCareNeeds.length > 0 && (
                 <Button
                   onClick={handleAddCareNeeds}
