@@ -42,6 +42,7 @@ interface CareType {
     description: string | null;
     keywords: string | null;
     price: number;
+    duration_hours: number;
   };
 }
 
@@ -173,7 +174,8 @@ const ClientDashboard = () => {
             category,
             description,
             keywords,
-            price
+            price,
+            duration_hours
           )
         `)
         .eq("client_id", clientData.id)

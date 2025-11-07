@@ -19,6 +19,7 @@ interface CareType {
     keywords: string;
     description: string;
     price: number;
+    duration_hours: number;
   };
 }
 
@@ -99,7 +100,7 @@ export const OrdersManagement = ({
   const [bookingData, setBookingData] = useState<BookingData>({
     primaryService: null,
     additionalService: null,
-    duration: 4,
+    duration: 0,
     day: null,
     repeat: 'once',
     caregiver: null,
@@ -116,7 +117,7 @@ export const OrdersManagement = ({
     const fetchCareTypes = async () => {
       const { data, error } = await supabase
         .from('care_types')
-        .select('id, code, name, category, description, keywords, price')
+        .select('id, code, name, category, description, keywords, price, duration_hours')
         .eq('is_active', true);
       if (!error && data) {
         const mapped: CareType[] = (data as any[]).map((ct: any) => ({
@@ -129,6 +130,7 @@ export const OrdersManagement = ({
             keywords: ct.keywords,
             description: ct.description,
             price: ct.price,
+            duration_hours: ct.duration_hours,
           },
         }));
         setAllCareTypes(mapped);
@@ -242,25 +244,28 @@ export const OrdersManagement = ({
     setBookingData(prev => ({ 
       ...prev, 
       primaryService: service, 
-      duration: 4,
+      duration: service.care_types.duration_hours || 4,
       rate: service.care_types.price || 35
     }));
   };
 
   const selectAdditionalService = (service: CareType | null) => {
     if (service) {
+      const primaryDuration = bookingData.primaryService?.care_types.duration_hours || 4;
+      const additionalDuration = service.care_types.duration_hours || 4;
+      const totalDuration = primaryDuration + additionalDuration;
       const totalRate = (bookingData.primaryService?.care_types.price || 35) + (service.care_types.price || 35);
       setBookingData(prev => ({ 
         ...prev, 
         additionalService: service, 
-        duration: 8,
+        duration: totalDuration,
         rate: totalRate / 2 // Average rate
       }));
     } else {
       setBookingData(prev => ({ 
         ...prev, 
         additionalService: null, 
-        duration: 4,
+        duration: bookingData.primaryService?.care_types.duration_hours || 4,
         rate: bookingData.primaryService?.care_types.price || 35
       }));
     }
@@ -373,7 +378,7 @@ export const OrdersManagement = ({
     setBookingData({
       primaryService: null,
       additionalService: null,
-      duration: 4,
+      duration: 0,
       day: null,
       repeat: 'once',
       caregiver: null,

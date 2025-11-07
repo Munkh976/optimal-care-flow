@@ -61,7 +61,7 @@ const OrderManagement = () => {
     primaryService: null as any,
     additionalService: null as any,
     client_id: "",
-    duration: 4,
+    duration: 0,
     day: null as number | null,
     repeat: "once" as "once" | "weekly" | "biweekly" | "monthly",
     caregiver: null as any,
@@ -276,7 +276,7 @@ const OrderManagement = () => {
       primaryService: null,
       additionalService: null,
       client_id: "",
-      duration: 4,
+      duration: 0,
       day: null,
       repeat: "once",
       caregiver: null,
@@ -1016,11 +1016,14 @@ const OrderManagement = () => {
                                 rate: prev.primaryService?.price || 35
                               }));
                             } else {
+                              const primaryDuration = bookingData.primaryService?.duration_hours || 4;
+                              const additionalDuration = service.duration_hours || 4;
+                              const totalDuration = primaryDuration + additionalDuration;
                               const totalRate = (bookingData.primaryService?.price || 35) + (service.price || 35);
                               setBookingData(prev => ({ 
                                 ...prev, 
                                 additionalService: service,
-                                duration: 8,
+                                duration: totalDuration,
                                 rate: totalRate / 2
                               }));
                             }
