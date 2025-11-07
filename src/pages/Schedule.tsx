@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,29 +12,78 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
   Calendar,
   LogOut,
-  Activity,
-  Clock,
-  User,
   Users,
-  Heart,
-  Pill,
-  Stethoscope,
-  AlertCircle,
-  Bath,
-  Utensils,
-  UserCheck,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  Grid,
+  List,
+  BarChart,
+  Star,
+  Phone,
+  MessageCircle,
+  Plus,
+  Home,
+  Shield,
+  Brain,
+  Moon,
   AlertTriangle,
+  Heart,
+  Bath,
+  ShoppingCart,
+  UserCheck,
 } from "lucide-react";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addWeeks, addMonths, subWeeks, subMonths, eachDayOfInterval, isSameDay, isToday } from "date-fns";
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, isToday } from "date-fns";
 import { toast } from "sonner";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
+
+// Service Categories Configuration
+const SERVICE_CATEGORIES = {
+  ADL: {
+    name: 'Activities of Daily Living',
+    color: 'hsl(217, 91%, 60%)',
+    bgClass: 'bg-blue-500/10',
+    textClass: 'text-blue-600',
+    borderClass: 'border-blue-500/20',
+  },
+  IADL: {
+    name: 'Instrumental Activities',
+    color: 'hsl(142, 76%, 36%)',
+    bgClass: 'bg-green-500/10',
+    textClass: 'text-green-600',
+    borderClass: 'border-green-500/20',
+  },
+  Health: {
+    name: 'Health Monitoring',
+    color: 'hsl(0, 84%, 60%)',
+    bgClass: 'bg-red-500/10',
+    textClass: 'text-red-600',
+    borderClass: 'border-red-500/20',
+  },
+  Cognitive: {
+    name: 'Cognitive Support',
+    color: 'hsl(262, 83%, 58%)',
+    bgClass: 'bg-purple-500/10',
+    textClass: 'text-purple-600',
+    borderClass: 'border-purple-500/20',
+  },
+  Safety: {
+    name: 'Safety & Transportation',
+    color: 'hsl(38, 92%, 50%)',
+    bgClass: 'bg-amber-500/10',
+    textClass: 'text-amber-600',
+    borderClass: 'border-amber-500/20',
+  },
+  Specialized: {
+    name: 'Specialized Care',
+    color: 'hsl(330, 81%, 60%)',
+    bgClass: 'bg-pink-500/10',
+    textClass: 'text-pink-600',
+    borderClass: 'border-pink-500/20',
+  },
+};
 
 const Schedule = () => {
   const navigate = useNavigate();
@@ -42,22 +91,19 @@ const Schedule = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [shifts, setShifts] = useState<any[]>([]);
-  const [scheduleView, setScheduleView] = useState<"timeline" | "grid" | "patient">("timeline");
-  const [dateView, setDateView] = useState<"week" | "month">("week");
+  const [scheduleView, setScheduleView] = useState<"timeline" | "density" | "caregiver" | "client">("timeline");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedShift, setSelectedShift] = useState(null);
-  const [selectedMultipleShifts, setSelectedMultipleShifts] = useState<{ time: string; shifts: any[] } | null>(null);
   const [careTypes, setCareTypes] = useState([]);
   const [caregivers, setCaregivers] = useState([]);
   const [clients, setClients] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [assignmentFilter, setAssignmentFilter] = useState("all");
-  const [caregiverProfile, setCaregiverProfile] = useState<any>(null);
   const [shiftAssignments, setShiftAssignments] = useState<any[]>([]);
 
   useEffect(() => {
     checkAuth();
-  }, [currentDate, dateView]);
+  }, [currentDate]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -77,34 +123,16 @@ const Schedule = () => {
 
     if (profileData) {
       setProfile(profileData);
-    }
-
-    // Check if user is a caregiver
-    const { data: caregiverData } = await supabase
-      .from("caregivers")
-      .select("*")
-      .eq("email", session.user.email)
-      .maybeSingle();
-
-    if (caregiverData) {
-      setCaregiverProfile(caregiverData);
-      await fetchScheduleData(caregiverData.agency_id, caregiverData.id);
-    } else if (profileData) {
-      await fetchScheduleData(session.user.id, null);
+      await fetchScheduleData(session.user.id);
     }
   };
 
-  const fetchScheduleData = async (userId, caregiverId = null) => {
+  const fetchScheduleData = async (userId) => {
     try {
       setLoading(true);
       
-      const startDate = dateView === "week" 
-        ? startOfWeek(currentDate)
-        : startOfMonth(currentDate);
-      
-      const endDate = dateView === "week"
-        ? endOfWeek(currentDate)
-        : endOfMonth(currentDate);
+      const startDate = startOfWeek(currentDate);
+      const endDate = endOfWeek(currentDate);
 
       // Fetch care types
       const { data: careTypesData } = await supabase
@@ -114,7 +142,7 @@ const Schedule = () => {
       setCareTypes(careTypesData || []);
 
       // Fetch shifts with assignments
-      const shiftsQuery = supabase
+      const { data: shiftsData, error } = await supabase
         .from("shifts")
         .select(`
           *,
@@ -128,7 +156,8 @@ const Schedule = () => {
           ),
           care_types (
             name,
-            code
+            code,
+            category
           )
         `)
         .eq("agency_id", userId)
@@ -136,12 +165,6 @@ const Schedule = () => {
         .lte("shift_date", format(endDate, "yyyy-MM-dd"))
         .order("shift_date", { ascending: true })
         .order("start_time", { ascending: true });
-
-      if (caregiverId) {
-        shiftsQuery.eq("caregiver_id", caregiverId);
-      }
-
-      const { data: shiftsData, error } = await shiftsQuery;
 
       if (error) throw error;
       setShifts(shiftsData || []);
@@ -185,334 +208,113 @@ const Schedule = () => {
   };
 
   const goToPrevious = () => {
-    if (dateView === "week") {
-      setCurrentDate(subWeeks(currentDate, 1));
-    } else {
-      setCurrentDate(subMonths(currentDate, 1));
-    }
+    setCurrentDate(subWeeks(currentDate, 1));
   };
 
   const goToNext = () => {
-    if (dateView === "week") {
-      setCurrentDate(addWeeks(currentDate, 1));
-    } else {
-      setCurrentDate(addMonths(currentDate, 1));
-    }
+    setCurrentDate(addWeeks(currentDate, 1));
   };
 
   const goToToday = () => {
     setCurrentDate(new Date());
   };
 
-  const getDaysInView = () => {
-    if (dateView === "week") {
-      return eachDayOfInterval({
-        start: startOfWeek(currentDate),
-        end: endOfWeek(currentDate)
-      });
-    }
+  const weekDays = useMemo(() => {
     return eachDayOfInterval({
-      start: startOfMonth(currentDate),
-      end: endOfMonth(currentDate)
+      start: startOfWeek(currentDate),
+      end: endOfWeek(currentDate)
     });
-  };
+  }, [currentDate]);
 
-  const getShiftsForDay = (day) => {
-    return filteredShifts.filter(shift => 
-      isSameDay(new Date(shift.shift_date), day)
-    );
-  };
-
-  // Helper functions for care type icons and colors
-  const getCareIcon = (careTypeCode: string) => {
-    const icons = {
-      personal_care: <Bath className="w-4 h-4" />,
-      medication: <Pill className="w-4 h-4" />,
-      medical: <Stethoscope className="w-4 h-4" />,
-      mobility: <Activity className="w-4 h-4" />,
-      companionship: <Users className="w-4 h-4" />,
-      meal_prep: <Utensils className="w-4 h-4" />,
-    };
-    return icons[careTypeCode] || <Heart className="w-4 h-4" />;
-  };
-
-  const getCareColor = (careTypeCode: string) => {
-    const colors = {
-      personal_care: "hsl(var(--primary))",
-      medication: "hsl(142, 76%, 36%)",
-      medical: "hsl(0, 84%, 60%)",
-      mobility: "hsl(262, 83%, 58%)",
-      companionship: "hsl(189, 94%, 43%)",
-      meal_prep: "hsl(38, 92%, 50%)",
-    };
-    return colors[careTypeCode] || "hsl(var(--muted))";
-  };
-
-  const getUrgencyBadge = (urgency: string) => {
-    switch (urgency) {
-      case "urgent":
-        return <Badge variant="destructive" className="text-xs">Urgent</Badge>;
-      case "high":
-        return <Badge variant="default" className="text-xs bg-orange-500">High Priority</Badge>;
-      case "routine":
-        return <Badge variant="secondary" className="text-xs">Routine</Badge>;
-      default:
-        return null;
-    }
-  };
-
-  const formatCareType = (code) => {
-    const careType = careTypes.find(ct => ct.code === code);
-    return careType?.name || code;
-  };
-
-  const getCareTypeColor = (type) => {
-    const colors = {
-      personal_care: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-      companionship: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-      medication: "bg-green-500/10 text-green-600 border-green-500/20",
-      mobility: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-      dementia_care: "bg-pink-500/10 text-pink-600 border-pink-500/20",
-      hospice: "bg-gray-500/10 text-gray-600 border-gray-500/20"
-    };
-    return colors[type] || "bg-muted";
-  };
-
-  const generateTimeSlots = () => {
-    const slots = [];
-    for (let hour = 6; hour <= 22; hour++) {
-      slots.push(`${hour.toString().padStart(2, '0')}:00`);
-    }
-    return slots;
-  };
-
-  const getShiftsForDayAndTime = (day, time) => {
-    const [slotHour] = time.split(':').map(Number);
-    
-    return filteredShifts.filter(shift => {
-      if (!isSameDay(new Date(shift.shift_date), day)) return false;
-      
-      const [startHour] = shift.start_time.split(':').map(Number);
-      return startHour === slotHour;
-    });
+  const getCategoryForShift = (shift) => {
+    const category = shift.care_types?.category;
+    return SERVICE_CATEGORIES[category] || SERVICE_CATEGORIES.ADL;
   };
 
   const getAssignedCaregiver = (shift) => {
-    if (!shift.caregiver_id) return null;
-    return caregivers.find(c => c.id === shift.caregiver_id);
+    const assignment = shiftAssignments.find(a => a.shift_id === shift.id);
+    if (!assignment) return null;
+    return caregivers.find(c => c.id === assignment.caregiver_id);
   };
 
-  const getShiftPosition = (shift) => {
-    const startHour = parseInt(shift.start_time.split(':')[0]);
-    const startMinute = parseInt(shift.start_time.split(':')[1]);
-    const basePosition = (startHour - 6) * 100 + (startMinute / 60) * 100;
-    return basePosition;
-  };
+  const filteredShifts = useMemo(() => {
+    let filtered = [...shifts];
 
-  const getShiftWidth = (duration) => {
-    return duration * 100;
-  };
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter(shift => shift.care_types?.category === categoryFilter);
+    }
 
-  const getShiftsAtTime = (time: string) => {
-    const timeMinutes = parseInt(time.split(':')[0]) * 60 + parseInt(time.split(':')[1]);
-    return filteredShifts.filter(shift => {
-      const startMinutes = parseInt(shift.start_time.split(':')[0]) * 60 + parseInt(shift.start_time.split(':')[1]);
-      const endMinutes = parseInt(shift.end_time.split(':')[0]) * 60 + parseInt(shift.end_time.split(':')[1]);
-      return timeMinutes >= startMinutes && timeMinutes < endMinutes;
-    });
-  };
+    if (assignmentFilter === "assigned") {
+      filtered = filtered.filter(shift => shiftAssignments.some(a => a.shift_id === shift.id));
+    } else if (assignmentFilter === "unassigned") {
+      filtered = filtered.filter(shift => !shiftAssignments.some(a => a.shift_id === shift.id));
+    }
 
-  // Apply filters
-  const filteredShifts = shifts.filter(shift => {
-    if (categoryFilter !== "all" && shift.care_type_code !== categoryFilter) return false;
-    
-    const hasAssignment = shift.caregiver_id !== null;
-    
-    if (assignmentFilter === "unassigned" && hasAssignment) return false;
-    if (assignmentFilter === "assigned" && !hasAssignment) return false;
-    
-    return true;
-  });
+    return filtered;
+  }, [shifts, categoryFilter, assignmentFilter, shiftAssignments]);
 
-  const isCaregiverUser = !!caregiverProfile;
-
-  // Timeline View Component (Caregiver-Centric)
+  // Timeline View Component
   const TimelineView = () => {
-    const hours = generateTimeSlots();
+    const timeSlots = ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'];
     const uniqueCaregivers = [...new Set(filteredShifts.map(s => s.caregiver_id).filter(Boolean))];
-    
-    return (
-      <div className="overflow-x-auto">
-        <div className="min-w-[1000px]">
-          {/* Time header */}
-          <div className="flex border-b-2 border-border pb-2 mb-4">
-            <div className="w-40 font-medium text-muted-foreground">Caregiver</div>
-            <div className="relative flex-1">
-              <div className="flex">
-                {hours.map((hour, idx) => (
-                  <div key={hour} className="w-[100px] text-sm font-medium text-muted-foreground">
-                    {hour}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Caregiver lanes */}
-          {uniqueCaregivers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No assigned caregivers in this period
-            </div>
-          ) : (
-            uniqueCaregivers.map(caregiverId => {
-              const caregiver = caregivers.find(c => c.id === caregiverId);
-              const caregiverShifts = filteredShifts.filter(s => s.caregiver_id === caregiverId);
-              
-              if (!caregiver) return null;
-              
-              return (
-                <div key={caregiverId} className="flex border-b border-border py-2 min-h-[80px]">
-                  <div className="w-40 pr-4">
-                    <div className="font-medium">{caregiver.first_name} {caregiver.last_name}</div>
-                    <div className="text-xs text-muted-foreground">{caregiver.role}</div>
-                  </div>
-                  <div className="relative flex-1 h-16">
-                    {caregiverShifts.map(shift => (
-                      <div
-                        key={shift.id}
-                        className="absolute top-0 h-full rounded-lg border-2 border-white shadow-sm hover:shadow-lg transition-all cursor-pointer hover:z-10"
-                        style={{
-                          left: `${getShiftPosition(shift)}px`,
-                          width: `${getShiftWidth(shift.duration_hours)}px`,
-                          backgroundColor: getCareColor(shift.care_type_code),
-                          opacity: 0.9
-                        }}
-                        onClick={() => setSelectedShift(shift)}
-                      >
-                        <div className="p-2 text-white h-full flex flex-col justify-between">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-1">
-                              {getCareIcon(shift.care_type_code)}
-                              <span className="text-xs font-medium truncate">
-                                {shift.clients?.first_name} {shift.clients?.last_name}
-                              </span>
-                            </div>
-                            {shift.status === 'urgent' && (
-                              <AlertCircle className="w-3 h-3 text-yellow-300" />
-                            )}
-                          </div>
-                          <div className="text-xs opacity-90 truncate">
-                            {formatCareType(shift.care_type_code)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Density Grid View Component (Time-Centric)
-  const DensityGridView = () => {
-    const timeSlots = generateTimeSlots().filter((_, idx) => idx % 2 === 0); // Every hour
-    
-    const ShiftBadge = ({ shift }) => (
-      <div
-        className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white cursor-pointer hover:scale-105 transition-transform"
-        style={{ backgroundColor: getCareColor(shift.care_type_code) }}
-        onClick={() => setSelectedShift(shift)}
-      >
-        {getCareIcon(shift.care_type_code)}
-        <span className="truncate max-w-[100px]">
-          {shift.clients?.first_name} {shift.clients?.last_name}
-        </span>
-        {shift.status === 'urgent' && <AlertCircle className="w-3 h-3" />}
-      </div>
-    );
 
     return (
       <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b-2 border-border">
-              <th className="text-left py-2 px-3 font-medium w-24">Time</th>
-              <th className="text-left py-2 px-3 font-medium">Active Care Sessions</th>
-              <th className="text-center py-2 px-3 font-medium w-20">Count</th>
-              <th className="text-center py-2 px-3 font-medium w-32">Staff Load</th>
+        <table className="w-full min-w-[800px]">
+          <thead className="bg-muted sticky top-0 z-10">
+            <tr>
+              <th className="text-left p-4 font-medium w-40 sticky left-0 bg-muted">
+                Caregiver
+              </th>
+              {timeSlots.map(time => (
+                <th key={time} className="text-center p-4 font-medium min-w-[120px]">
+                  {time}
+                </th>
+              ))}
             </tr>
           </thead>
-          <tbody>
-            {timeSlots.map(time => {
-              const activeShifts = getShiftsAtTime(time);
-              const uniqueCaregivers = [...new Set(activeShifts.map(s => s.caregiver_id).filter(Boolean))];
-              
-              const getDensityColor = (count) => {
-                if (count === 0) return 'bg-background';
-                if (count <= 2) return 'bg-green-500/10';
-                if (count <= 4) return 'bg-yellow-500/10';
-                return 'bg-orange-500/10';
-              };
+          <tbody className="bg-background">
+            {uniqueCaregivers.map(caregiverId => {
+              const caregiver = caregivers.find(c => c.id === caregiverId);
+              if (!caregiver) return null;
 
               return (
-                <tr key={time} className={`border-b ${getDensityColor(activeShifts.length)}`}>
-                  <td className="py-3 px-3 font-medium">{time}</td>
-                  <td className="py-3 px-3">
-                    {activeShifts.length === 0 ? (
-                      <span className="text-muted-foreground text-sm">No active shifts</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {activeShifts.slice(0, 3).map(shift => (
-                          <ShiftBadge key={shift.id} shift={shift} />
-                        ))}
-                        {activeShifts.length > 3 && (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs"
-                              >
-                                +{activeShifts.length - 3} more
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80">
-                              <div className="space-y-2">
-                                <h4 className="font-medium text-sm">All shifts at {time}</h4>
-                                <div className="space-y-1">
-                                  {activeShifts.slice(3).map(shift => (
-                                    <div key={shift.id} className="flex items-center gap-2">
-                                      <ShiftBadge shift={shift} />
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
-                      activeShifts.length === 0 ? 'bg-muted text-muted-foreground' :
-                      activeShifts.length <= 2 ? 'bg-green-500 text-white' :
-                      activeShifts.length <= 4 ? 'bg-yellow-500 text-white' :
-                      'bg-orange-500 text-white'
-                    }`}>
-                      {activeShifts.length}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    <div className="flex justify-center items-center gap-1">
-                      <Users className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">{uniqueCaregivers.length} staff</span>
+                <tr key={caregiverId} className="border-t hover:bg-muted/50">
+                  <td className="p-4 font-medium sticky left-0 bg-background">
+                    <div>
+                      <div className="font-semibold">{caregiver.first_name} {caregiver.last_name}</div>
+                      <div className="text-sm text-muted-foreground">{caregiver.role || 'Caregiver'}</div>
                     </div>
                   </td>
+                  {timeSlots.map(time => {
+                    const shift = filteredShifts.find(s => 
+                      s.caregiver_id === caregiverId && 
+                      s.start_time.startsWith(time.split(':')[0])
+                    );
+
+                    if (shift) {
+                      const category = getCategoryForShift(shift);
+
+                      return (
+                        <td key={time} className="p-2">
+                          <div 
+                            className="rounded-lg p-2 text-xs text-white cursor-pointer hover:shadow-lg transition-all"
+                            style={{ 
+                              backgroundColor: category.color,
+                              minWidth: '100px'
+                            }}
+                            onClick={() => setSelectedShift(shift)}
+                          >
+                            <div className="font-semibold">{shift.clients?.first_name} {shift.clients?.last_name}</div>
+                            <div className="opacity-90">{shift.care_types?.name}</div>
+                            <div className="opacity-80">{shift.duration_hours}hr</div>
+                          </div>
+                        </td>
+                      );
+                    }
+
+                    return <td key={time} className="p-2"></td>;
+                  })}
                 </tr>
               );
             })}
@@ -522,145 +324,303 @@ const Schedule = () => {
     );
   };
 
-  // Patient Focus View Component (Patient-Centric)
-  const PatientFocusView = () => {
-    const uniquePatients = [...new Set(filteredShifts.map(s => s.client_id))];
-    
+  // Density Grid View
+  const DensityGridView = () => {
+    const timeSlots = ['Morning (6-12)', 'Afternoon (12-18)', 'Evening (18-24)'];
+
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {uniquePatients.map(clientId => {
-          const client = clients.find(c => c.id === clientId);
-          if (!client) return null;
-          
-          const patientShifts = filteredShifts.filter(s => s.client_id === clientId);
-          const totalCareHours = patientShifts.reduce((sum, s) => sum + (s.duration_hours || 0), 0);
-          const careTypesUsed = [...new Set(patientShifts.map(s => s.care_type_code))];
+      <div className="overflow-x-auto">
+        <div className="grid grid-cols-8 gap-4 min-w-[600px]">
+          <div className="font-semibold text-foreground">Time / Day</div>
+          {weekDays.map(day => (
+            <div key={day.toISOString()} className="text-center">
+              <div className="font-semibold">{format(day, 'EEE')}</div>
+              <div className="text-sm text-muted-foreground">{format(day, 'd')}</div>
+            </div>
+          ))}
 
-          return (
-            <Card key={clientId} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="font-semibold">{client.first_name} {client.last_name}</h3>
-                    <p className="text-sm text-muted-foreground">{client.city}, {client.state}</p>
-                  </div>
-                  <UserCheck className="w-5 h-5 text-green-500" />
-                </div>
+          {timeSlots.map(slot => (
+            <div key={slot} className="contents">
+              <div className="font-medium text-muted-foreground py-3">{slot}</div>
+              {weekDays.map(day => {
+                const dayShifts = filteredShifts.filter(s => 
+                  isSameDay(new Date(s.shift_date), day)
+                );
 
-                <div className="mb-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{totalCareHours.toFixed(1)} hours of care</span>
-                  </div>
-                  <div className="flex gap-1 mt-2">
-                    {careTypesUsed.map(code => (
-                      <div
-                        key={code}
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-white"
-                        style={{ backgroundColor: getCareColor(code) }}
-                        title={formatCareType(code)}
-                      >
-                        {getCareIcon(code)}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                const density = dayShifts.length;
+                const bgColor = density === 0 ? 'bg-muted' :
+                              density <= 2 ? 'bg-green-500/20' :
+                              density <= 4 ? 'bg-yellow-500/20' :
+                              density <= 6 ? 'bg-orange-500/20' : 'bg-red-500/20';
 
-                <div className="space-y-2">
-                  {patientShifts.map(shift => (
-                    <div
-                      key={shift.id}
-                      className="p-2 bg-muted/50 rounded-lg border-l-4 cursor-pointer hover:bg-muted transition-colors"
-                      style={{ borderLeftColor: getCareColor(shift.care_type_code) }}
-                      onClick={() => setSelectedShift(shift)}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
-                            {shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}
-                          </span>
-                          {shift.status && getUrgencyBadge(shift.status)}
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {formatCareType(shift.care_type_code)}
-                      </div>
-                      {shift.caregiver_id && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          by {caregivers.find(c => c.id === shift.caregiver_id)?.first_name}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                return (
+                  <div 
+                    key={day.toISOString()} 
+                    className={`${bgColor} rounded-lg p-3 cursor-pointer hover:shadow-md transition-all`}
+                  >
+                    <div className="text-2xl font-bold text-center">{density}</div>
+                    <div className="text-xs text-center text-muted-foreground">shifts</div>
+                    {density > 4 && (
+                      <AlertTriangle className="w-4 h-4 text-orange-500 mx-auto mt-1" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
 
+  // By Caregiver View
+  const ByCaregiverView = () => (
+    <div className="space-y-6">
+      {caregivers.map(caregiver => {
+        const caregiverShifts = filteredShifts.filter(s => s.caregiver_id === caregiver.id);
+
+        return (
+          <Card key={caregiver.id} className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center text-primary-foreground font-semibold">
+                    {caregiver.first_name?.[0]}{caregiver.last_name?.[0]}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">{caregiver.first_name} {caregiver.last_name}</h3>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className={`px-2 py-0.5 rounded ${SERVICE_CATEGORIES.ADL.bgClass} ${SERVICE_CATEGORIES.ADL.textClass}`}>
+                        {caregiver.role || 'Caregiver'}
+                      </span>
+                      <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                      <span>{caregiver.performance_rating || 5.0}</span>
+                      <span>• {caregiverShifts.length} shifts this week</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="icon">
+                    <MessageCircle className="w-5 h-5" />
+                  </Button>
+                  <Button variant="ghost" size="icon">
+                    <Phone className="w-5 h-5" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 gap-2">
+                {weekDays.map(day => {
+                  const dayShifts = caregiverShifts.filter(s => 
+                    isSameDay(new Date(s.shift_date), day)
+                  );
+
+                  return (
+                    <div key={day.toISOString()} className="border rounded-lg p-2 min-h-[100px]">
+                      <div className="text-xs font-medium text-muted-foreground mb-2">
+                        {format(day, 'EEE d')}
+                      </div>
+
+                      {dayShifts.length === 0 ? (
+                        <div className="text-xs text-muted-foreground text-center py-4">No shifts</div>
+                      ) : (
+                        <div className="space-y-1">
+                          {dayShifts.map(shift => {
+                            const category = getCategoryForShift(shift);
+
+                            return (
+                              <div 
+                                key={shift.id}
+                                className="rounded p-1 text-xs text-white cursor-pointer hover:shadow-md transition-all"
+                                style={{ backgroundColor: category.color }}
+                                onClick={() => setSelectedShift(shift)}
+                              >
+                                <div className="font-medium">{shift.start_time}</div>
+                                <div className="truncate">{shift.clients?.first_name}</div>
+                                <div className="truncate opacity-80">{shift.care_types?.name}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+
+  // By Client View
+  const ByClientView = () => (
+    <div className="space-y-6">
+      {clients.map(client => {
+        const clientShifts = filteredShifts.filter(s => s.client_id === client.id);
+
+        return (
+          <Card key={client.id} className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-white font-semibold">
+                    {client.first_name?.[0]}{client.last_name?.[0]}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">{client.first_name} {client.last_name}</h3>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>{client.city}, {client.state}</span>
+                      <Badge variant="secondary">Active</Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <Button size="sm" className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add Shift
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-7 gap-2">
+                {weekDays.map(day => {
+                  const dayShifts = clientShifts.filter(s => 
+                    isSameDay(new Date(s.shift_date), day)
+                  );
+
+                  return (
+                    <div key={day.toISOString()} className="border rounded-lg p-2 min-h-[100px]">
+                      <div className="text-xs font-medium text-muted-foreground mb-2">
+                        {format(day, 'EEE d')}
+                      </div>
+
+                      {dayShifts.length === 0 ? (
+                        <div className="text-xs text-muted-foreground text-center py-4">No care</div>
+                      ) : (
+                        <div className="space-y-1">
+                          {dayShifts.map(shift => {
+                            const caregiver = getAssignedCaregiver(shift);
+                            const category = getCategoryForShift(shift);
+
+                            return (
+                              <div 
+                                key={shift.id}
+                                className="rounded p-1 text-xs text-white cursor-pointer hover:shadow-md transition-all"
+                                style={{ backgroundColor: category.color }}
+                                onClick={() => setSelectedShift(shift)}
+                              >
+                                <div className="font-medium">{shift.start_time}</div>
+                                <div className="truncate">{caregiver?.first_name || 'Unassigned'}</div>
+                                <div className="truncate opacity-80">{shift.care_types?.name}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Loading schedule...</p>
-        </div>
+      <div className="flex items-center justify-center h-screen">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
+  const totalShifts = filteredShifts.length;
+  const assignedShifts = filteredShifts.filter(s => shiftAssignments.some(a => a.shift_id === s.id)).length;
+  const unassignedShifts = totalShifts - assignedShifts;
+  const activeCaregivers = [...new Set(filteredShifts.map(s => s.caregiver_id).filter(Boolean))].length;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/dashboard")}>
-            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
-              <Activity className="h-6 w-6 text-primary-foreground" />
-            </div>
+      <header className="bg-gradient-to-r from-primary/10 via-primary/5 to-background border-b">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">CareMuch</h1>
-              <p className="text-sm text-muted-foreground">{profile?.agency_name || "Care Agency"}</p>
+              <h1 className="text-3xl font-bold">Schedule Management</h1>
+              <p className="text-muted-foreground mt-1">
+                Manage shifts and caregiver assignments
+              </p>
             </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              {profile?.full_name || user?.email}
-            </span>
-            <Button variant="outline" size="icon" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4" />
+            <Button variant="outline" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-          <div>
-            <h2 className="text-3xl font-bold mb-2">Schedule</h2>
-            <p className="text-muted-foreground">View and manage shifts</p>
+      <div className="container mx-auto px-4 py-6">
+        {/* View Controls */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <Button
+              variant={scheduleView === "timeline" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setScheduleView("timeline")}
+              className="gap-2"
+            >
+              <List className="w-4 h-4" />
+              Timeline
+            </Button>
+            <Button
+              variant={scheduleView === "density" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setScheduleView("density")}
+              className="gap-2"
+            >
+              <Grid className="w-4 h-4" />
+              Density
+            </Button>
+            <Button
+              variant={scheduleView === "caregiver" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setScheduleView("caregiver")}
+              className="gap-2"
+            >
+              <Users className="w-4 h-4" />
+              By Caregiver
+            </Button>
+            <Button
+              variant={scheduleView === "client" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setScheduleView("client")}
+              className="gap-2"
+            >
+              <UserCheck className="w-4 h-4" />
+              By Client
+            </Button>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+
+          <div className="flex items-center gap-2">
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All Care Types" />
+                <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Care Types</SelectItem>
-                {careTypes.map((type) => (
-                  <SelectItem key={type.code} value={type.code}>
-                    {type.name}
-                  </SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
+                {Object.entries(SERVICE_CATEGORIES).map(([key, cat]) => (
+                  <SelectItem key={key} value={key}>{cat.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
             <Select value={assignmentFilter} onValueChange={setAssignmentFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All Shifts" />
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Assignment" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Shifts</SelectItem>
@@ -671,161 +631,77 @@ const Schedule = () => {
           </div>
         </div>
 
-        {/* View and Navigation Controls */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            {/* View Toggle Tabs */}
-            <div className="flex gap-2 border-b mb-4">
-              <Button
-                variant={scheduleView === "timeline" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setScheduleView("timeline")}
-                className="rounded-b-none"
-              >
-                Timeline View
-              </Button>
-              <Button
-                variant={scheduleView === "grid" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setScheduleView("grid")}
-                className="rounded-b-none"
-              >
-                Density Grid
-              </Button>
-              <Button
-                variant={scheduleView === "patient" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setScheduleView("patient")}
-                className="rounded-b-none"
-              >
-                By Patient
-              </Button>
-            </div>
+        {/* Date Navigation */}
+        <div className="flex items-center justify-between mb-6">
+          <Button variant="outline" size="sm" onClick={goToPrevious}>
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="sm" onClick={goToToday}>
+              Today
+            </Button>
+            <h2 className="text-lg font-semibold">
+              {format(startOfWeek(currentDate), 'MMM d')} - {format(endOfWeek(currentDate), 'MMM d, yyyy')}
+            </h2>
+          </div>
 
-            {/* Date Navigation */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-semibold text-foreground">
-                  {format(currentDate, dateView === "week" ? "'Week of' MMM d, yyyy" : "MMMM yyyy")}
-                </h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={dateView === "week" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDateView("week")}
-                >
-                  Week
-                </Button>
-                <Button
-                  variant={dateView === "month" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDateView("month")}
-                >
-                  Month
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToPrevious}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToToday}
-                >
-                  Today
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToNext}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          <Button variant="outline" size="sm" onClick={goToNext}>
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
 
         {/* Legend */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: getCareColor('personal_care') }}></div>
-                  <span className="text-sm">Personal Care</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: getCareColor('medication') }}></div>
-                  <span className="text-sm">Medication</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: getCareColor('medical') }}></div>
-                  <span className="text-sm">Medical</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: getCareColor('mobility') }}></div>
-                  <span className="text-sm">Mobility</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: getCareColor('companionship') }}></div>
-                  <span className="text-sm">Companionship</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-orange-500" />
-                <span className="text-sm text-muted-foreground">High Priority Indicator</span>
-              </div>
+        <div className="flex flex-wrap gap-3 mb-6 p-4 bg-muted/30 rounded-lg">
+          {Object.entries(SERVICE_CATEGORIES).map(([key, cat]) => (
+            <div key={key} className="flex items-center gap-2">
+              <div 
+                className="w-4 h-4 rounded"
+                style={{ backgroundColor: cat.color }}
+              />
+              <span className="text-sm">{cat.name}</span>
             </div>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
 
-        {/* Main View Content */}
+        {/* View Content */}
         <Card className="mb-6">
           <CardContent className="p-6">
             {scheduleView === "timeline" && <TimelineView />}
-            {scheduleView === "grid" && <DensityGridView />}
-            {scheduleView === "patient" && <PatientFocusView />}
+            {scheduleView === "density" && <DensityGridView />}
+            {scheduleView === "caregiver" && <ByCaregiverView />}
+            {scheduleView === "client" && <ByClientView />}
           </CardContent>
         </Card>
 
         {/* Summary Stats */}
-        <div className="grid sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">Total Shifts</div>
-              <div className="text-2xl font-bold">{shifts.length}</div>
+              <div className="text-2xl font-bold">{totalShifts}</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">Assigned</div>
-              <div className="text-2xl font-bold">
-                {shifts.filter(s => s.caregiver_id).length}
-              </div>
+              <div className="text-2xl font-bold text-green-600">{assignedShifts}</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">Unassigned</div>
-              <div className="text-2xl font-bold text-destructive">
-                {shifts.filter(s => !s.caregiver_id).length}
-              </div>
+              <div className="text-2xl font-bold text-orange-600">{unassignedShifts}</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">Active Caregivers</div>
-              <div className="text-2xl font-bold">{caregivers.length}</div>
+              <div className="text-2xl font-bold text-blue-600">{activeCaregivers}</div>
             </CardContent>
           </Card>
         </div>
-      </main>
+      </div>
 
       <ShiftDetailsDialog
         shift={selectedShift}

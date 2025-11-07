@@ -47,9 +47,10 @@ const CaregiverDashboard = () => {
   const [weekShifts, setWeekShifts] = useState<Assignment[]>([]);
   const [historyShifts, setHistoryShifts] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'schedule'>('overview');
   const [shiftView, setShiftView] = useState<'upcoming' | 'week' | 'history'>('upcoming');
   const [selectedShift, setSelectedShift] = useState<any>(null);
+  const [todayShifts, setTodayShifts] = useState<Assignment[]>([]);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -134,6 +135,18 @@ const CaregiverDashboard = () => {
       setWeekShifts(thisWeek);
       setHistoryShifts(history);
 
+      // Filter today's shifts
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(today);
+      todayEnd.setHours(23, 59, 59, 999);
+
+      const todaySchedule = allAssignments.filter(a => {
+        const shiftDate = new Date(a.shifts?.shift_date || '');
+        return shiftDate >= today && shiftDate <= todayEnd;
+      });
+      setTodayShifts(todaySchedule);
+
     } catch (error) {
       console.error("Error:", error);
       toast.error("Failed to load dashboard");
@@ -188,21 +201,26 @@ const CaregiverDashboard = () => {
         <div className="container mx-auto px-4 py-3">
           <Tabs value={activeTab} onValueChange={(v) => {
             if (v === 'overview') setActiveTab('overview');
+            if (v === 'schedule') setActiveTab('schedule');
             if (v === 'available') navigate('/available-shifts');
             if (v === 'timeoff') navigate('/caregiver-time-off');
             if (v === 'settings') navigate('/caregiver-settings');
           }}>
-            <TabsList className="grid w-full grid-cols-4 gap-2">
+            <TabsList className="grid w-full grid-cols-5 gap-2">
               <TabsTrigger value="overview" className="gap-2">
                 <Home className="w-4 h-4" />
                 <span className="hidden sm:inline">Overview</span>
               </TabsTrigger>
+              <TabsTrigger value="schedule" className="gap-2">
+                <Calendar className="w-4 h-4" />
+                <span className="hidden sm:inline">My Schedule</span>
+              </TabsTrigger>
               <TabsTrigger value="available" className="gap-2">
                 <Briefcase className="w-4 h-4" />
-                <span className="hidden sm:inline">Available Shifts</span>
+                <span className="hidden sm:inline">Available</span>
               </TabsTrigger>
               <TabsTrigger value="timeoff" className="gap-2">
-                <Calendar className="w-4 h-4" />
+                <Clock className="w-4 h-4" />
                 <span className="hidden sm:inline">Time Off</span>
               </TabsTrigger>
               <TabsTrigger value="settings" className="gap-2">
@@ -215,8 +233,10 @@ const CaregiverDashboard = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {activeTab === 'overview' && (
+          <>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">
@@ -360,6 +380,180 @@ const CaregiverDashboard = () => {
             </CardContent>
           </Card>
         </div>
+          </>
+        )}
+
+        {activeTab === 'schedule' && (
+          <div className="space-y-6">
+            {/* Today's Schedule Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">My Schedule - Today</h2>
+                <p className="text-muted-foreground">
+                  {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+              </div>
+              <Badge variant="secondary" className="text-lg px-4 py-2">
+                {todayShifts.length} Shift{todayShifts.length !== 1 ? 's' : ''}
+              </Badge>
+            </div>
+
+            {/* Today's Timeline */}
+            {todayShifts.length === 0 ? (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">No shifts scheduled today</h3>
+                  <p className="text-muted-foreground">Enjoy your day off!</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="relative">
+                {/* Timeline Container */}
+                <div className="space-y-4">
+                  {todayShifts
+                    .sort((a, b) => {
+                      const timeA = a.shifts?.start_time || '';
+                      const timeB = b.shifts?.start_time || '';
+                      return timeA.localeCompare(timeB);
+                    })
+                    .map((assignment, index) => {
+                      const shift = assignment.shifts;
+                      const client = shift?.clients;
+                      const now = new Date();
+                      const shiftDate = new Date(shift?.shift_date || '');
+                      const [startHour, startMin] = (shift?.start_time || '00:00').split(':').map(Number);
+                      const [endHour, endMin] = (shift?.end_time || '00:00').split(':').map(Number);
+                      
+                      const shiftStart = new Date(shiftDate);
+                      shiftStart.setHours(startHour, startMin, 0, 0);
+                      
+                      const shiftEnd = new Date(shiftDate);
+                      shiftEnd.setHours(endHour, endMin, 0, 0);
+
+                      const isActive = now >= shiftStart && now <= shiftEnd;
+                      const isPast = now > shiftEnd;
+                      const isUpcoming = now < shiftStart;
+
+                      return (
+                        <Card 
+                          key={assignment.id}
+                          className={`relative border-l-4 ${
+                            isActive ? 'border-l-green-500 bg-green-500/5' :
+                            isPast ? 'border-l-gray-400 bg-muted/30' :
+                            'border-l-blue-500 bg-blue-500/5'
+                          } hover:shadow-lg transition-all cursor-pointer`}
+                          onClick={() => setSelectedShift(shift)}
+                        >
+                          <CardContent className="p-6">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <Badge variant={
+                                    isActive ? 'default' :
+                                    isPast ? 'secondary' :
+                                    'outline'
+                                  }>
+                                    {isActive ? '🟢 In Progress' : isPast ? '✓ Completed' : '⏱️ Upcoming'}
+                                  </Badge>
+                                  <span className="text-2xl font-bold">
+                                    {shift?.start_time} - {shift?.end_time}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    ({shift?.duration_hours}h)
+                                  </span>
+                                </div>
+                                
+                                <h3 className="text-xl font-semibold mb-1">
+                                  {client?.first_name} {client?.last_name}
+                                </h3>
+                                
+                                <div className="flex items-center gap-2 text-muted-foreground mb-3">
+                                  <Clock className="w-4 h-4" />
+                                  <span>{client?.address}, {client?.city}</span>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                  <Badge variant="secondary" className="bg-blue-500/10 text-blue-600">
+                                    {shift?.care_type_code?.replace(/_/g, ' ').toUpperCase()}
+                                  </Badge>
+                                  <Badge variant="outline">
+                                    {assignment.status}
+                                  </Badge>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col items-end gap-2">
+                                {assignment.clock_in_time && (
+                                  <Badge variant="secondary" className="bg-green-500/10 text-green-600">
+                                    ✓ Clocked In
+                                  </Badge>
+                                )}
+                                {assignment.clock_out_time && (
+                                  <Badge variant="secondary" className="bg-gray-500/10 text-gray-600">
+                                    ✓ Clocked Out
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Progress Bar for Active Shift */}
+                            {isActive && (
+                              <div className="mt-4">
+                                <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+                                  <span>Shift Progress</span>
+                                  <span>
+                                    {Math.round(
+                                      ((now.getTime() - shiftStart.getTime()) / 
+                                      (shiftEnd.getTime() - shiftStart.getTime())) * 100
+                                    )}%
+                                  </span>
+                                </div>
+                                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-green-500 transition-all"
+                                    style={{
+                                      width: `${Math.min(100, Math.max(0, 
+                                        ((now.getTime() - shiftStart.getTime()) / 
+                                        (shiftEnd.getTime() - shiftStart.getTime())) * 100
+                                      ))}%`
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Week Overview */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">This Week's Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center p-4 bg-muted/30 rounded-lg">
+                    <div className="text-3xl font-bold text-primary">{weekShifts.length}</div>
+                    <div className="text-sm text-muted-foreground">Total Shifts</div>
+                  </div>
+                  <div className="text-center p-4 bg-muted/30 rounded-lg">
+                    <div className="text-3xl font-bold text-green-600">{weeklyHours.toFixed(1)}</div>
+                    <div className="text-sm text-muted-foreground">Hours Scheduled</div>
+                  </div>
+                  <div className="text-center p-4 bg-muted/30 rounded-lg">
+                    <div className="text-3xl font-bold text-blue-600">
+                      ${weeklyEarnings.toFixed(0)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Expected Earnings</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
       <ShiftDetailsDialog
