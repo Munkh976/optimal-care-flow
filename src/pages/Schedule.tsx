@@ -38,6 +38,10 @@ import {
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, isToday } from "date-fns";
 import { toast } from "sonner";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Input } from "@/components/ui/input";
 
 // Service Categories Configuration
 const SERVICE_CATEGORIES = {
@@ -100,6 +104,25 @@ const Schedule = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [assignmentFilter, setAssignmentFilter] = useState("all");
   const [shiftAssignments, setShiftAssignments] = useState<any[]>([]);
+  const [isAddShiftDialogOpen, setIsAddShiftDialogOpen] = useState(false);
+  const [selectedClientForShift, setSelectedClientForShift] = useState<any>(null);
+  const [shiftStep, setShiftStep] = useState(1);
+  const [shiftData, setShiftData] = useState({
+    primaryService: null as any,
+    additionalService: null as any,
+    client_id: "",
+    duration: 0,
+    day: null as number | null,
+    repeat: "once" as "once" | "weekly" | "biweekly" | "monthly",
+    caregiver: null as any,
+    time: "",
+    startDate: "",
+    rate: 35,
+  });
+  const [availableCaregiversForShift, setAvailableCaregiversForShift] = useState<any[]>([]);
+  const [loadingCaregiversForShift, setLoadingCaregiversForShift] = useState(false);
+  const [clientCareTypesForShift, setClientCareTypesForShift] = useState<any[]>([]);
+  const [loadingClientCareTypesForShift, setLoadingClientCareTypesForShift] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -252,6 +275,207 @@ const Schedule = () => {
 
     return filtered;
   }, [shifts, categoryFilter, assignmentFilter, shiftAssignments]);
+
+  const loadClientCareTypesForShift = async (clientId: string) => {
+    setLoadingClientCareTypesForShift(true);
+    try {
+      const { data: careNeeds, error } = await supabase
+        .from("client_care_needs")
+        .select(`
+          care_need_code,
+          care_types:care_need_code (
+            id,
+            code,
+            name,
+            category,
+            description,
+            keywords,
+            price,
+            duration_hours
+          )
+        `)
+        .eq("client_id", clientId);
+
+      if (error) throw error;
+
+      const types = careNeeds?.map((cn: any) => ({
+        ...cn.care_types,
+        care_need_code: cn.care_need_code
+      })) || [];
+      
+      setClientCareTypesForShift(types);
+      
+      if (types.length === 0) {
+        toast.info("This client has no care types configured. Showing all available services.");
+        setClientCareTypesForShift(careTypes);
+      }
+    } catch (error: any) {
+      toast.error("Failed to load client care types");
+      console.error(error);
+      setClientCareTypesForShift(careTypes);
+    } finally {
+      setLoadingClientCareTypesForShift(false);
+    }
+  };
+
+  const loadAvailableCaregiversForShift = async () => {
+    if (!shiftData.client_id || shiftData.day === null) return;
+
+    setLoadingCaregiversForShift(true);
+    try {
+      const { data: clientData } = await supabase
+        .from("clients")
+        .select("zip_code")
+        .eq("id", shiftData.client_id)
+        .single();
+
+      if (!clientData?.zip_code) {
+        toast.error("Client zip code not found");
+        return;
+      }
+
+      const { data: caregiversData } = await supabase
+        .from("caregivers")
+        .select(`
+          id, first_name, last_name, hourly_rate, performance_rating,
+          service_zipcodes,
+          caregiver_availability(day_of_week, start_time, end_time, is_available)
+        `)
+        .eq("is_active", true);
+
+      const filtered = (caregiversData || [])
+        .filter((cg) => {
+          const serviceZipcodes = cg.service_zipcodes || [];
+          if (!serviceZipcodes.includes(clientData.zip_code)) return false;
+          
+          const daySlot = cg.caregiver_availability?.find(
+            (slot: any) => slot.day_of_week === shiftData.day && slot.is_available
+          );
+          return !!daySlot;
+        })
+        .sort((a, b) => (b.performance_rating || 0) - (a.performance_rating || 0));
+
+      setAvailableCaregiversForShift(filtered);
+      if (filtered.length === 0) {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        toast.info(`No caregivers available on ${dayNames[shiftData.day]}`);
+      }
+    } catch (error: any) {
+      toast.error("Failed to fetch caregivers");
+    } finally {
+      setLoadingCaregiversForShift(false);
+    }
+  };
+
+  const handleCloseShiftDialog = () => {
+    setIsAddShiftDialogOpen(false);
+    setSelectedClientForShift(null);
+    setShiftStep(1);
+    setShiftData({
+      primaryService: null,
+      additionalService: null,
+      client_id: "",
+      duration: 0,
+      day: null,
+      repeat: "once",
+      caregiver: null,
+      time: "",
+      startDate: "",
+      rate: 35,
+    });
+    setAvailableCaregiversForShift([]);
+    setClientCareTypesForShift([]);
+  };
+
+  const handleSaveShift = async () => {
+    if (!shiftData.client_id || !shiftData.primaryService || !shiftData.caregiver ||
+        !shiftData.time || shiftData.day === null || !shiftData.startDate) {
+      toast.error("Please complete all required fields");
+      return;
+    }
+
+    try {
+      const start = shiftData.startDate;
+      let end = new Date(start);
+      
+      if (shiftData.repeat === 'weekly') {
+        end.setMonth(end.getMonth() + 3);
+      } else if (shiftData.repeat === 'biweekly') {
+        end.setMonth(end.getMonth() + 6);
+      } else if (shiftData.repeat === 'monthly') {
+        end.setMonth(end.getMonth() + 12);
+      } else {
+        end = new Date(start);
+      }
+
+      const shiftsToCreate = [];
+      const [timeValue, period] = shiftData.time.split(' ');
+      let [hours] = timeValue.split(':').map(Number);
+      
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      
+      const startTimeHours = hours;
+      const endTimeHours = hours + shiftData.duration;
+      const startTime = `${String(startTimeHours).padStart(2, '0')}:00`;
+      const endTime = `${String(endTimeHours % 24).padStart(2, '0')}:00`;
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        if (d.getDay() === shiftData.day) {
+          const shiftDate = d.toISOString().split('T')[0];
+          shiftsToCreate.push({
+            client_id: shiftData.client_id,
+            agency_id: user.id,
+            caregiver_id: shiftData.caregiver.id,
+            shift_date: shiftDate,
+            start_time: startTime,
+            end_time: endTime,
+            duration_hours: shiftData.duration,
+            care_type_code: shiftData.primaryService.code,
+            status: 'open',
+            special_notes: shiftData.additionalService
+              ? `Includes ${shiftData.additionalService.name}`
+              : null,
+            order_title: shiftData.primaryService.name
+          });
+        }
+      }
+
+      const { error: shiftsError } = await supabase.from("shifts").insert(shiftsToCreate);
+      if (shiftsError) throw shiftsError;
+
+      toast.success("Shift(s) created successfully");
+      handleCloseShiftDialog();
+      if (user) fetchScheduleData(user.id);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create shift");
+      console.error(error);
+    }
+  };
+
+  const getServiceIcon = (category: string) => {
+    const iconMap: Record<string, string> = {
+      'Activities of Daily Living (ADL)': '🛁',
+      'Instrumental Activities of Daily Living (IADL)': '🏠',
+      'Health Monitoring & Care': '❤️',
+      'Cognitive & Emotional Support': '🧠',
+      'Safety & Transportation': '🚗',
+      'Specialized Care': '⚕️',
+    };
+    return iconMap[category] || '💼';
+  };
+
+  useEffect(() => {
+    if (shiftStep === 2 && shiftData.day !== null) {
+      loadAvailableCaregiversForShift();
+    }
+  }, [shiftStep, shiftData.day]);
+
+  useEffect(() => {
+    if (shiftData.client_id && isAddShiftDialogOpen) {
+      loadClientCareTypesForShift(shiftData.client_id);
+    }
+  }, [shiftData.client_id, isAddShiftDialogOpen]);
 
   // Timeline View Component
   const TimelineView = () => {
@@ -478,7 +702,17 @@ const Schedule = () => {
                   </div>
                 </div>
 
-                <Button size="sm" className="gap-2">
+                <Button 
+                  size="sm" 
+                  className="gap-2"
+                  onClick={() => {
+                    setSelectedClientForShift(client);
+                    setShiftData(prev => ({ ...prev, client_id: client.id }));
+                    setIsAddShiftDialogOpen(true);
+                    setShiftStep(1);
+                    loadClientCareTypesForShift(client.id);
+                  }}
+                >
                   <Plus className="w-4 h-4" />
                   Add Shift
                 </Button>
@@ -708,6 +942,385 @@ const Schedule = () => {
         open={!!selectedShift}
         onOpenChange={(open) => !open && setSelectedShift(null)}
       />
+
+      {/* Add Shift Dialog */}
+      <Dialog open={isAddShiftDialogOpen} onOpenChange={setIsAddShiftDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div>
+              <DialogTitle>Add Shift for {selectedClientForShift?.first_name} {selectedClientForShift?.last_name}</DialogTitle>
+              <p className="text-sm text-muted-foreground mt-1">Step {shiftStep} of 3</p>
+            </div>
+          </DialogHeader>
+
+          {/* Progress Bar */}
+          <div className="mb-6">
+            <div className="flex items-center justify-center gap-3">
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                shiftStep >= 1 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
+              }`}>1</div>
+              <div className={`h-1 w-12 transition-all ${shiftStep >= 2 ? 'bg-primary' : 'bg-muted'}`} />
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                shiftStep >= 2 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
+              }`}>2</div>
+              <div className={`h-1 w-12 transition-all ${shiftStep >= 3 ? 'bg-primary' : 'bg-muted'}`} />
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                shiftStep >= 3 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
+              }`}>3</div>
+            </div>
+          </div>
+
+          {/* Step 1: Select Service */}
+          {shiftStep === 1 && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-2xl font-bold mb-2">Select Primary Care Service</h3>
+                <p className="text-sm text-muted-foreground">
+                  {clientCareTypesForShift.length > 0 
+                    ? "Services configured for this client" 
+                    : loadingClientCareTypesForShift 
+                    ? "Loading client services..." 
+                    : "Choose the main care service"}
+                </p>
+              </div>
+              
+              {loadingClientCareTypesForShift ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="grid gap-3 max-h-[400px] overflow-y-auto">
+                  {clientCareTypesForShift
+                    .filter(s => s.category === 'Activities of Daily Living (ADL)' ||
+                                 s.category === 'Health Monitoring & Care' ||
+                                 s.category === 'Instrumental Activities of Daily Living (IADL)')
+                    .map((service) => (
+                    <Card
+                      key={service.id}
+                      className={`cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${
+                        shiftData.primaryService?.id === service.id
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary'
+                          : 'hover:border-primary/50'
+                      }`}
+                      onClick={() => setShiftData(prev => ({ 
+                        ...prev, 
+                        primaryService: service,
+                        duration: service.duration_hours || 4,
+                        rate: service.price || 35
+                      }))}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl flex-shrink-0">
+                            {getServiceIcon(service.category)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <h4 className="font-semibold text-base">{service.name}</h4>
+                              <Badge variant="secondary" className="shrink-0">${service.price}/hr</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {service.description || service.keywords}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {shiftData.primaryService && (
+                <div className="border-t pt-6">
+                  <h4 className="text-lg font-semibold mb-3">Add Another Service? (Optional)</h4>
+                  <div className="grid gap-3 max-h-[200px] overflow-y-auto">
+                    {clientCareTypesForShift
+                      .filter(s => s.code !== shiftData.primaryService?.code)
+                      .slice(0, 5)
+                      .map((service) => (
+                      <Card
+                        key={service.id}
+                        className={`cursor-pointer transition-all hover:shadow-md ${
+                          shiftData.additionalService?.id === service.id
+                            ? 'border-primary bg-primary/5 ring-2 ring-primary'
+                            : 'hover:border-primary/50'
+                        }`}
+                        onClick={() => {
+                          if (shiftData.additionalService?.id === service.id) {
+                            setShiftData(prev => ({ 
+                              ...prev, 
+                              additionalService: null,
+                              duration: prev.primaryService?.duration_hours || 4,
+                              rate: prev.primaryService?.price || 35
+                            }));
+                          } else {
+                            const primaryDuration = shiftData.primaryService?.duration_hours || 4;
+                            const additionalDuration = service.duration_hours || 4;
+                            const totalDuration = primaryDuration + additionalDuration;
+                            const totalRate = (shiftData.primaryService?.price || 35) + (service.price || 35);
+                            setShiftData(prev => ({ 
+                              ...prev, 
+                              additionalService: service,
+                              duration: totalDuration,
+                              rate: totalRate / 2
+                            }));
+                          }
+                        }}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{service.name}</span>
+                            <Badge variant="secondary">${service.price}/hr</Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={handleCloseShiftDialog}>Cancel</Button>
+                <Button 
+                  onClick={() => setShiftStep(2)}
+                  disabled={!shiftData.primaryService}
+                >
+                  Next: Schedule
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Schedule Details */}
+          {shiftStep === 2 && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-2xl font-bold mb-2">Schedule & Caregiver</h3>
+                <p className="text-sm text-muted-foreground">Choose day, time, and select a caregiver</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label>Select Day *</Label>
+                  <div className="grid grid-cols-7 gap-2">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                      <Button
+                        key={day}
+                        variant={shiftData.day === index ? "default" : "outline"}
+                        onClick={() => setShiftData(prev => ({ ...prev, day: index, caregiver: null, time: '' }))}
+                        className="text-xs"
+                      >
+                        {day}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {shiftData.day !== null && (
+                  <>
+                    <div>
+                      <Label>Select Caregiver *</Label>
+                      {loadingCaregiversForShift ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        </div>
+                      ) : availableCaregiversForShift.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No caregivers available on {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][shiftData.day]}
+                        </div>
+                      ) : (
+                        <div className="grid gap-2 max-h-[250px] overflow-y-auto">
+                          {availableCaregiversForShift.map((cg) => (
+                            <Card
+                              key={cg.id}
+                              className={`cursor-pointer transition-all ${
+                                shiftData.caregiver?.id === cg.id
+                                  ? 'border-primary bg-primary/5 ring-2 ring-primary'
+                                  : 'hover:border-primary/50'
+                              }`}
+                              onClick={() => setShiftData(prev => ({ ...prev, caregiver: cg, time: '' }))}
+                            >
+                              <CardContent className="p-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
+                                      {cg.first_name[0]}{cg.last_name[0]}
+                                    </div>
+                                    <div>
+                                      <div className="font-medium">{cg.first_name} {cg.last_name}</div>
+                                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                                        {cg.performance_rating || 5.0}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <Badge variant="secondary">${cg.hourly_rate}/hr</Badge>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {shiftData.caregiver && (
+                      <>
+                        <div>
+                          <Label>Select Time *</Label>
+                          <div className="space-y-3">
+                            {[
+                              { period: 'morning', slots: ['6:00', '7:00', '8:00', '9:00', '10:00'] },
+                              { period: 'afternoon', slots: ['12:00', '1:00', '2:00', '3:00', '4:00'] },
+                              { period: 'evening', slots: ['6:00', '7:00', '8:00'] }
+                            ].map(({ period, slots }) => (
+                              <div key={period}>
+                                <div className="text-sm font-medium capitalize mb-2">{period}</div>
+                                <div className="grid grid-cols-5 gap-2">
+                                  {slots.map((time) => (
+                                    <Button
+                                      key={time}
+                                      variant={shiftData.time === `${time} ${period.toUpperCase()}` ? "default" : "outline"}
+                                      onClick={() => setShiftData(prev => ({ 
+                                        ...prev, 
+                                        time: `${time} ${period.toUpperCase()}`,
+                                        rate: prev.caregiver?.hourly_rate || 35
+                                      }))}
+                                      className="text-xs"
+                                    >
+                                      {time}
+                                    </Button>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label>Schedule *</Label>
+                          <RadioGroup 
+                            value={shiftData.repeat}
+                            onValueChange={(value: any) => setShiftData(prev => ({ ...prev, repeat: value }))}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="once" id="shift-once" />
+                              <Label htmlFor="shift-once" className="cursor-pointer">One Time Only</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="weekly" id="shift-weekly" />
+                              <Label htmlFor="shift-weekly" className="cursor-pointer">Weekly (3 months)</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="biweekly" id="shift-biweekly" />
+                              <Label htmlFor="shift-biweekly" className="cursor-pointer">Bi-weekly (6 months)</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="monthly" id="shift-monthly" />
+                              <Label htmlFor="shift-monthly" className="cursor-pointer">Monthly (12 months)</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+
+                        <div>
+                          <Label>Start Date *</Label>
+                          <Input
+                            type="date"
+                            value={shiftData.startDate}
+                            onChange={(e) => setShiftData(prev => ({ ...prev, startDate: e.target.value }))}
+                            min={new Date().toISOString().split('T')[0]}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="flex justify-between gap-2">
+                <Button variant="outline" onClick={() => setShiftStep(1)}>Back</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleCloseShiftDialog}>Cancel</Button>
+                  <Button 
+                    onClick={() => setShiftStep(3)}
+                    disabled={!shiftData.caregiver || !shiftData.time || !shiftData.startDate}
+                  >
+                    Next: Review
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Review & Confirm */}
+          {shiftStep === 3 && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-2xl font-bold mb-2">Review & Confirm</h3>
+                <p className="text-sm text-muted-foreground">Please review your shift details before creating</p>
+              </div>
+
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-muted-foreground">Client</Label>
+                      <p className="font-medium">{selectedClientForShift?.first_name} {selectedClientForShift?.last_name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Primary Service</Label>
+                      <p className="font-medium">{shiftData.primaryService?.name}</p>
+                    </div>
+                    {shiftData.additionalService && (
+                      <div>
+                        <Label className="text-muted-foreground">Additional Service</Label>
+                        <p className="font-medium">{shiftData.additionalService?.name}</p>
+                      </div>
+                    )}
+                    <div>
+                      <Label className="text-muted-foreground">Caregiver</Label>
+                      <p className="font-medium">{shiftData.caregiver?.first_name} {shiftData.caregiver?.last_name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Day</Label>
+                      <p className="font-medium">{['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][shiftData.day!]}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Time</Label>
+                      <p className="font-medium">{shiftData.time}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Duration</Label>
+                      <p className="font-medium">{shiftData.duration} hours</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Schedule</Label>
+                      <p className="font-medium capitalize">{shiftData.repeat}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Start Date</Label>
+                      <p className="font-medium">{new Date(shiftData.startDate).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Rate</Label>
+                      <p className="font-medium">${shiftData.rate}/hr</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="flex justify-between gap-2">
+                <Button variant="outline" onClick={() => setShiftStep(2)}>Back</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleCloseShiftDialog}>Cancel</Button>
+                  <Button onClick={handleSaveShift}>
+                    Create Shift
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
