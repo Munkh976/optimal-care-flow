@@ -72,6 +72,8 @@ const OrderManagement = () => {
 
   const [availableCaregivers, setAvailableCaregivers] = useState<any[]>([]);
   const [loadingCaregivers, setLoadingCaregivers] = useState(false);
+  const [clientCareTypes, setClientCareTypes] = useState<any[]>([]);
+  const [loadingClientCareTypes, setLoadingClientCareTypes] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -283,6 +285,49 @@ const OrderManagement = () => {
       rate: 35,
     });
     setAvailableCaregivers([]);
+    setClientCareTypes([]);
+  };
+
+  const loadClientCareTypes = async (clientId: string) => {
+    setLoadingClientCareTypes(true);
+    try {
+      const { data: careNeeds, error } = await supabase
+        .from("client_care_needs")
+        .select(`
+          care_need_code,
+          care_types:care_need_code (
+            id,
+            code,
+            name,
+            category,
+            description,
+            keywords,
+            price,
+            duration_hours
+          )
+        `)
+        .eq("client_id", clientId);
+
+      if (error) throw error;
+
+      const types = careNeeds?.map((cn: any) => ({
+        ...cn.care_types,
+        care_need_code: cn.care_need_code
+      })) || [];
+      
+      setClientCareTypes(types);
+      
+      if (types.length === 0) {
+        toast.info("This client has no care types configured. Showing all available services.");
+        setClientCareTypes(careTypes);
+      }
+    } catch (error: any) {
+      toast.error("Failed to load client care types");
+      console.error(error);
+      setClientCareTypes(careTypes);
+    } finally {
+      setLoadingClientCareTypes(false);
+    }
   };
 
   const handleDeleteOrder = async (orderId: string) => {
@@ -423,10 +468,16 @@ const OrderManagement = () => {
   };
 
   useEffect(() => {
-    if (step === 2 && bookingData.day !== null) {
+    if (step === 3 && bookingData.day !== null) {
       loadAvailableCaregivers();
     }
   }, [step, bookingData.day]);
+
+  useEffect(() => {
+    if (bookingData.client_id && step === 2) {
+      loadClientCareTypes(bookingData.client_id);
+    }
+  }, [bookingData.client_id, step]);
 
   const getServiceIcon = (category: string) => {
     const iconMap: Record<string, string> = {
@@ -448,13 +499,15 @@ const OrderManagement = () => {
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   
-  const primaryServices = careTypes.filter(
+  const servicesToShow = clientCareTypes.length > 0 ? clientCareTypes : careTypes;
+  
+  const primaryServices = servicesToShow.filter(
     s => s.category === 'Activities of Daily Living (ADL)' ||
          s.category === 'Health Monitoring & Care' ||
          s.category === 'Instrumental Activities of Daily Living (IADL)'
   );
 
-  const additionalServices = careTypes.filter(
+  const additionalServices = servicesToShow.filter(
     s => bookingData.primaryService ? s.code !== bookingData.primaryService.code : true
   );
 
@@ -811,70 +864,136 @@ const OrderManagement = () => {
             <DialogHeader>
               <div>
                 <DialogTitle>Create Care Order</DialogTitle>
-                <p className="text-sm text-muted-foreground mt-1">Step {step} of 3</p>
+                <p className="text-sm text-muted-foreground mt-1">Step {step} of 4</p>
               </div>
             </DialogHeader>
 
             {/* Progress Bar */}
             <div className="mb-6">
-              <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center justify-center gap-3">
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
                   step >= 1 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
                 }`}>1</div>
-                <div className={`h-1 w-16 transition-all ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
+                <div className={`h-1 w-12 transition-all ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
                   step >= 2 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
                 }`}>2</div>
-                <div className={`h-1 w-16 transition-all ${step >= 3 ? 'bg-primary' : 'bg-muted'}`} />
+                <div className={`h-1 w-12 transition-all ${step >= 3 ? 'bg-primary' : 'bg-muted'}`} />
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
                   step >= 3 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
                 }`}>3</div>
+                <div className={`h-1 w-12 transition-all ${step >= 4 ? 'bg-primary' : 'bg-muted'}`} />
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold transition-all ${
+                  step >= 4 ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted text-muted-foreground'
+                }`}>4</div>
               </div>
             </div>
 
-            {/* Step 1: Select Service */}
+            {/* Step 1: Select Client */}
             {step === 1 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-2xl font-bold mb-2">Select Primary Service</h3>
-                  <p className="text-sm text-muted-foreground">Choose the main care service</p>
+                  <h3 className="text-2xl font-bold mb-2">Select Client</h3>
+                  <p className="text-sm text-muted-foreground">Choose the client for this care order</p>
                 </div>
-                
+
                 <div className="grid gap-3 max-h-[400px] overflow-y-auto">
-                  {primaryServices.map((service) => (
+                  {clients.map((client) => (
                     <Card
-                      key={service.id}
+                      key={client.id}
                       className={`cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${
-                        bookingData.primaryService?.id === service.id
+                        bookingData.client_id === client.id
                           ? 'border-primary bg-primary/5 ring-2 ring-primary'
                           : 'hover:border-primary/50'
                       }`}
-                      onClick={() => setBookingData(prev => ({ 
-                        ...prev, 
-                        primaryService: service,
-                        duration: service.duration_hours || 4,
-                        rate: service.price || 35
-                      }))}
+                      onClick={() => setBookingData(prev => ({ ...prev, client_id: client.id }))}
                     >
                       <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl flex-shrink-0">
-                            {getServiceIcon(service.category)}
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-lg font-bold text-primary-foreground">
+                            {client.first_name[0]}{client.last_name[0]}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <h4 className="font-semibold text-base">{service.name}</h4>
-                              <Badge variant="secondary" className="shrink-0">${service.price}/hr</Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {service.description || service.keywords}
-                            </p>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-base">
+                              {client.first_name} {client.last_name}
+                            </h4>
                           </div>
+                          {bookingData.client_id === client.id && (
+                            <CheckCircle2 className="h-5 w-5 text-primary" />
+                          )}
                         </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
+                  <Button 
+                    onClick={() => setStep(2)}
+                    disabled={!bookingData.client_id}
+                  >
+                    Next: Select Services
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Select Service */}
+            {step === 2 && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h3 className="text-2xl font-bold mb-2">Select Primary Care Service</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {clientCareTypes.length > 0 
+                      ? "Services configured for this client" 
+                      : loadingClientCareTypes 
+                      ? "Loading client services..." 
+                      : "Choose the main care service"}
+                  </p>
+                </div>
+                
+                {loadingClientCareTypes ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 max-h-[400px] overflow-y-auto">
+                    {primaryServices.map((service) => (
+                      <Card
+                        key={service.id}
+                        className={`cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${
+                          bookingData.primaryService?.id === service.id
+                            ? 'border-primary bg-primary/5 ring-2 ring-primary'
+                            : 'hover:border-primary/50'
+                        }`}
+                        onClick={() => setBookingData(prev => ({ 
+                          ...prev, 
+                          primaryService: service,
+                          duration: service.duration_hours || 4,
+                          rate: service.price || 35
+                        }))}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl flex-shrink-0">
+                              {getServiceIcon(service.category)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <h4 className="font-semibold text-base">{service.name}</h4>
+                                <Badge variant="secondary" className="shrink-0">${service.price}/hr</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                {service.description || service.keywords}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
 
                 {bookingData.primaryService && (
                   <div className="border-t pt-6">
@@ -919,46 +1038,30 @@ const OrderManagement = () => {
                   </div>
                 )}
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
-                  <Button 
-                    onClick={() => setStep(2)}
-                    disabled={!bookingData.primaryService}
-                  >
-                    Next
-                  </Button>
+                <div className="flex justify-between gap-2">
+                  <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
+                    <Button 
+                      onClick={() => setStep(3)}
+                      disabled={!bookingData.primaryService}
+                    >
+                      Next: Schedule
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Step 2: Schedule Details */}
-            {step === 2 && (
+            {/* Step 3: Schedule Details */}
+            {step === 3 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-2xl font-bold mb-2">Schedule Details</h3>
-                  <p className="text-sm text-muted-foreground">Choose client, day, time, and caregiver</p>
+                  <h3 className="text-2xl font-bold mb-2">Schedule & Caregiver</h3>
+                  <p className="text-sm text-muted-foreground">Choose day, time, and select a caregiver</p>
                 </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <Label>Select Client *</Label>
-                    <Select
-                      value={bookingData.client_id}
-                      onValueChange={(value) => setBookingData(prev => ({ ...prev, client_id: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a client" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.first_name} {client.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   <div>
                     <Label>Select Day *</Label>
                     <div className="grid grid-cols-7 gap-2">
@@ -1092,12 +1195,12 @@ const OrderManagement = () => {
                 </div>
 
                 <div className="flex justify-between gap-2">
-                  <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+                  <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
                     <Button 
-                      onClick={() => setStep(3)}
-                      disabled={!bookingData.client_id || !bookingData.caregiver || !bookingData.time || !bookingData.startDate}
+                      onClick={() => setStep(4)}
+                      disabled={!bookingData.caregiver || !bookingData.time || !bookingData.startDate}
                     >
                       Review Order
                     </Button>
@@ -1106,8 +1209,8 @@ const OrderManagement = () => {
               </div>
             )}
 
-            {/* Step 3: Confirmation */}
-            {step === 3 && (
+            {/* Step 4: Confirmation */}
+            {step === 4 && (
               <div className="space-y-6 animate-fade-in">
                 <div className="text-center">
                   <CheckCircle2 className="mx-auto h-16 w-16 text-primary mb-4" />
@@ -1155,7 +1258,7 @@ const OrderManagement = () => {
                 </Card>
 
                 <div className="flex justify-between gap-2">
-                  <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+                  <Button variant="outline" onClick={() => setStep(3)}>Back</Button>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
                     <Button variant="secondary" onClick={() => handleSaveOrder("draft")}>
