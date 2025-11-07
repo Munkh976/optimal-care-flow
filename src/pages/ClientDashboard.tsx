@@ -267,7 +267,7 @@ const ClientDashboard = () => {
           </TabsContent>
 
           <TabsContent value="schedule">
-            <MySchedule clientId={clientProfile?.id || null} />
+            <MySchedule clientProfile={clientProfile} />
           </TabsContent>
 
           <TabsContent value="team">
