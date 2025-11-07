@@ -19,6 +19,7 @@ import {
   Tag,
   List,
   FileText,
+  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -129,6 +130,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       icon: UserPlus,
       path: "/caregiver-approvals",
       roles: ["agency_admin", "manager", "hr_staff"],
+    },
+    {
+      label: "Admin Utilities",
+      icon: Settings,
+      path: "/admin-utilities",
+      roles: ["agency_admin", "system_admin"],
     },
   ];
 
