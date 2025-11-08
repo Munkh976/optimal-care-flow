@@ -80,6 +80,10 @@ export const usePermissions = () => {
         caregiver_registration: "/caregiver-registration",
         live_operations: "/live-operations",
         quick_assign: "/quick-assign",
+        caregiver_dashboard: "/caregiver-dashboard",
+        caregiver_time_off: "/caregiver-time-off",
+        caregiver_settings: "/caregiver-settings",
+        client_dashboard: "/client-dashboard",
       };
 
       const formattedPermissions: Permission[] = (permissionsData || []).map((p: any) => ({

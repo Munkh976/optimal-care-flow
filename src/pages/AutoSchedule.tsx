@@ -4,12 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Calendar, Users, Zap, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, Calendar, Users, Zap, CheckCircle, AlertCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppLayout } from "@/components/AppLayout";
 
 const AutoSchedule = () => {
   const navigate = useNavigate();
@@ -107,12 +108,6 @@ const AutoSchedule = () => {
       fetchOpenShifts(user.id);
     }
   }, [selectedWeek, user]);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Signed out successfully");
-    navigate("/auth");
-  };
 
   const handleAutoSchedule = async () => {
     if (openShifts.length === 0) {
@@ -256,33 +251,14 @@ const AutoSchedule = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/dashboard")}>
-            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
-              <Activity className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">CareMuch</h1>
-              <p className="text-sm text-muted-foreground">{profile?.agency_name || "Care Agency"}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              {profile?.full_name || user?.email}
-            </span>
-            <Button variant="outline" size="icon" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+    <AppLayout>
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={() => navigate("/dashboard")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <div>
-            <h2 className="text-3xl font-bold mb-2 flex items-center gap-2">
+            <h2 className="text-3xl font-bold flex items-center gap-2">
               <Zap className="h-8 w-8" />
               Auto Schedule
             </h2>
@@ -293,7 +269,7 @@ const AutoSchedule = () => {
         </div>
 
         {/* Week Selector */}
-        <Card className="mb-6">
+        <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
               <Calendar className="h-5 w-5 text-muted-foreground" />
@@ -318,7 +294,7 @@ const AutoSchedule = () => {
         </Card>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Open Shifts</CardTitle>
@@ -364,7 +340,7 @@ const AutoSchedule = () => {
         </div>
 
         {/* Action Button */}
-        <Card className="mb-6">
+        <Card>
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div>
@@ -461,8 +437,8 @@ const AutoSchedule = () => {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 

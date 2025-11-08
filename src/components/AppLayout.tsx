@@ -67,6 +67,10 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     caregiver_registration: UserPlus,
     live_operations: Radio,
     quick_assign: UserCog,
+    caregiver_dashboard: LayoutDashboard,
+    caregiver_time_off: Clock,
+    caregiver_settings: Settings,
+    client_dashboard: LayoutDashboard,
   };
 
   // Build menu items from permissions
@@ -79,7 +83,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       category: p.category,
     }));
 
-  // Add dashboard as first item for non-system admins
+  // Add dashboard as first item based on role
   const menuItems = userRole === "system_admin" 
     ? [
         {
@@ -90,6 +94,10 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         },
         ...dynamicMenuItems,
       ]
+    : userRole === "caregiver"
+    ? dynamicMenuItems // Caregivers use their own dashboard from permissions
+    : userRole === "client"
+    ? dynamicMenuItems // Clients use their own dashboard from permissions
     : [
         {
           label: "Dashboard",
