@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,8 +20,10 @@ import {
   List,
   FileText,
   Settings,
+  Shield,
 } from "lucide-react";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -30,19 +32,8 @@ interface AppLayoutProps {
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [userRole, setUserRole] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase.rpc('get_user_role', { _user_id: user.id });
-        setUserRole(data);
-      }
-    };
-    fetchUserRole();
-  }, []);
+  const { permissions, userRole, loading } = usePermissions();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -52,96 +43,63 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const menuItems = [
-    {
-      label: "Dashboard",
-      icon: LayoutDashboard,
-      path: "/dashboard",
-      roles: ["agency_admin", "manager", "scheduler"],
-    },
-    {
-      label: "Schedule",
-      icon: Calendar,
-      path: "/schedule",
-      roles: ["agency_admin", "manager", "scheduler", "caregiver"],
-    },
-    {
-      label: "Caregivers",
-      icon: Users,
-      path: "/caregivers",
-      roles: ["agency_admin", "manager", "hr_staff"],
-    },
-    {
-      label: "Clients",
-      icon: UserCog,
-      path: "/clients",
-      roles: ["agency_admin", "manager"],
-    },
-    {
-      label: "Care Types",
-      icon: Tag,
-      path: "/care-types",
-      roles: ["agency_admin", "manager"],
-    },
-    {
-      label: "Care Needs",
-      icon: List,
-      path: "/care-needs",
-      roles: ["agency_admin", "manager"],
-    },
-    {
-      label: "Users",
-      icon: UserCheck,
-      path: "/users",
-      roles: ["agency_admin", "system_admin"],
-    },
-    {
-      label: "Time Off",
-      icon: Clock,
-      path: "/time-off",
-      roles: ["agency_admin", "manager", "scheduler"],
-    },
-    {
-      label: "Live Operations",
-      icon: Radio,
-      path: "/live-operations",
-      roles: ["agency_admin", "manager", "scheduler"],
-    },
-    {
-      label: "Unassigned Shifts",
-      icon: ClipboardList,
-      path: "/unassigned-shifts",
-      roles: ["agency_admin", "manager", "scheduler"],
-    },
-    {
-      label: "Shift Trades",
-      icon: Repeat,
-      path: "/shift-trades",
-      roles: ["agency_admin", "manager", "scheduler"],
-    },
-    {
-      label: "Order Management",
-      icon: FileText,
-      path: "/order-management",
-      roles: ["agency_admin", "manager", "scheduler"],
-    },
-    {
-      label: "Caregiver Approvals",
-      icon: UserPlus,
-      path: "/caregiver-approvals",
-      roles: ["agency_admin", "manager", "hr_staff"],
-    },
-    {
-      label: "Admin Utilities",
-      icon: Settings,
-      path: "/admin-utilities",
-      roles: ["agency_admin", "system_admin"],
-    },
-  ];
+  // Icon mapping for modules
+  const iconMap: Record<string, any> = {
+    users: UserCheck,
+    user_roles: UserCog,
+    system_roles: Shield,
+    role_permissions: Settings,
+    caregivers: Users,
+    clients: UserCog,
+    shifts: Calendar,
+    orders: FileText,
+    availability: Clock,
+    time_off: Clock,
+    shift_trades: Repeat,
+    care_types: Tag,
+    care_needs: List,
+    agency: Settings,
+  };
 
-  const filteredMenuItems = menuItems.filter((item) =>
-    !item.roles || (userRole && item.roles.includes(userRole))
-  );
+  // Build menu items from permissions
+  const dynamicMenuItems = permissions
+    .filter(p => p.route && p.can_read)
+    .map(p => ({
+      label: p.module_name,
+      icon: iconMap[p.module_code] || FileText,
+      path: p.route!,
+      category: p.category,
+    }));
+
+  // Add dashboard as first item for non-system admins
+  const menuItems = userRole === "system_admin" 
+    ? [
+        {
+          label: "System Admin",
+          icon: Shield,
+          path: "/system-admin",
+          category: "dashboard",
+        },
+        ...dynamicMenuItems,
+      ]
+    : [
+        {
+          label: "Dashboard",
+          icon: LayoutDashboard,
+          path: "/dashboard",
+          category: "dashboard",
+        },
+        ...dynamicMenuItems,
+      ];
+
+  // Group by category
+  const groupedItems = menuItems.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = [];
+    }
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<string, typeof menuItems>);
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -169,24 +127,37 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             </p>
           </div>
 
-          <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
-            {filteredMenuItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                    isActive(item.path)
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
+          <nav className="flex-1 space-y-4 p-4 overflow-y-auto">
+            {loading ? (
+              <div className="text-center text-muted-foreground text-sm">Loading...</div>
+            ) : (
+              Object.entries(groupedItems).map(([category, items]) => (
+                <div key={category}>
+                  <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase">
+                    {category}
+                  </h3>
+                  <div className="space-y-1">
+                    {items.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                            isActive(item.path)
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
           </nav>
 
           <div className="border-t p-4">

@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { AppLayout } from "@/components/AppLayout";
 import {
   Users, Building2, Calendar, TrendingUp, 
-  UserCheck, Clock, Shield
+  UserCheck, Clock, Shield, Settings, UserCog, FileText, List, Tag
 } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface SystemStats {
   totalAgencies: number;
@@ -22,6 +23,7 @@ interface SystemStats {
 const SystemAdminDashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const { getModulesByCategory } = usePermissions();
   const [stats, setStats] = useState<SystemStats>({
     totalAgencies: 0,
     totalUsers: 0,
@@ -213,60 +215,121 @@ const SystemAdminDashboard = () => {
           </Card>
         </div>
 
-        {/* Quick Actions */}
+        {/* System Administration Modules */}
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>System Administration</CardTitle>
+            <p className="text-sm text-muted-foreground">Manage system-wide settings and roles</p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button 
-                variant="outline" 
-                className="justify-start h-auto py-4"
-                onClick={() => navigate("/users")}
-              >
-                <div className="flex items-start gap-3 text-left">
-                  <Users className="h-5 w-5 mt-0.5" />
-                  <div>
-                    <div className="font-semibold">Manage Users</div>
-                    <div className="text-xs text-muted-foreground">
-                      View and edit all user accounts
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {getModulesByCategory("administration").map((module) => {
+                const iconMap: Record<string, any> = {
+                  users: Users,
+                  user_roles: UserCog,
+                  system_roles: Shield,
+                  role_permissions: Settings,
+                };
+                const Icon = iconMap[module.module_code] || Settings;
+                
+                return (
+                  <Button
+                    key={module.module_code}
+                    variant="outline"
+                    className="justify-start h-auto py-4"
+                    onClick={() => module.route && navigate(module.route)}
+                  >
+                    <div className="flex items-start gap-3 text-left">
+                      <Icon className="h-5 w-5 mt-0.5" />
+                      <div>
+                        <div className="font-semibold">{module.module_name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {module.can_create && module.can_update && module.can_delete ? "Full Access" : "View & Edit"}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </Button>
+                  </Button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
-              <Button 
-                variant="outline" 
-                className="justify-start h-auto py-4"
-                onClick={() => navigate("/users/add")}
-              >
-                <div className="flex items-start gap-3 text-left">
-                  <UserCheck className="h-5 w-5 mt-0.5" />
-                  <div>
-                    <div className="font-semibold">Add New User</div>
-                    <div className="text-xs text-muted-foreground">
-                      Create new user accounts
+        {/* Configuration Modules */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Configuration</CardTitle>
+            <p className="text-sm text-muted-foreground">Configure care types and needs</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {getModulesByCategory("configuration").map((module) => {
+                const iconMap: Record<string, any> = {
+                  care_types: Tag,
+                  care_needs: List,
+                };
+                const Icon = iconMap[module.module_code] || FileText;
+                
+                return (
+                  <Button
+                    key={module.module_code}
+                    variant="outline"
+                    className="justify-start h-auto py-4"
+                    onClick={() => module.route && navigate(module.route)}
+                  >
+                    <div className="flex items-start gap-3 text-left">
+                      <Icon className="h-5 w-5 mt-0.5" />
+                      <div>
+                        <div className="font-semibold">{module.module_name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {module.can_create && module.can_update && module.can_delete ? "Full Access" : "View & Edit"}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </Button>
+                  </Button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
-              <Button 
-                variant="outline" 
-                className="justify-start h-auto py-4"
-                onClick={() => navigate("/caregiver-approvals")}
-              >
-                <div className="flex items-start gap-3 text-left">
-                  <Clock className="h-5 w-5 mt-0.5" />
-                  <div>
-                    <div className="font-semibold">Caregiver Approvals</div>
-                    <div className="text-xs text-muted-foreground">
-                      Review pending registrations
+        {/* Operations Modules */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Operations Management</CardTitle>
+            <p className="text-sm text-muted-foreground">Manage daily operations and scheduling</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {getModulesByCategory("operations").map((module) => {
+                const iconMap: Record<string, any> = {
+                  caregivers: Users,
+                  clients: UserCheck,
+                  shifts: Calendar,
+                  orders: FileText,
+                  availability: Clock,
+                };
+                const Icon = iconMap[module.module_code] || FileText;
+                
+                return (
+                  <Button
+                    key={module.module_code}
+                    variant="outline"
+                    className="justify-start h-auto py-4"
+                    onClick={() => module.route && navigate(module.route)}
+                  >
+                    <div className="flex items-start gap-3 text-left">
+                      <Icon className="h-5 w-5 mt-0.5" />
+                      <div>
+                        <div className="font-semibold">{module.module_name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {module.can_create && module.can_update && module.can_delete ? "Full Access" : "View & Edit"}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </Button>
+                  </Button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
