@@ -52,6 +52,7 @@ const UserRoles = () => {
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [newRole, setNewRole] = useState<AppRole | "">("");
   const [currentUserRole, setCurrentUserRole] = useState<AppRole | "">("");
+  const [availableRoles, setAvailableRoles] = useState<Array<{ role_code: AppRole; role_name: string }>>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -84,7 +85,7 @@ const UserRoles = () => {
       }
 
       setCurrentUserRole(roleData);
-      await fetchUserRoles();
+      await Promise.all([fetchUserRoles(), fetchAvailableRoles(roleData)]);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -93,6 +94,32 @@ const UserRoles = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAvailableRoles = async (userRole: AppRole) => {
+    try {
+      const { data, error } = await supabase
+        .from("system_roles")
+        .select("role_code, role_name, access_level")
+        .eq("is_active", true)
+        .order("access_level", { ascending: false });
+
+      if (error) throw error;
+
+      // Filter roles based on current user's role
+      const filteredRoles = (data || []).filter((role) => {
+        if (userRole === "system_admin") return true;
+        return role.role_code !== "system_admin";
+      });
+
+      setAvailableRoles(filteredRoles);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -225,9 +252,6 @@ const UserRoles = () => {
     }
   };
 
-  const availableRoles = currentUserRole === "system_admin"
-    ? ["system_admin", "agency_admin", "manager", "scheduler", "hr_staff", "caregiver", "client"]
-    : ["manager", "scheduler", "hr_staff", "caregiver", "client"];
 
   if (loading) {
     return (
@@ -244,17 +268,11 @@ const UserRoles = () => {
       <div className="container mx-auto py-8">
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>User Role Management</CardTitle>
-                <CardDescription>
-                  Manage user roles and permissions across the system
-                </CardDescription>
-              </div>
-              <Button onClick={() => navigate("/add-user")}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add New User
-              </Button>
+            <div>
+              <CardTitle>User Role Management</CardTitle>
+              <CardDescription>
+                Manage user roles and permissions across the system
+              </CardDescription>
             </div>
           </CardHeader>
           <CardContent>
@@ -272,13 +290,11 @@ const UserRoles = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="system_admin">System Admin</SelectItem>
-                  <SelectItem value="agency_admin">Agency Admin</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="scheduler">Scheduler</SelectItem>
-                  <SelectItem value="hr_staff">HR Staff</SelectItem>
-                  <SelectItem value="caregiver">Caregiver</SelectItem>
-                  <SelectItem value="client">Client</SelectItem>
+                  {availableRoles.map((role) => (
+                    <SelectItem key={role.role_code} value={role.role_code}>
+                      {role.role_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -366,8 +382,8 @@ const UserRoles = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {availableRoles.map((role) => (
-                      <SelectItem key={role} value={role}>
-                        {role.replace("_", " ").toUpperCase()}
+                      <SelectItem key={role.role_code} value={role.role_code}>
+                        {role.role_name}
                       </SelectItem>
                     ))}
                   </SelectContent>

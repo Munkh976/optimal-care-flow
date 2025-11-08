@@ -921,6 +921,39 @@ export type Database = {
           },
         ]
       }
+      system_roles: {
+        Row: {
+          access_level: number
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          role_code: Database["public"]["Enums"]["app_role"]
+          role_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          access_level?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          role_code: Database["public"]["Enums"]["app_role"]
+          role_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          access_level?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          role_code?: Database["public"]["Enums"]["app_role"]
+          role_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       time_off_requests: {
         Row: {
           approved_by_user_id: string | null
