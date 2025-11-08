@@ -132,14 +132,13 @@ const UserRoles = () => {
 
       if (error) throw error;
 
-      // Fetch profile data separately for each user
       const rolesWithProfiles = await Promise.all(
         (data || []).map(async (role) => {
           const { data: profile } = await supabase
             .from("profiles")
             .select("email, full_name")
             .eq("id", role.user_id)
-            .single();
+            .maybeSingle();
 
           return {
             ...role,
@@ -166,7 +165,14 @@ const UserRoles = () => {
   };
 
   const handleUpdateRole = async () => {
-    if (!selectedRole || !newRole) return;
+    if (!selectedRole || !newRole) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a role",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const { error } = await supabase

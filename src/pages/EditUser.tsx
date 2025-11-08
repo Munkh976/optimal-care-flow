@@ -87,10 +87,14 @@ const EditUser = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
 
+    if (!selectedRole) {
+      toast.error("Please select a role");
+      return;
+    }
+
+    setSaving(true);
     try {
-      // Delete old role
       const { error: deleteError } = await supabase
         .from("user_roles")
         .delete()
@@ -98,7 +102,6 @@ const EditUser = () => {
 
       if (deleteError) throw deleteError;
 
-      // Insert new role
       const { error: insertError } = await supabase
         .from("user_roles")
         .insert([{
@@ -112,7 +115,6 @@ const EditUser = () => {
       navigate("/users");
     } catch (error: any) {
       toast.error(error.message || "Failed to update user role");
-      console.error(error);
     } finally {
       setSaving(false);
     }

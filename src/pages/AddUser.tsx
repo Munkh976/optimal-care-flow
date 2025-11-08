@@ -46,10 +46,23 @@ const AddUser = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
 
+    // Validation
+    if (!fullName.trim()) {
+      toast.error("Full name is required");
+      return;
+    }
+    if (!email.trim() || !email.includes("@")) {
+      toast.error("Valid email is required");
+      return;
+    }
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    setLoading(true);
     try {
-      // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -64,7 +77,6 @@ const AddUser = () => {
       if (authError) throw authError;
       if (!authData.user) throw new Error("Failed to create user");
 
-      // Assign role
       const { error: roleError } = await supabase
         .from("user_roles")
         .insert([{
@@ -78,7 +90,6 @@ const AddUser = () => {
       navigate("/users");
     } catch (error: any) {
       toast.error(error.message || "Failed to create user");
-      console.error(error);
     } finally {
       setLoading(false);
     }

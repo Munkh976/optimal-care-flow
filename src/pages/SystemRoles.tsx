@@ -142,10 +142,29 @@ const SystemRoles = () => {
   };
 
   const handleSaveRole = async () => {
-    if (!formData.role_name || !formData.role_code) {
+    // Validation
+    if (!formData.role_name.trim()) {
       toast({
         title: "Validation Error",
-        description: "Role name and code are required",
+        description: "Role name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.role_code.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Role code is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.access_level < 0 || formData.access_level > 100) {
+      toast({
+        title: "Validation Error",
+        description: "Access level must be between 0 and 100",
         variant: "destructive",
       });
       return;
@@ -157,7 +176,7 @@ const SystemRoles = () => {
           .from("system_roles")
           .update({
             role_name: formData.role_name,
-            description: formData.description,
+            description: formData.description || null,
             access_level: formData.access_level,
             is_active: formData.is_active,
           })
@@ -176,7 +195,7 @@ const SystemRoles = () => {
           .insert([{
             role_name: formData.role_name,
             role_code: formData.role_code as AppRole,
-            description: formData.description,
+            description: formData.description || null,
             access_level: formData.access_level,
             is_active: formData.is_active,
           }]);

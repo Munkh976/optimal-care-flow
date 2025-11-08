@@ -137,12 +137,17 @@ const Users = () => {
   const handleResetPassword = async () => {
     if (!selectedUser || !newPassword) return;
 
+    // Validate password
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
     setResetting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("No session found");
 
-      // Call edge function to reset password
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
         {
@@ -170,7 +175,6 @@ const Users = () => {
       setSelectedUser(null);
     } catch (error: any) {
       toast.error(error.message || "Failed to reset password");
-      console.error(error);
     } finally {
       setResetting(false);
     }
@@ -211,7 +215,6 @@ const Users = () => {
       await fetchUsers();
     } catch (error: any) {
       toast.error(error.message || "Failed to delete user");
-      console.error(error);
     } finally {
       setDeleting(false);
     }
