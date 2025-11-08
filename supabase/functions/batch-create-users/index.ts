@@ -12,8 +12,6 @@ serve(async (req) => {
   }
 
   try {
-    // This is a one-time batch operation, so no auth check needed
-    // It uses the service role key which has full access
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -26,26 +24,54 @@ serve(async (req) => {
     );
 
     const defaultPassword = "123456";
+    const agencyId = "56fbfe38-e8eb-40c1-ba27-07428f62ed2e";
+    const preservedEmails = ["munkh.mn@gmail.com"];
+    
     const results = {
+      deleted: 0,
       clients: [] as any[],
       caregivers: [] as any[],
       errors: [] as any[],
     };
 
-    // Get agency_id from the first profile (assuming single agency for now)
-    const { data: profiles } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .limit(1)
-      .single();
+    // Get all auth users
+    const { data: { users: allUsers }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    if (listError) throw listError;
 
-    const agencyId = profiles?.id;
+    // Identify system_admin and preserved accounts
+    const preservedUserIds: string[] = [];
+    for (const user of allUsers || []) {
+      const { data: roleData } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (roleData?.role === "system_admin" || preservedEmails.includes(user.email || "")) {
+        preservedUserIds.push(user.id);
+      }
+    }
 
-    // Fetch clients without user_id
+    // Delete all users except preserved ones
+    for (const user of allUsers || []) {
+      if (!preservedUserIds.includes(user.id)) {
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(user.id);
+          results.deleted++;
+        } catch (error) {
+          console.error(`Failed to delete user ${user.email}:`, error);
+        }
+      }
+    }
+
+    // Reset user_id in clients and caregivers tables
+    await supabaseAdmin.from("clients").update({ user_id: null }).neq("user_id", null);
+    await supabaseAdmin.from("caregivers").update({ user_id: null }).neq("user_id", null);
+
+    // Fetch all clients
     const { data: clients, error: clientsError } = await supabaseAdmin
       .from("clients")
-      .select("*")
-      .is("user_id", null);
+      .select("*");
 
     if (clientsError) throw clientsError;
 
@@ -72,7 +98,7 @@ serve(async (req) => {
             email: client.email,
             full_name: `${client.first_name} ${client.last_name}`,
             phone: client.phone,
-            agency_name: "Sample Agency",
+            agency_id: agencyId,
           });
 
         if (profileError) throw profileError;
@@ -110,11 +136,10 @@ serve(async (req) => {
       }
     }
 
-    // Fetch caregivers without user_id
+    // Fetch all caregivers
     const { data: caregivers, error: caregiversError } = await supabaseAdmin
       .from("caregivers")
-      .select("*")
-      .is("user_id", null);
+      .select("*");
 
     if (caregiversError) throw caregiversError;
 
@@ -141,7 +166,7 @@ serve(async (req) => {
             email: caregiver.email,
             full_name: `${caregiver.first_name} ${caregiver.last_name}`,
             phone: caregiver.phone,
-            agency_name: "Sample Agency",
+            agency_id: agencyId,
           });
 
         if (profileError) throw profileError;
@@ -182,7 +207,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Created ${results.clients.length} client users and ${results.caregivers.length} caregiver users`,
+        message: `Deleted ${results.deleted} users. Created ${results.clients.length} client users and ${results.caregivers.length} caregiver users`,
         results,
       }),
       {

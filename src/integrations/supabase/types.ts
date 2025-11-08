@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      agency: {
+        Row: {
+          agency_name: string
+          created_at: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          agency_name: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          agency_name?: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       care_needs: {
         Row: {
           category: string
@@ -608,7 +629,7 @@ export type Database = {
       }
       profiles: {
         Row: {
-          agency_name: string
+          agency_id: string
           business_license: string | null
           created_at: string | null
           default_ft_min_hours: number | null
@@ -623,7 +644,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          agency_name: string
+          agency_id: string
           business_license?: string | null
           created_at?: string | null
           default_ft_min_hours?: number | null
@@ -638,7 +659,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          agency_name?: string
+          agency_id?: string
           business_license?: string | null
           created_at?: string | null
           default_ft_min_hours?: number | null
@@ -652,7 +673,15 @@ export type Database = {
           subscription_tier?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shift_assignments: {
         Row: {
