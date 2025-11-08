@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, Calendar, Clock, DollarSign, MapPin, CheckCircle } from "lucide-react";
+import { RefreshCw, Calendar, Clock, DollarSign, MapPin, CheckCircle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { AppLayout } from "@/components/AppLayout";
 
 interface ShiftTrade {
   id: string;
@@ -208,25 +209,20 @@ const ShiftTrades = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Shift Trade Board</h1>
-              <p className="text-muted-foreground">Browse and claim available shift trades</p>
-            </div>
-          </div>
+    <AppLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Shift Trade Board</h1>
+          <p className="text-muted-foreground mt-1">Browse and claim available shift trades</p>
         </div>
 
         {/* Stats Overview */}
@@ -384,7 +380,7 @@ const ShiftTrades = () => {
           )}
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 };
 

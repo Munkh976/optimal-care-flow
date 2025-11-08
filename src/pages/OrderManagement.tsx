@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package, Zap, Star, CheckCircle2 } from "lucide-react";
+import { Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package, Zap, Star, CheckCircle2, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +16,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addWeeks, addMonths, addYears, subWeeks, subMonths, subYears } from "date-fns";
+import { AppLayout } from "@/components/AppLayout";
 
 type Order = {
   id: string;
@@ -124,7 +125,6 @@ const OrderManagement = () => {
       .order("created_at", { ascending: false });
 
     if (ordersError) {
-      console.error("Error fetching orders:", ordersError);
       toast.error("Failed to load orders");
       setLoading(false);
       return;
@@ -156,7 +156,7 @@ const OrderManagement = () => {
       .order("first_name");
 
     if (error) {
-      console.error("Error fetching clients:", error);
+      toast.error("Failed to load clients");
     } else {
       setClients(data || []);
     }
@@ -170,16 +170,10 @@ const OrderManagement = () => {
       .order("name");
 
     if (error) {
-      console.error("Error fetching care types:", error);
+      toast.error("Failed to load care types");
     } else {
       setCareTypes(data || []);
     }
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Signed out successfully");
-    navigate("/auth");
   };
 
   const handleSaveOrder = async (status: "draft" | "submitted") => {
@@ -264,7 +258,6 @@ const OrderManagement = () => {
       if (user) fetchOrders(user.id);
     } catch (error: any) {
       toast.error(error.message || "Failed to create order");
-      console.error(error);
     }
   };
 
@@ -323,7 +316,6 @@ const OrderManagement = () => {
       }
     } catch (error: any) {
       toast.error("Failed to load client care types");
-      console.error(error);
       setClientCareTypes(careTypes);
     } finally {
       setLoadingClientCareTypes(false);
@@ -346,7 +338,6 @@ const OrderManagement = () => {
 
     if (error) {
       toast.error("Failed to delete order");
-      console.error(error);
     } else {
       toast.success("Order deleted successfully");
       if (user) fetchOrders(user.id);
@@ -514,41 +505,18 @@ const OrderManagement = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Loading orders...</p>
+      <AppLayout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/dashboard")}>
-            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
-              <Activity className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">CareMuch</h1>
-              <p className="text-sm text-muted-foreground">{profile?.agency_name || "Care Agency"}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              {profile?.full_name || user?.email}
-            </span>
-            <Button variant="outline" size="icon" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+    <AppLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <h2 className="text-3xl font-bold">Order Management</h2>
             <p className="text-muted-foreground mt-1">
@@ -1277,8 +1245,8 @@ const OrderManagement = () => {
             )}
           </DialogContent>
         </Dialog>
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 
