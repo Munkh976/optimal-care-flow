@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppLayout } from "@/components/AppLayout";
 import { 
-  Home, Package, Calendar, Users, History, Settings, LogOut
+  Home, Package, Calendar, Users, History, Settings
 } from "lucide-react";
 import { Overview } from "@/components/client-dashboard/Overview";
 import { OrdersManagement } from "@/components/client-dashboard/OrdersManagement";
@@ -195,32 +196,26 @@ const ClientDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Loading...</p>
+      <AppLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Header */}
-      <header className="border-b bg-card/95 backdrop-blur sticky top-0 z-30 shadow-sm">
-        <div className="container mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">Welcome, {clientProfile?.first_name}</h1>
-            <p className="text-sm text-muted-foreground">Client Dashboard</p>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleSignOut}>
-            <LogOut className="h-4 w-4 md:mr-2" />
-            <span className="hidden md:inline">Sign Out</span>
-          </Button>
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold">Welcome, {clientProfile?.first_name}</h1>
+          <p className="text-sm text-muted-foreground">Client Dashboard</p>
         </div>
-      </header>
 
-      <main className="container mx-auto p-4 md:p-6 max-w-6xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-2">
             <TabsTrigger value="overview" className="gap-2">
@@ -288,8 +283,8 @@ const ClientDashboard = () => {
             />
           </TabsContent>
         </Tabs>
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 

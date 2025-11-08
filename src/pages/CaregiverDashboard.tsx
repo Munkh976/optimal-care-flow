@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, LogOut, AlertCircle, Home, Settings, DollarSign, Briefcase } from "lucide-react";
+import { AppLayout } from "@/components/AppLayout";
+import { Calendar, Clock, AlertCircle, Home, Settings, DollarSign, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
@@ -155,12 +156,6 @@ const CaregiverDashboard = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Signed out successfully");
-    navigate("/auth");
-  };
-
   // Calculate weekly hours and earnings from this week's shifts
   const weeklyHours = weekShifts.reduce((sum, a) => sum + (a.shifts?.duration_hours || 0), 0);
   const weeklyEarnings = profile ? weeklyHours * profile.hourly_rate : 0;
@@ -168,37 +163,29 @@ const CaregiverDashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-primary/10 via-primary/5 to-background border-b border-border/40">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                Welcome back, {profile?.first_name}! 👋
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                Here's your schedule and stats for this week
-              </p>
-            </div>
-            <Button variant="outline" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">
+            Welcome back, {profile?.first_name}! 👋
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Here's your schedule and stats for this week
+          </p>
         </div>
-      </header>
 
-      {/* Navigation Tabs */}
-      <div className="border-b border-border/40">
-        <div className="container mx-auto px-4 py-3">
+        {/* Navigation Tabs */}
+        <div className="border-b border-border/40">
           <Tabs value={activeTab} onValueChange={(v) => {
             if (v === 'overview') setActiveTab('overview');
             if (v === 'schedule') setActiveTab('schedule');
@@ -230,9 +217,6 @@ const CaregiverDashboard = () => {
             </TabsList>
           </Tabs>
         </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-6">
         {activeTab === 'overview' && (
           <>
             {/* Stats Cards */}
@@ -561,7 +545,7 @@ const CaregiverDashboard = () => {
         open={!!selectedShift}
         onOpenChange={(open) => !open && setSelectedShift(null)}
       />
-    </div>
+    </AppLayout>
   );
 };
 
