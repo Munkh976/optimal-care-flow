@@ -639,7 +639,6 @@ export type Database = {
           id: string
           overtime_threshold: number | null
           phone: string | null
-          role: string | null
           subscription_tier: string | null
           updated_at: string | null
         }
@@ -654,7 +653,6 @@ export type Database = {
           id: string
           overtime_threshold?: number | null
           phone?: string | null
-          role?: string | null
           subscription_tier?: string | null
           updated_at?: string | null
         }
@@ -669,7 +667,6 @@ export type Database = {
           id?: string
           overtime_threshold?: number | null
           phone?: string | null
-          role?: string | null
           subscription_tier?: string | null
           updated_at?: string | null
         }

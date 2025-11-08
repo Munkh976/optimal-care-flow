@@ -20,6 +20,7 @@ import CaregiverApprovals from "./pages/CaregiverApprovals";
 import Users from "./pages/Users";
 import AddUser from "./pages/AddUser";
 import EditUser from "./pages/EditUser";
+import UserRoles from "./pages/UserRoles";
 import SystemAdminDashboard from "./pages/SystemAdminDashboard";
 import CareTypes from "./pages/CareTypes";
 import OrderManagement from "./pages/OrderManagement";
@@ -55,6 +56,7 @@ const App = () => (
           <Route path="/users" element={<Users />} />
           <Route path="/users/add" element={<AddUser />} />
           <Route path="/users/edit/:id" element={<EditUser />} />
+          <Route path="/user-roles" element={<UserRoles />} />
           <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
           <Route path="/care-types" element={<CareTypes />} />
           <Route path="/order-management" element={<OrderManagement />} />
