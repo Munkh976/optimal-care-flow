@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Calendar, Users, Zap, CheckCircle, AlertCircle } from "lucide-react";
+import { Calendar, Users, Zap, CheckCircle, AlertCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -37,7 +37,7 @@ const AutoSchedule = () => {
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
-        .single();
+        .maybeSingle();
 
       if (profileData) {
         setProfile(profileData);
@@ -241,31 +241,28 @@ const AutoSchedule = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Loading schedule data...</p>
+      <AppLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Loading schedule data...</p>
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h2 className="text-3xl font-bold flex items-center gap-2">
-              <Zap className="h-8 w-8" />
-              Auto Schedule
-            </h2>
-            <p className="text-muted-foreground">
-              Automatically assign caregivers to open shifts based on skills and availability
-            </p>
-          </div>
+        <div>
+          <h2 className="text-3xl font-bold flex items-center gap-2">
+            <Zap className="h-8 w-8" />
+            Auto Schedule
+          </h2>
+          <p className="text-muted-foreground">
+            Automatically assign caregivers to open shifts based on skills and availability
+          </p>
         </div>
 
         {/* Week Selector */}

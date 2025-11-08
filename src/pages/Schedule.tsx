@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AppLayout } from "@/components/AppLayout";
 import {
   Select,
   SelectContent,
@@ -13,7 +14,6 @@ import {
 } from "@/components/ui/select";
 import {
   Calendar,
-  LogOut,
   Users,
   Clock,
   ChevronLeft,
@@ -142,7 +142,7 @@ const Schedule = () => {
       .from("profiles")
       .select("*")
       .eq("id", session.user.id)
-      .single();
+      .maybeSingle();
 
     if (profileData) {
       setProfile(profileData);
@@ -222,12 +222,6 @@ const Schedule = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Signed out successfully");
-    navigate("/auth");
   };
 
   const goToPrevious = () => {
@@ -327,7 +321,7 @@ const Schedule = () => {
         .from("clients")
         .select("zip_code")
         .eq("id", shiftData.client_id)
-        .single();
+        .maybeSingle();
 
       if (!clientData?.zip_code) {
         toast.error("Client zip code not found");
@@ -778,28 +772,17 @@ const Schedule = () => {
   const activeCaregivers = [...new Set(filteredShifts.map(s => s.caregiver_id).filter(Boolean))].length;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-primary/10 via-primary/5 to-background border-b">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Schedule Management</h1>
-              <p className="text-muted-foreground mt-1">
-                Manage shifts and caregiver assignments
-              </p>
-            </div>
-            <Button variant="outline" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold">Schedule Management</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage shifts and caregiver assignments
+          </p>
         </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-6">
         {/* View Controls */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Button
               variant={scheduleView === "timeline" ? "default" : "outline"}
@@ -1321,7 +1304,7 @@ const Schedule = () => {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </AppLayout>
   );
 };
 
