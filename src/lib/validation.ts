@@ -51,6 +51,20 @@ export const clientFormSchema = z.object({
   notes: z.string().max(1000, "Notes too long").optional(),
 });
 
+export const agencyFormSchema = z.object({
+  agency_name: z.string().min(1, "Agency name is required").max(200, "Name too long"),
+  address: z.string().max(255, "Address too long").optional(),
+  city: z.string().max(100, "City too long").optional(),
+  state: z.string().max(2, "State code too long").optional(),
+  zip_code: z.string().max(10, "Zip code too long").optional(),
+  phone: z.string().max(20, "Phone too long").optional(),
+  email: z.string().email("Invalid email address").max(255, "Email too long").optional(),
+  website: z.string().url("Invalid website URL").max(255, "URL too long").optional().or(z.literal("")),
+  naics_code: z.string().max(10, "NAICS code too long").optional(),
+  business_type: z.string().max(100, "Business type too long").optional(),
+  tax_id: z.string().max(20, "Tax ID too long").optional(),
+});
+
 export const careTypeFormSchema = z.object({
   code: z.string().min(1, "Code is required").max(50, "Code too long"),
   category: z.string().min(1, "Category is required").max(100, "Category too long"),

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, Save } from "lucide-react";
 import { US_STATES } from "@/constants/usStates";
+import { agencyFormSchema } from "@/lib/validation";
 
 interface AgencyData {
   id: string;
@@ -65,7 +66,7 @@ const AgencySettings = () => {
         .from("profiles")
         .select("agency_id")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
 
@@ -79,19 +80,25 @@ const AgencySettings = () => {
         .from("agency")
         .select("*")
         .eq("id", profileData.agency_id)
-        .single();
+        .maybeSingle();
 
       if (agencyError) throw agencyError;
 
       setAgencyData(agency);
     } catch (error) {
-      console.error("Error fetching agency data:", error);
       toast.error("Failed to load agency data");
     }
   };
 
   const handleSave = async () => {
     if (!agencyData) return;
+
+    // Validate form data
+    const validation = agencyFormSchema.safeParse(agencyData);
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -117,7 +124,6 @@ const AgencySettings = () => {
 
       toast.success("Agency settings saved successfully");
     } catch (error) {
-      console.error("Error saving agency data:", error);
       toast.error("Failed to save agency settings");
     } finally {
       setSaving(false);
@@ -131,12 +137,14 @@ const AgencySettings = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Loading agency settings...</p>
+      <AppLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Loading agency settings...</p>
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 

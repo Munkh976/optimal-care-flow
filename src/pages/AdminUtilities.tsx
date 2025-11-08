@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Download, Upload, Trash2, AlertTriangle } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
@@ -16,7 +16,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 const AdminUtilities = () => {
   const [loading, setLoading] = useState(false);
@@ -25,7 +24,6 @@ const AdminUtilities = () => {
   const [exportLoading, setExportLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
 
   const handleBatchCreateUsers = async () => {
     setLoading(true);
@@ -55,18 +53,9 @@ const AdminUtilities = () => {
 
       const result = await response.json();
       
-      toast({
-        title: "Success",
-        description: result.message,
-      });
-
-      console.log("Batch create results:", result.results);
+      toast.success(result.message);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to create users");
     } finally {
       setLoading(false);
     }
@@ -102,20 +91,13 @@ const AdminUtilities = () => {
           .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
 
         if (error) {
-          console.error(`Error deleting from ${table}:`, error);
+          toast.error(`Error deleting from ${table}: ${error.message}`);
         }
       }
 
-      toast({
-        title: "Success",
-        description: "Test data deleted from all tables",
-      });
+      toast.success("Test data deleted from all tables");
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to delete data");
     } finally {
       setLoading(false);
     }
@@ -149,16 +131,9 @@ const AdminUtilities = () => {
 
       const result = await response.json();
       
-      toast({
-        title: "Success",
-        description: result.message,
-      });
+      toast.success(result.message);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to reset database");
     } finally {
       setLoading(false);
     }
@@ -192,7 +167,7 @@ const AdminUtilities = () => {
           .select('*');
 
         if (error) {
-          console.error(`Error fetching ${table}:`, error);
+          toast.error(`Error fetching ${table}: ${error.message}`);
           continue;
         }
 
@@ -209,16 +184,9 @@ const AdminUtilities = () => {
       link.click();
       URL.revokeObjectURL(url);
 
-      toast({
-        title: "Success",
-        description: "Data exported successfully",
-      });
+      toast.success("Data exported successfully");
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to export data");
     } finally {
       setExportLoading(false);
     }
@@ -258,21 +226,14 @@ const AdminUtilities = () => {
 
       const result = await response.json();
       
-      toast({
-        title: "Success",
-        description: result.message,
-      });
+      toast.success(result.message);
 
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to import data");
     } finally {
       setImportLoading(false);
     }

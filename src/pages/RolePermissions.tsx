@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Loader2, Save } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -46,7 +46,6 @@ const RolePermissions = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -67,22 +66,14 @@ const RolePermissions = () => {
       });
 
       if (!roleData || roleData !== "system_admin") {
-        toast({
-          title: "Access Denied",
-          description: "Only system administrators can manage role permissions",
-          variant: "destructive",
-        });
+        toast.error("Access denied. Only system administrators can manage role permissions");
         navigate("/");
         return;
       }
 
       await fetchData();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -104,11 +95,7 @@ const RolePermissions = () => {
       setRoles(rolesRes.data || []);
       setPermissions(permissionsRes.data || []);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to load permissions data");
     }
   };
 
@@ -162,18 +149,11 @@ const RolePermissions = () => {
 
       if (insertError) throw insertError;
 
-      toast({
-        title: "Success",
-        description: "Role permissions updated successfully",
-      });
+      toast.success("Role permissions updated successfully");
 
       await fetchData();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to save permissions");
     } finally {
       setSaving(false);
     }
