@@ -267,10 +267,15 @@ const SystemRoles = () => {
                   Define and manage system roles with access levels
                 </CardDescription>
               </div>
-              <Button onClick={handleAddRole}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add System Role
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => navigate("/role-permissions")}>
+                  Manage Permissions
+                </Button>
+                <Button onClick={handleAddRole}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add System Role
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

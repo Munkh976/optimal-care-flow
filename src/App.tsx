@@ -22,6 +22,7 @@ import AddUser from "./pages/AddUser";
 import EditUser from "./pages/EditUser";
 import UserRoles from "./pages/UserRoles";
 import SystemRoles from "./pages/SystemRoles";
+import RolePermissions from "./pages/RolePermissions";
 import SystemAdminDashboard from "./pages/SystemAdminDashboard";
 import CareTypes from "./pages/CareTypes";
 import OrderManagement from "./pages/OrderManagement";
@@ -59,6 +60,7 @@ const App = () => (
           <Route path="/users/edit/:id" element={<EditUser />} />
           <Route path="/user-roles" element={<UserRoles />} />
           <Route path="/system-roles" element={<SystemRoles />} />
+          <Route path="/role-permissions" element={<RolePermissions />} />
           <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
           <Route path="/care-types" element={<CareTypes />} />
           <Route path="/order-management" element={<OrderManagement />} />

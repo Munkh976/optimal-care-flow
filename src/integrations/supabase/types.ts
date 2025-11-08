@@ -680,6 +680,50 @@ export type Database = {
           },
         ]
       }
+      role_permissions: {
+        Row: {
+          can_create: boolean | null
+          can_delete: boolean | null
+          can_read: boolean | null
+          can_update: boolean | null
+          created_at: string | null
+          id: string
+          module_code: string
+          role_code: Database["public"]["Enums"]["app_role"]
+          updated_at: string | null
+        }
+        Insert: {
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_read?: boolean | null
+          can_update?: boolean | null
+          created_at?: string | null
+          id?: string
+          module_code: string
+          role_code: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+        }
+        Update: {
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_read?: boolean | null
+          can_update?: boolean | null
+          created_at?: string | null
+          id?: string
+          module_code?: string
+          role_code?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_module_code_fkey"
+            columns: ["module_code"]
+            isOneToOne: false
+            referencedRelation: "system_modules"
+            referencedColumns: ["module_code"]
+          },
+        ]
+      }
       shift_assignments: {
         Row: {
           actual_hours_worked: number | null
@@ -921,6 +965,39 @@ export type Database = {
           },
         ]
       }
+      system_modules: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          module_code: string
+          module_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          module_code: string
+          module_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          module_code?: string
+          module_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       system_roles: {
         Row: {
           access_level: number
@@ -1083,6 +1160,14 @@ export type Database = {
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_permission: {
+        Args: {
+          _module_code: string
+          _permission_type: string
+          _user_id: string
+        }
+        Returns: boolean
       }
       has_role: {
         Args: {
