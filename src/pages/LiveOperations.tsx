@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Clock, AlertCircle, MapPin, Phone, CheckCircle } from "lucide-react";
+import { Clock, AlertCircle, MapPin, Phone, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
+import { AppLayout } from "@/components/AppLayout";
 
 interface LiveShift {
   id: string;
@@ -171,26 +172,21 @@ const LiveOperations = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6">
-        <div className="mb-6 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Live Operations</h1>
-            <p className="text-muted-foreground">
-              {format(new Date(), "EEEE, MMMM d, yyyy")} • Real-time monitoring
-            </p>
-          </div>
-        </div>
+    <AppLayout>
+      <div>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Live Operations</h1>
+        <p className="text-muted-foreground mb-6">
+          {format(new Date(), "EEEE, MMMM d, yyyy")} • Real-time monitoring
+        </p>
 
         {/* Stats Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -327,7 +323,7 @@ const LiveOperations = () => {
           )}
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 };
 

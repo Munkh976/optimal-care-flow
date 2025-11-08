@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Calendar, Clock, MapPin, DollarSign, ArrowLeft, Filter, Search } from "lucide-react";
+import { Calendar, Clock, MapPin, DollarSign, Filter, Search } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
+import { AppLayout } from "@/components/AppLayout";
 
 interface OpenShift {
   id: string;
@@ -29,7 +29,6 @@ interface OpenShift {
 }
 
 const AvailableShifts = () => {
-  const navigate = useNavigate();
   const [shifts, setShifts] = useState<OpenShift[]>([]);
   const [loading, setLoading] = useState(true);
   const [caregiverId, setCaregiverId] = useState<string | null>(null);
@@ -45,7 +44,7 @@ const AvailableShifts = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        navigate("/auth");
+        toast.error("Please log in to view shifts");
         return;
       }
 
@@ -149,32 +148,21 @@ const AvailableShifts = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-gradient-to-r from-primary/10 via-primary/5 to-background border-b">
-        <div className="container mx-auto px-4 py-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/caregiver-dashboard")}
-            className="mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-          <h1 className="text-3xl font-bold">Available Shifts</h1>
-          <p className="text-muted-foreground mt-1">
-            Pick up extra shifts to increase your earnings
-          </p>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-6">
+    <AppLayout>
+      <div>
+        <h1 className="text-3xl font-bold mb-2">Available Shifts</h1>
+        <p className="text-muted-foreground mb-6">
+          Pick up extra shifts to increase your earnings
+        </p>
         {/* Filters */}
         <Card className="mb-6">
           <CardContent className="p-4">
@@ -289,14 +277,14 @@ const AvailableShifts = () => {
             ))}
           </div>
         )}
-      </div>
 
-      <ShiftDetailsDialog
-        shift={selectedShift}
-        open={!!selectedShift}
-        onOpenChange={(open) => !open && setSelectedShift(null)}
-      />
-    </div>
+        <ShiftDetailsDialog
+          shift={selectedShift}
+          open={!!selectedShift}
+          onOpenChange={(open) => !open && setSelectedShift(null)}
+        />
+      </div>
+    </AppLayout>
   );
 };
 

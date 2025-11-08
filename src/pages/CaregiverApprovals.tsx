@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, CheckCircle, XCircle, Clock, Mail, Phone, MapPin } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Mail, Phone, MapPin } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { AppLayout } from "@/components/AppLayout";
 
 interface CaregiverRegistration {
   id: string;
@@ -183,24 +184,21 @@ const CaregiverApprovals = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6">
+    <AppLayout>
+      <div>
         <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Caregiver Applications</h1>
-              <p className="text-muted-foreground">Review and approve caregiver registrations</p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Caregiver Applications</h1>
+            <p className="text-muted-foreground">Review and approve caregiver registrations</p>
           </div>
           <div className="flex gap-2">
             <Button
@@ -316,39 +314,39 @@ const CaregiverApprovals = () => {
             ))
           )}
         </div>
-      </div>
 
-      <Dialog open={rejectDialog.open} onOpenChange={(open) => setRejectDialog({ ...rejectDialog, open })}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject Application</DialogTitle>
-            <DialogDescription>
-              Please provide a reason for rejection. This will be shared with the applicant.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="reason">Reason for Rejection</Label>
-              <Textarea
-                id="reason"
-                placeholder="Enter reason..."
-                value={rejectDialog.reason}
-                onChange={(e) => setRejectDialog({ ...rejectDialog, reason: e.target.value })}
-                rows={4}
-              />
+        <Dialog open={rejectDialog.open} onOpenChange={(open) => setRejectDialog({ ...rejectDialog, open })}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reject Application</DialogTitle>
+              <DialogDescription>
+                Please provide a reason for rejection. This will be shared with the applicant.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reason">Reason for Rejection</Label>
+                <Textarea
+                  id="reason"
+                  placeholder="Enter reason..."
+                  value={rejectDialog.reason}
+                  onChange={(e) => setRejectDialog({ ...rejectDialog, reason: e.target.value })}
+                  rows={4}
+                />
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectDialog({ open: false, registrationId: null, reason: "" })}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleReject} disabled={!rejectDialog.reason.trim()}>
-              Reject Application
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRejectDialog({ open: false, registrationId: null, reason: "" })}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleReject} disabled={!rejectDialog.reason.trim()}>
+                Reject Application
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </AppLayout>
   );
 };
 

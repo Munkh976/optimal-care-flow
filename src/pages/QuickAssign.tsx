@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Clock, Star, AlertCircle, TrendingUp, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { AppLayout } from "@/components/AppLayout";
 
 interface OpenShift {
   id: string;
@@ -198,27 +199,17 @@ const QuickAssign = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border/40 sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-primary">CareMuch - Quick Assign</h1>
-              <p className="text-sm text-muted-foreground">Drag & Drop Shift Assignment</p>
-            </div>
-            <Button variant="outline" onClick={() => navigate("/dashboard")}>
-              Back to Dashboard
-            </Button>
-          </div>
-        </div>
-      </header>
+    <AppLayout>
+      <div>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Quick Assign</h1>
+        <p className="text-muted-foreground mb-6">AI-powered shift assignment</p>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-[calc(100vh-120px)]">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      ) : (
-        <div className="container mx-auto px-4 py-6 space-y-6">
+        {loading ? (
+          <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <div className="space-y-6">
           {/* Step 1: Select Shift */}
           <Card>
             <CardHeader>
@@ -342,9 +333,10 @@ const QuickAssign = () => {
               </CardContent>
             </Card>
           )}
-        </div>
-      )}
-    </div>
+          </div>
+        )}
+      </div>
+    </AppLayout>
   );
 };
 
