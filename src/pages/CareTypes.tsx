@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -14,9 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { AppLayout } from "@/components/AppLayout";
+import { careTypeFormSchema } from "@/lib/validation";
 
 const CareTypes = () => {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("active");
@@ -91,17 +91,15 @@ const CareTypes = () => {
 
   const handleSave = async () => {
     try {
-      const priceValue = parseFloat(formData.price);
-      if (isNaN(priceValue) || priceValue < 0) {
-        toast.error("Please enter a valid price");
+      // Validate form data
+      const validation = careTypeFormSchema.safeParse(formData);
+      if (!validation.success) {
+        toast.error(validation.error.errors[0].message);
         return;
       }
 
+      const priceValue = parseFloat(formData.price);
       const durationValue = parseFloat(formData.duration);
-      if (isNaN(durationValue) || durationValue <= 0) {
-        toast.error("Please enter a valid duration");
-        return;
-      }
 
       if (selectedCareType) {
         const { error } = await supabase
@@ -160,17 +158,20 @@ const CareTypes = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Loading care types...</p>
+      <AppLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Loading care types...</p>
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <AppLayout>
+      <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
           <h2 className="text-3xl font-bold mb-2">Care Services</h2>
@@ -448,7 +449,8 @@ const CareTypes = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 

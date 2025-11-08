@@ -4,18 +4,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Mail, Phone, MapPin, Award, Search, Upload, Eye, Trash2, Edit, Clock, Lock } from "lucide-react";
+import { Plus, Mail, Phone, MapPin, Award, Activity, Search, Upload, Eye, Trash2, Edit, Clock, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import ReactSelect from "react-select";
 import { AvailabilityDialog } from "@/components/caregivers/AvailabilityDialog";
 import { US_STATES } from "@/constants/usStates";
 import { Separator } from "@/components/ui/separator";
+import { AppLayout } from "@/components/AppLayout";
+import { caregiverFormSchema, passwordResetSchema } from "@/lib/validation";
 
 
 const Caregivers = () => {
@@ -67,7 +69,7 @@ const Caregivers = () => {
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
-        .single();
+        .maybeSingle();
 
       if (profileData) {
         setProfile(profileData);
@@ -112,7 +114,6 @@ const Caregivers = () => {
       .eq("agency_id", userId);
 
     if (error) {
-      console.error("Error fetching caregivers:", error);
       toast.error("Failed to load caregivers");
     } else {
       // Map data to include profile fields at caregiver level for backward compatibility
@@ -137,17 +138,12 @@ const Caregivers = () => {
       .order("name", { ascending: true });
 
     if (error) {
-      console.error("Error fetching care types:", error);
+      toast.error("Failed to load care types");
     } else {
       setCareTypes(data || []);
     }
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Signed out successfully");
-    navigate("/auth");
-  };
 
   const handleOpenAddDialog = () => {
     setIsEditMode(false);
@@ -194,8 +190,15 @@ const Caregivers = () => {
   };
 
   const handleSaveCaregiver = async () => {
-    if (!user || !formData.first_name || !formData.last_name || !formData.email || !formData.phone) {
-      toast.error("Please fill in all required fields");
+    // Validate form data
+    const validation = caregiverFormSchema.safeParse(formData);
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+    
+    if (!user) {
+      toast.error("User session not found");
       return;
     }
 
@@ -327,8 +330,10 @@ const Caregivers = () => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    // Validate password
+    const validation = passwordResetSchema.safeParse({ newPassword });
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
       return;
     }
 
@@ -361,7 +366,6 @@ const Caregivers = () => {
       .eq("id", deleteCaregiver.id);
 
     if (error) {
-      console.error("Error deleting caregiver:", error);
       toast.error("Failed to delete caregiver");
     } else {
       toast.success("Caregiver deleted successfully");
@@ -413,7 +417,6 @@ const Caregivers = () => {
           });
 
         if (error) {
-          console.error('Error importing caregiver:', error);
           errorCount++;
         } else {
           successCount++;
@@ -463,32 +466,8 @@ const Caregivers = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/dashboard")}>
-            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
-              <Activity className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">CareMuch</h1>
-              <p className="text-sm text-muted-foreground">{profile?.agency_name || "Care Agency"}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              {profile?.full_name || user?.email}
-            </span>
-            <Button variant="outline" size="icon" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+    <AppLayout>
+      <div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
             <h2 className="text-3xl font-bold mb-2">Caregiver Management</h2>
@@ -944,7 +923,6 @@ const Caregivers = () => {
             )}
           </CardContent>
         </Card>
-      </main>
 
       {/* View Details Dialog */}
       <Dialog open={!!viewCaregiver} onOpenChange={() => setViewCaregiver(null)}>
@@ -1084,7 +1062,8 @@ const Caregivers = () => {
           onClose={() => setAvailabilityCaregiver(null)}
         />
       )}
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 

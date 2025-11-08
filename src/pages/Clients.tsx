@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, LogOut, Plus, Phone, MapPin, Heart, AlertCircle, User, Search, Upload, Eye, Trash2, Edit, Key } from "lucide-react";
+import { Activity, Plus, Phone, MapPin, Heart, AlertCircle, User, Search, Upload, Eye, Trash2, Edit, Key } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,7 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import ReactSelect from "react-select";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import { AppLayout } from "@/components/AppLayout";
+import { clientFormSchema, passwordResetSchema } from "@/lib/validation";
 
 const Clients = () => {
   const navigate = useNavigate();
@@ -130,7 +133,7 @@ const Clients = () => {
       .order("name", { ascending: true });
 
     if (error) {
-      console.error("Error fetching care types:", error);
+      toast.error("Failed to load care types");
     } else {
       setCareTypes(data || []);
     }
@@ -157,7 +160,6 @@ const Clients = () => {
       .order("first_name", { ascending: true });
 
     if (error) {
-      console.error("Error fetching clients:", error);
       toast.error("Failed to load clients");
     } else {
       setClients(data || []);
@@ -165,11 +167,6 @@ const Clients = () => {
     setLoading(false);
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Signed out successfully");
-    navigate("/auth");
-  };
 
   const calculateAge = (dob: string | null) => {
     if (!dob) return null;
@@ -241,8 +238,15 @@ const Clients = () => {
       return;
     }
 
-    if (!user || !formData.first_name || !formData.last_name || !formData.phone || !formData.address) {
-      toast.error("Please fill in all required fields");
+    // Validate form data
+    const validation = clientFormSchema.safeParse(formData);
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
+    if (!user) {
+      toast.error("User session not found");
       return;
     }
 
@@ -367,6 +371,13 @@ const Clients = () => {
   const handleResetPassword = async () => {
     if (!selectedClient || !newPassword) return;
 
+    // Validate password
+    const validation = passwordResetSchema.safeParse({ newPassword });
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
     setResetting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -406,7 +417,6 @@ const Clients = () => {
       setSelectedClient(null);
     } catch (error: any) {
       toast.error(error.message || "Failed to reset password");
-      console.error(error);
     } finally {
       setResetting(false);
     }
@@ -426,7 +436,6 @@ const Clients = () => {
       .eq("id", deleteClient.id);
 
     if (error) {
-      console.error("Error deleting client:", error);
       toast.error("Failed to delete client");
     } else {
       toast.success("Client deleted successfully");
@@ -485,7 +494,6 @@ const Clients = () => {
           });
 
         if (error) {
-          console.error('Error importing client:', error);
           errorCount++;
         } else {
           successCount++;
@@ -541,32 +549,8 @@ const Clients = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/dashboard")}>
-            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
-              <Activity className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">CareMuch</h1>
-              <p className="text-sm text-muted-foreground">{profile?.agency_name || "Care Agency"}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              {profile?.full_name || user?.email}
-            </span>
-            <Button variant="outline" size="icon" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+    <AppLayout>
+      <div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
             <h2 className="text-3xl font-bold mb-2">Client Management</h2>
@@ -818,7 +802,6 @@ const Clients = () => {
             )}
           </CardContent>
         </Card>
-      </main>
 
       {/* Add/Edit Client Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -1151,7 +1134,8 @@ const Clients = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 
