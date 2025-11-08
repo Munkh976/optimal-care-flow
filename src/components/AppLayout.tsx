@@ -61,6 +61,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     care_needs: List,
     agency: Settings,
     agency_settings: Building2,
+    auto_schedule: Calendar,
+    available_shifts: ClipboardList,
+    caregiver_approvals: UserCheck,
+    caregiver_registration: UserPlus,
+    live_operations: Radio,
+    quick_assign: UserCog,
   };
 
   // Build menu items from permissions

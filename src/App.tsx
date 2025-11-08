@@ -32,6 +32,7 @@ import NotFound from "./pages/NotFound";
 import AvailableShifts from "./pages/AvailableShifts";
 import CaregiverTimeOff from "./pages/CaregiverTimeOff";
 import CaregiverSettings from "./pages/CaregiverSettings";
+import AutoSchedule from "./pages/AutoSchedule";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const App = () => (
           <Route path="/caregiver-settings" element={<CaregiverSettings />} />
           <Route path="/admin-utilities" element={<AdminUtilities />} />
           <Route path="/agency-settings" element={<AgencySettings />} />
+          <Route path="/auto-schedule" element={<AutoSchedule />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

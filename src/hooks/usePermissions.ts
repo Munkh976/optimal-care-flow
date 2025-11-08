@@ -74,6 +74,12 @@ export const usePermissions = () => {
         care_needs: "/care-needs",
         agency: "/admin-utilities",
         agency_settings: "/agency-settings",
+        auto_schedule: "/auto-schedule",
+        available_shifts: "/available-shifts",
+        caregiver_approvals: "/caregiver-approvals",
+        caregiver_registration: "/caregiver-registration",
+        live_operations: "/live-operations",
+        quick_assign: "/quick-assign",
       };
 
       const formattedPermissions: Permission[] = (permissionsData || []).map((p: any) => ({
