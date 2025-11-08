@@ -21,6 +21,7 @@ import {
   FileText,
   Settings,
   Shield,
+  Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -59,6 +60,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     care_types: Tag,
     care_needs: List,
     agency: Settings,
+    agency_settings: Building2,
   };
 
   // Build menu items from permissions

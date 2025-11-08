@@ -24,13 +24,14 @@ import UserRoles from "./pages/UserRoles";
 import SystemRoles from "./pages/SystemRoles";
 import RolePermissions from "./pages/RolePermissions";
 import SystemAdminDashboard from "./pages/SystemAdminDashboard";
+import AdminUtilities from "./pages/AdminUtilities";
+import AgencySettings from "./pages/AgencySettings";
 import CareTypes from "./pages/CareTypes";
 import OrderManagement from "./pages/OrderManagement";
 import NotFound from "./pages/NotFound";
 import AvailableShifts from "./pages/AvailableShifts";
 import CaregiverTimeOff from "./pages/CaregiverTimeOff";
 import CaregiverSettings from "./pages/CaregiverSettings";
-import AdminUtilities from "./pages/AdminUtilities";
 
 const queryClient = new QueryClient();
 
@@ -62,12 +63,14 @@ const App = () => (
           <Route path="/system-roles" element={<SystemRoles />} />
           <Route path="/role-permissions" element={<RolePermissions />} />
           <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
+          <Route path="/system-admin" element={<SystemAdminDashboard />} />
           <Route path="/care-types" element={<CareTypes />} />
           <Route path="/order-management" element={<OrderManagement />} />
           <Route path="/available-shifts" element={<AvailableShifts />} />
           <Route path="/caregiver-time-off" element={<CaregiverTimeOff />} />
           <Route path="/caregiver-settings" element={<CaregiverSettings />} />
           <Route path="/admin-utilities" element={<AdminUtilities />} />
+          <Route path="/agency-settings" element={<AgencySettings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

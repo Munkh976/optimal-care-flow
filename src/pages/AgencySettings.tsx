@@ -1,0 +1,322 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { AppLayout } from "@/components/AppLayout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Building2, Save } from "lucide-react";
+import { US_STATES } from "@/constants/usStates";
+
+interface AgencyData {
+  id: string;
+  agency_name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  naics_code?: string;
+  business_type?: string;
+  tax_id?: string;
+  is_active?: boolean;
+}
+
+const AgencySettings = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [agencyData, setAgencyData] = useState<AgencyData | null>(null);
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      navigate("/auth");
+      return;
+    }
+
+    // Check if user has agency_admin or system_admin role
+    const { data: roleData } = await supabase.rpc('get_user_role', { _user_id: session.user.id });
+    
+    if (roleData !== 'system_admin' && roleData !== 'agency_admin') {
+      toast.error("Access denied. Agency admin role required.");
+      navigate("/dashboard");
+      return;
+    }
+
+    await fetchAgencyData(session.user.id);
+    setLoading(false);
+  };
+
+  const fetchAgencyData = async (userId: string) => {
+    try {
+      // Get user's agency_id from profiles
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("agency_id")
+        .eq("id", userId)
+        .single();
+
+      if (profileError) throw profileError;
+
+      if (!profileData?.agency_id) {
+        toast.error("No agency associated with this account");
+        return;
+      }
+
+      // Fetch agency data
+      const { data: agency, error: agencyError } = await supabase
+        .from("agency")
+        .select("*")
+        .eq("id", profileData.agency_id)
+        .single();
+
+      if (agencyError) throw agencyError;
+
+      setAgencyData(agency);
+    } catch (error) {
+      console.error("Error fetching agency data:", error);
+      toast.error("Failed to load agency data");
+    }
+  };
+
+  const handleSave = async () => {
+    if (!agencyData) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("agency")
+        .update({
+          agency_name: agencyData.agency_name,
+          address: agencyData.address,
+          city: agencyData.city,
+          state: agencyData.state,
+          zip_code: agencyData.zip_code,
+          phone: agencyData.phone,
+          email: agencyData.email,
+          website: agencyData.website,
+          naics_code: agencyData.naics_code,
+          business_type: agencyData.business_type,
+          tax_id: agencyData.tax_id,
+          is_active: agencyData.is_active,
+        })
+        .eq("id", agencyData.id);
+
+      if (error) throw error;
+
+      toast.success("Agency settings saved successfully");
+    } catch (error) {
+      console.error("Error saving agency data:", error);
+      toast.error("Failed to save agency settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateField = (field: keyof AgencyData, value: any) => {
+    if (!agencyData) return;
+    setAgencyData({ ...agencyData, [field]: value });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Loading agency settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!agencyData) {
+    return (
+      <AppLayout>
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">No agency data found</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Building2 className="h-8 w-8 text-primary" />
+              Agency Settings
+            </h1>
+            <p className="text-muted-foreground mt-1">Manage your agency business information</p>
+          </div>
+          <Button onClick={handleSave} disabled={saving}>
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+
+        {/* Basic Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Basic Information</CardTitle>
+            <CardDescription>General agency details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="agency_name">Agency Name *</Label>
+                <Input
+                  id="agency_name"
+                  value={agencyData.agency_name}
+                  onChange={(e) => updateField("agency_name", e.target.value)}
+                  placeholder="Enter agency name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="business_type">Business Type</Label>
+                <Input
+                  id="business_type"
+                  value={agencyData.business_type || ""}
+                  onChange={(e) => updateField("business_type", e.target.value)}
+                  placeholder="e.g., LLC, Corporation, Partnership"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  value={agencyData.phone || ""}
+                  onChange={(e) => updateField("phone", e.target.value)}
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={agencyData.email || ""}
+                  onChange={(e) => updateField("email", e.target.value)}
+                  placeholder="contact@agency.com"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="website">Website</Label>
+              <Input
+                id="website"
+                value={agencyData.website || ""}
+                onChange={(e) => updateField("website", e.target.value)}
+                placeholder="https://www.agency.com"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Address Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Address Information</CardTitle>
+            <CardDescription>Physical business location</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="address">Street Address</Label>
+              <Input
+                id="address"
+                value={agencyData.address || ""}
+                onChange={(e) => updateField("address", e.target.value)}
+                placeholder="123 Main Street"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  value={agencyData.city || ""}
+                  onChange={(e) => updateField("city", e.target.value)}
+                  placeholder="City"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State</Label>
+                <Select value={agencyData.state || ""} onValueChange={(value) => updateField("state", value)}>
+                  <SelectTrigger id="state">
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {US_STATES.map((state) => (
+                      <SelectItem key={state.value} value={state.value}>
+                        {state.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="zip_code">ZIP Code</Label>
+                <Input
+                  id="zip_code"
+                  value={agencyData.zip_code || ""}
+                  onChange={(e) => updateField("zip_code", e.target.value)}
+                  placeholder="12345"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Business Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Business Information</CardTitle>
+            <CardDescription>Tax and industry classification details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="tax_id">Tax ID / EIN</Label>
+                <Input
+                  id="tax_id"
+                  value={agencyData.tax_id || ""}
+                  onChange={(e) => updateField("tax_id", e.target.value)}
+                  placeholder="XX-XXXXXXX"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="naics_code">NAICS Code</Label>
+                <Input
+                  id="naics_code"
+                  value={agencyData.naics_code || ""}
+                  onChange={(e) => updateField("naics_code", e.target.value)}
+                  placeholder="621610 (Home Health Care Services)"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </AppLayout>
+  );
+};
+
+export default AgencySettings;

@@ -16,22 +16,55 @@ export type Database = {
     Tables: {
       agency: {
         Row: {
+          address: string | null
           agency_name: string
+          business_type: string | null
+          city: string | null
           created_at: string | null
+          email: string | null
           id: string
+          is_active: boolean | null
+          naics_code: string | null
+          phone: string | null
+          state: string | null
+          tax_id: string | null
           updated_at: string | null
+          website: string | null
+          zip_code: string | null
         }
         Insert: {
+          address?: string | null
           agency_name: string
+          business_type?: string | null
+          city?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
+          is_active?: boolean | null
+          naics_code?: string | null
+          phone?: string | null
+          state?: string | null
+          tax_id?: string | null
           updated_at?: string | null
+          website?: string | null
+          zip_code?: string | null
         }
         Update: {
+          address?: string | null
           agency_name?: string
+          business_type?: string | null
+          city?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
+          is_active?: boolean | null
+          naics_code?: string | null
+          phone?: string | null
+          state?: string | null
+          tax_id?: string | null
           updated_at?: string | null
+          website?: string | null
+          zip_code?: string | null
         }
         Relationships: []
       }
