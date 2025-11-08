@@ -67,6 +67,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     caregiver_registration: UserPlus,
     live_operations: Radio,
     quick_assign: UserCog,
+    reports: FileText,
     caregiver_dashboard: LayoutDashboard,
     caregiver_time_off: Clock,
     caregiver_settings: Settings,
