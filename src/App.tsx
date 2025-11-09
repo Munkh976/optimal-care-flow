@@ -34,6 +34,7 @@ import CaregiverTimeOff from "./pages/CaregiverTimeOff";
 import CaregiverSettings from "./pages/CaregiverSettings";
 import AutoSchedule from "./pages/AutoSchedule";
 import Reports from "./pages/Reports";
+import AdminUserManagement from "./pages/AdminUserManagement";
 
 const queryClient = new QueryClient();
 
@@ -75,6 +76,7 @@ const App = () => (
           <Route path="/agency-settings" element={<AgencySettings />} />
           <Route path="/auto-schedule" element={<AutoSchedule />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/admin-user-management" element={<AdminUserManagement />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

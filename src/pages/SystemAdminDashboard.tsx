@@ -116,10 +116,16 @@ const SystemAdminDashboard = () => {
             </h1>
             <p className="text-muted-foreground mt-1">System-wide overview and management</p>
           </div>
-          <Button onClick={() => navigate("/users")}>
-            <Users className="h-4 w-4 mr-2" />
-            Manage Users
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => navigate("/admin-user-management")}>
+              <UserCog className="h-4 w-4 mr-2" />
+              User Management
+            </Button>
+            <Button onClick={() => navigate("/users")} variant="outline">
+              <Users className="h-4 w-4 mr-2" />
+              View Users
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
