@@ -456,7 +456,7 @@ export type Database = {
             foreignKeyName: "caregivers_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "agency"
             referencedColumns: ["id"]
           },
           {
@@ -558,6 +558,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "client_orders_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "client_orders_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -641,7 +648,7 @@ export type Database = {
             foreignKeyName: "clients_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "agency"
             referencedColumns: ["id"]
           },
           {
@@ -965,7 +972,7 @@ export type Database = {
             foreignKeyName: "shifts_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "agency"
             referencedColumns: ["id"]
           },
           {
