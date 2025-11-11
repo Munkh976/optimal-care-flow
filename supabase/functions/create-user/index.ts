@@ -50,6 +50,20 @@ serve(async (req) => {
       );
     }
 
+    // Get caller's agency_id from profiles
+    const { data: callerProfile } = await supabaseClient
+      .from('profiles')
+      .select('agency_id')
+      .eq('id', caller.id)
+      .single();
+
+    if (!callerProfile?.agency_id) {
+      return new Response(
+        JSON.stringify({ error: 'Caller profile not found or missing agency_id' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { email, password, firstName, lastName, phone, userType, userData } = await req.json();
 
     if (!email || !password || !firstName || !lastName || !userType) {
@@ -66,6 +80,7 @@ serve(async (req) => {
       email_confirm: true,
       user_metadata: {
         full_name: `${firstName} ${lastName}`,
+        agency_id: callerProfile.agency_id,
       }
     });
 
@@ -97,7 +112,7 @@ serve(async (req) => {
         .insert({
           ...userData,
           user_id: authData.user.id,
-          agency_id: caller.id,
+          agency_id: callerProfile.agency_id,
         })
         .select()
         .single();
@@ -122,7 +137,7 @@ serve(async (req) => {
           email,
           phone: phone || '',
           user_id: authData.user.id,
-          agency_id: caller.id,
+          agency_id: callerProfile.agency_id,
         })
         .select()
         .single();
@@ -137,13 +152,16 @@ serve(async (req) => {
         );
       }
       recordId = caregiverData.id;
+    } else if (userType === 'staff') {
+      // Staff roles (system_admin, agency_admin, manager, scheduler, hr_staff)
+      // No additional table record needed, just user_roles
     }
 
     // Add user role
     await supabaseClient.from('user_roles').insert({
       user_id: authData.user.id,
-      role: userType,
-      agency_id: caller.id,
+      role: userType === 'staff' ? userData.staffRole : userType,
+      agency_id: callerProfile.agency_id,
     });
 
     return new Response(

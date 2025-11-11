@@ -52,7 +52,9 @@ const AdminUserManagement = () => {
             lastName,
             phone,
             userType: 'staff', // Generic staff type
-            userData: {}
+            userData: {
+              staffRole: role // Pass the actual staff role
+            }
           },
           headers: {
             Authorization: `Bearer ${session.access_token}`
@@ -61,16 +63,6 @@ const AdminUserManagement = () => {
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-
-        // Add the specific role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert([{
-            user_id: data.userId,
-            role: role as any
-          }]);
-
-        if (roleError) throw roleError;
 
         toast.success(`User created successfully with ${role} role`);
       } else {

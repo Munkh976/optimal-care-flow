@@ -1144,7 +1144,7 @@ export type Database = {
             foreignKeyName: "user_roles_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "agency"
             referencedColumns: ["id"]
           },
         ]
