@@ -1,0 +1,1 @@
+id;shift_id;caregiver_id;status;is_locked;clock_in_time;clock_in_location;clock_out_time;clock_out_location;actual_hours_worked;mileage;notes;assigned_at;assignment_method;created_at;updated_at

@@ -1,0 +1,91 @@
+-- Clean up any previous attempts
+DELETE FROM public.user_roles WHERE user_id IN (
+    SELECT id FROM auth.users WHERE email IN ('admin@test.com', 'munkh.mn@gmail.com')
+);
+DELETE FROM public.profiles WHERE email IN ('admin@test.com', 'munkh.mn@gmail.com');
+DELETE FROM auth.users WHERE email IN ('admin@test.com', 'munkh.mn@gmail.com');
+
+-- Create both users with their respective agencies
+DO $$
+DECLARE
+    admin_id uuid;
+    munkh_id uuid;
+BEGIN
+    -- Create System Admin
+    INSERT INTO auth.users (
+        id,
+        email,
+        encrypted_password,
+        email_confirmed_at,
+        aud,
+        role,
+        raw_app_meta_data,
+        raw_user_meta_data,
+        created_at,
+        updated_at
+    ) VALUES (
+        gen_random_uuid(),
+        'admin@test.com',
+        crypt('Password123!', gen_salt('bf')),
+        now(),
+        'authenticated',
+        'authenticated',
+        '{"provider":"email","providers":["email"]}'::jsonb,
+        json_build_object(
+            'full_name', 'System Admin',
+            'agency_id', '00000000-0000-0000-0000-000000000000'  -- System agency
+        )::jsonb,
+        now(),
+        now()
+    ) RETURNING id INTO admin_id;
+
+    -- Create Munkh  
+    INSERT INTO auth.users (
+        id,
+        email,
+        encrypted_password,
+        email_confirmed_at,
+        aud,
+        role,
+        raw_app_meta_data,
+        raw_user_meta_data,
+        created_at,
+        updated_at
+    ) VALUES (
+        gen_random_uuid(),
+        'munkh.mn@gmail.com',
+        crypt('Password123!', gen_salt('bf')),
+        now(),
+        'authenticated',
+        'authenticated',
+        '{"provider":"email","providers":["email"]}'::jsonb,
+        json_build_object(
+            'full_name', 'Munkh',
+            'agency_id', '56fbfe38-e8eb-40c1-ba27-07428f62ed2e'  -- CareMuch agency
+        )::jsonb,
+        now(),
+        now()
+    ) RETURNING id INTO munkh_id;
+
+    -- Add roles
+    INSERT INTO public.user_roles (user_id, role) VALUES
+        (admin_id, 'system_admin'),
+        (munkh_id, 'agency_admin');
+    
+    RAISE NOTICE 'Created admin user with ID: %', admin_id;
+    RAISE NOTICE 'Created munkh user with ID: %', munkh_id;
+END $$;
+
+-- Verify everything was created correctly
+SELECT 
+    u.email,
+    p.full_name,
+    ur.role,
+    a.agency_name,
+    substring(p.agency_id::text, 1, 8) as agency_id_prefix
+FROM auth.users u
+JOIN public.profiles p ON u.id = p.id
+JOIN public.user_roles ur ON u.id = ur.user_id
+JOIN public.agency a ON p.agency_id = a.id
+WHERE u.email IN ('admin@test.com', 'munkh.mn@gmail.com')
+ORDER BY ur.role DESC;
