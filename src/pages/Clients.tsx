@@ -51,7 +51,7 @@ const Clients = () => {
     zip_code: "",
     date_of_birth: "",
     medical_conditions: [] as string[],
-    care_need_codes: [] as string[],
+    care_type_codes: [] as string[],
     emergency_contact_name: "",
     emergency_contact_phone: "",
     notes: "",
@@ -151,9 +151,9 @@ const Clients = () => {
           phone
         ),
         client_care_needs(
-          care_need_code,
+          care_type_code,
           priority,
-          care_types!client_care_needs_care_need_code_fkey(code, name, category)
+          care_types!client_care_needs_care_type_code_fkey(code, name, category)
         )
       `)
       .eq("agency_id", userId)
@@ -198,7 +198,7 @@ const Clients = () => {
       zip_code: "",
       date_of_birth: "",
       medical_conditions: [],
-      care_need_codes: [],
+      care_type_codes: [],
       emergency_contact_name: "",
       emergency_contact_phone: "",
       notes: "",
@@ -224,7 +224,7 @@ const Clients = () => {
       zip_code: client.zip_code || "",
       date_of_birth: client.date_of_birth || "",
       medical_conditions: client.medical_conditions || [],
-      care_need_codes: client.client_care_needs?.map((cn: any) => cn.care_need_code) || [],
+      care_type_codes: client.client_care_needs?.map((cn: any) => cn.care_type_code) || [],
       emergency_contact_name: client.emergency_contact_name || "",
       emergency_contact_phone: client.emergency_contact_phone || "",
       notes: client.notes || "",
@@ -304,10 +304,10 @@ const Clients = () => {
         .delete()
         .eq("client_id", editClient.id);
 
-      if (formData.care_need_codes.length > 0) {
-        const careNeedsData = formData.care_need_codes.map((code, idx) => ({
+      if (formData.care_type_codes.length > 0) {
+        const careNeedsData = formData.care_type_codes.map((code, idx) => ({
           client_id: editClient.id,
-          care_need_code: code,
+          care_type_code: code,
           priority: idx + 1,
         }));
 
@@ -352,10 +352,10 @@ const Clients = () => {
       }
 
       // Add care needs
-      if (formData.care_need_codes.length > 0 && data.recordId) {
-        const careNeedsData = formData.care_need_codes.map((code, idx) => ({
+      if (formData.care_type_codes.length > 0 && data.recordId) {
+        const careNeedsData = formData.care_type_codes.map((code, idx) => ({
           client_id: data.recordId,
-          care_need_code: code,
+          care_type_code: code,
           priority: idx + 1,
         }));
 
@@ -736,7 +736,7 @@ const Clients = () => {
                           <div className="flex flex-wrap gap-1">
                             {client.client_care_needs.slice(0, 2).map((cn: any, idx: number) => (
                               <Badge key={idx} variant="outline" className="text-xs">
-                                {cn.care_types?.name || cn.care_need_code}
+                                {cn.care_types?.name || cn.care_type_code}
                               </Badge>
                             ))}
                             {client.client_care_needs.length > 2 && (
@@ -921,11 +921,11 @@ const Clients = () => {
                     .map(cn => ({ value: cn.code, label: cn.name }))
                 }))}
                 value={careTypes
-                  .filter(cn => formData.care_need_codes.includes(cn.code))
+                  .filter(cn => formData.care_type_codes.includes(cn.code))
                   .map(cn => ({ value: cn.code, label: cn.name }))}
                 onChange={(selected) => setFormData({ 
                   ...formData, 
-                  care_need_codes: selected.map(s => s.value) 
+                  care_type_codes: selected.map(s => s.value) 
                 })}
                 className="react-select-container"
                 classNamePrefix="react-select"
@@ -1031,7 +1031,7 @@ const Clients = () => {
                       <div key={idx} className="flex items-start justify-between p-2 rounded bg-secondary/10">
                         <div className="flex-1">
                           <div className="font-medium text-sm">
-                            {cn.care_needs?.name || cn.care_need_code}
+                            {cn.care_types?.name || cn.care_type_code}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {cn.care_needs?.category}

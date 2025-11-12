@@ -287,8 +287,8 @@ const OrderManagement = () => {
       const { data: careNeeds, error } = await supabase
         .from("client_care_needs")
         .select(`
-          care_need_code,
-          care_types:care_need_code (
+          care_type_code,
+          care_types:care_type_code (
             id,
             code,
             name,
@@ -305,7 +305,7 @@ const OrderManagement = () => {
 
       const types = careNeeds?.map((cn: any) => ({
         ...cn.care_types,
-        care_need_code: cn.care_need_code
+        care_type_code: cn.care_type_code
       })) || [];
       
       setClientCareTypes(types);

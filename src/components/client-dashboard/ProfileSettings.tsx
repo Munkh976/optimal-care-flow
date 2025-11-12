@@ -50,7 +50,7 @@ interface CareType {
 
 interface ClientCareType {
   id: string;
-  care_need_code: string;
+  care_type_code: string;
   priority: number;
   notes: string | null;
   care_type?: CareType;
@@ -86,10 +86,10 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
         .from("client_care_needs")
         .select(`
           id,
-          care_need_code,
+          care_type_code,
           priority,
           notes,
-          care_types!client_care_needs_care_need_code_fkey (
+          care_types!client_care_needs_care_type_code_fkey (
             id,
             code,
             name,
@@ -132,7 +132,7 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
     if (!selectedCareTypes.length || !clientProfile?.id) return;
 
     // Filter out already existing care types
-    const existingCodes = clientCareTypes.map(cn => cn.care_need_code);
+    const existingCodes = clientCareTypes.map(cn => cn.care_type_code);
     const newCareTypes = selectedCareTypes.filter(code => !existingCodes.includes(code));
 
     if (!newCareTypes.length) {
@@ -143,7 +143,7 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
     try {
       const insertData = newCareTypes.map((code, index) => ({
         client_id: clientProfile.id,
-        care_need_code: code,
+        care_type_code: code,
         priority: clientCareTypes.length + index + 1,
       }));
 
@@ -420,7 +420,7 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
               <ReactSelect
                 isMulti
                 options={availableCareTypes
-                  .filter(type => !clientCareTypes.some(cn => cn.care_need_code === type.code))
+                  .filter(type => !clientCareTypes.some(cn => cn.care_type_code === type.code))
                   .map(type => ({
                     value: type.code,
                     label: `${type.name} (${type.category})`
