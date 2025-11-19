@@ -95,8 +95,8 @@ const OrderManagement = () => {
 
       if (profileData) {
         setProfile(profileData);
-        fetchOrders(session.user.id);
-        fetchClients(session.user.id);
+        fetchOrders(profileData.agency_id);
+        fetchClients(profileData.agency_id);
         fetchCareTypes();
       }
     };
@@ -114,14 +114,14 @@ const OrderManagement = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const fetchOrders = async (userId: string) => {
+  const fetchOrders = async (agencyId: string) => {
     const { data: ordersData, error: ordersError } = await supabase
       .from("client_orders")
       .select(`
         *,
         clients(first_name, last_name)
       `)
-      .eq("agency_id", userId)
+      .eq("agency_id", agencyId)
       .order("created_at", { ascending: false });
 
     if (ordersError) {
@@ -147,11 +147,11 @@ const OrderManagement = () => {
     setLoading(false);
   };
 
-  const fetchClients = async (userId: string) => {
+  const fetchClients = async (agencyId: string) => {
     const { data, error } = await supabase
       .from("clients")
       .select("id, first_name, last_name")
-      .eq("agency_id", userId)
+      .eq("agency_id", agencyId)
       .eq("is_active", true)
       .order("first_name");
 
@@ -200,11 +200,11 @@ const OrderManagement = () => {
       const { data: newOrderNumber, error: fnError } = await supabase.rpc('generate_order_number');
       if (fnError) throw fnError;
 
-      const { data: newOrder, error: orderError } = await supabase
+        const { data: newOrder, error: orderError } = await supabase
         .from("client_orders")
         .insert({
           client_id: bookingData.client_id,
-          agency_id: user.id,
+          agency_id: profile?.agency_id,
           order_number: newOrderNumber,
           start_date: start,
           end_date: end.toISOString().split('T')[0],

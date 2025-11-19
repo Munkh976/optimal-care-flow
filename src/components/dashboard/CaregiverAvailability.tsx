@@ -13,10 +13,22 @@ const CaregiverAvailability = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("agency_id")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile) {
+        console.error("Profile not found for user", user.id);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("caregivers")
         .select("*")
-        .eq("agency_id", user.id)
+        .eq("agency_id", profile.agency_id)
         .eq("is_active", true)
         .order("first_name", { ascending: true })
         .limit(8);
