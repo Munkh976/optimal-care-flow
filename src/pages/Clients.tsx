@@ -89,7 +89,7 @@ const Clients = () => {
 
       if (profileData) {
         setProfile(profileData);
-        fetchClients(session.user.id);
+        fetchClients(profileData.agency_id);
       }
 
       // Fetch user role
@@ -139,7 +139,7 @@ const Clients = () => {
     }
   };
 
-  const fetchClients = async (userId: string) => {
+  const fetchClients = async (agencyId: string) => {
     const { data, error } = await supabase
       .from("clients")
       .select(`
@@ -156,7 +156,7 @@ const Clients = () => {
           care_types!client_care_needs_care_type_code_fkey(code, name, category)
         )
       `)
-      .eq("agency_id", userId)
+      .eq("agency_id", agencyId)
       .order("first_name", { ascending: true });
 
     if (error) {
@@ -316,7 +316,7 @@ const Clients = () => {
 
       toast.success("Client updated successfully");
       setIsAddDialogOpen(false);
-      if (user) fetchClients(user.id);
+      if (profile) fetchClients(profile.agency_id);
     } else {
       // Check if email already exists
       const { data: existingUser } = await supabase
@@ -364,7 +364,7 @@ const Clients = () => {
 
       toast.success("Client added successfully");
       setIsAddDialogOpen(false);
-      if (user) fetchClients(user.id);
+      if (profile) fetchClients(profile.agency_id);
     }
   };
 
@@ -440,7 +440,7 @@ const Clients = () => {
     } else {
       toast.success("Client deleted successfully");
       setDeleteClient(null);
-      if (user) fetchClients(user.id);
+      if (profile) fetchClients(profile.agency_id);
     }
   };
 
@@ -501,7 +501,7 @@ const Clients = () => {
       }
 
       toast.success(`Imported ${successCount} clients${errorCount > 0 ? `, ${errorCount} failed` : ''}`);
-      if (user) fetchClients(user.id);
+      if (profile) fetchClients(profile.agency_id);
     };
     input.click();
   };

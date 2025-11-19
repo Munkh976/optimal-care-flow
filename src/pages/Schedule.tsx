@@ -146,14 +146,13 @@ const Schedule = () => {
 
     if (profileData) {
       setProfile(profileData);
-      await fetchScheduleData(session.user.id);
+      await fetchScheduleData(profileData.agency_id);
     }
   };
 
-  const fetchScheduleData = async (userId) => {
+  const fetchScheduleData = async (agencyId: string) => {
     try {
       setLoading(true);
-      
       const startDate = startOfWeek(currentDate);
       const endDate = endOfWeek(currentDate);
 
@@ -183,7 +182,7 @@ const Schedule = () => {
             category
           )
         `)
-        .eq("agency_id", userId)
+        .eq("agency_id", agencyId)
         .gte("shift_date", format(startDate, "yyyy-MM-dd"))
         .lte("shift_date", format(endDate, "yyyy-MM-dd"))
         .order("shift_date", { ascending: true })
@@ -194,7 +193,7 @@ const Schedule = () => {
 
       // Fetch shift assignments
       if (shiftsData) {
-        const shiftIds = shiftsData.map(s => s.id);
+        const shiftIds = shiftsData.map((s) => s.id);
         const { data: assignmentsData } = await supabase
           .from("shift_assignments")
           .select("*")
@@ -206,7 +205,7 @@ const Schedule = () => {
       const { data: caregiversData } = await supabase
         .from("caregivers")
         .select("*")
-        .eq("agency_id", userId)
+        .eq("agency_id", agencyId)
         .eq("is_active", true);
       setCaregivers(caregiversData || []);
 
@@ -214,7 +213,7 @@ const Schedule = () => {
       const { data: clientsData } = await supabase
         .from("clients")
         .select("*")
-        .eq("agency_id", userId);
+        .eq("agency_id", agencyId);
       setClients(clientsData || []);
     } catch (error) {
       console.error("Error:", error);
