@@ -1,6 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, User, Briefcase, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar, Clock, MapPin, User, Briefcase, FileText, Zap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface ShiftDetailsDialogProps {
   shift: any;
@@ -9,7 +11,10 @@ interface ShiftDetailsDialogProps {
 }
 
 export const ShiftDetailsDialog = ({ shift, open, onOpenChange }: ShiftDetailsDialogProps) => {
+  const navigate = useNavigate();
   if (!shift) return null;
+
+  const isUnassigned = !shift.shift_assignments || shift.shift_assignments.length === 0;
 
   const formatCareType = (careType: string) => {
     const types: any = {
@@ -153,6 +158,22 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange }: ShiftDetailsDi
                   {shift.shift_assignments[0].status}
                 </Badge>
               </div>
+            </div>
+          )}
+
+          {/* Quick Assign Button for Unassigned Shifts */}
+          {isUnassigned && (
+            <div className="mt-6 pt-6 border-t">
+              <Button 
+                className="w-full gap-2" 
+                onClick={() => {
+                  navigate(`/quick-assign?shift=${shift.id}`);
+                  onOpenChange(false);
+                }}
+              >
+                <Zap className="h-4 w-4" />
+                Quick Assign Caregiver
+              </Button>
             </div>
           )}
         </div>
