@@ -68,6 +68,19 @@ const QuickAssign = () => {
     try {
       setLoading(true);
 
+      // Get user's profile to fetch agency_id
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("agency_id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (!profileData?.agency_id) {
+        toast.error("Profile not found");
+        setLoading(false);
+        return;
+      }
+
       // First check if a specific shift was requested via URL
       let specificShift = null;
       if (shiftIdParam) {
@@ -93,7 +106,7 @@ const QuickAssign = () => {
           clients (first_name, last_name, city, address, state, zip_code),
           shift_assignments(id)
         `)
-        .eq("agency_id", userId)
+        .eq("agency_id", profileData.agency_id)
         .in("status", ["open", "unassigned"])
         .order("shift_date", { ascending: true })
         .limit(50);
