@@ -305,7 +305,7 @@ const QuickAssign = () => {
                 ) : (
                   <div className="space-y-3">
                     {matchedCaregivers.map((match, index) => (
-                      <Card key={match.caregiverId} className="overflow-hidden">
+                      <Card key={match.caregiver_id} className="overflow-hidden">
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1 space-y-2">
@@ -335,19 +335,33 @@ const QuickAssign = () => {
                                 </div>
                               </div>
                               
-                              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full font-semibold ${getMatchScoreColor(match.matchScore)}`}>
+                              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full font-semibold ${getMatchScoreColor(match.match_score)}`}>
                                 <TrendingUp className="w-4 h-4" />
-                                <span>{match.matchScore}% Match</span>
+                                <span>{match.match_score}% Match</span>
                               </div>
 
                               <div className="bg-muted/50 p-3 rounded-lg">
-                                <p className="text-sm font-medium mb-1">AI Reasoning:</p>
-                                <p className="text-sm text-muted-foreground">{match.reasoning}</p>
+                                <p className="text-sm font-medium mb-1">Key Factors:</p>
+                                <ul className="text-sm text-muted-foreground list-disc list-inside">
+                                  {match.key_factors.map((factor, i) => (
+                                    <li key={i}>{factor}</li>
+                                  ))}
+                                </ul>
+                                {match.warnings && match.warnings.length > 0 && (
+                                  <div className="mt-2 text-sm text-amber-600">
+                                    <p className="font-medium">Warnings:</p>
+                                    <ul className="list-disc list-inside">
+                                      {match.warnings.map((warning, i) => (
+                                        <li key={i}>{warning}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
                             <Button 
-                              onClick={() => handleAssignCaregiver(match.caregiverId)}
+                              onClick={() => handleAssignCaregiver(match.caregiver_id)}
                               className="shrink-0"
                             >
                               Assign
