@@ -168,23 +168,31 @@ const QuickAssign = () => {
   };
 
   const handleAssignCaregiver = async (caregiverId: string) => {
-    if (!selectedShift) return;
+    if (!selectedShift || !caregiverId) {
+      toast.error("Missing required information");
+      return;
+    }
 
     try {
+      // Create assignment
       const { error: assignError } = await supabase
         .from("shift_assignments")
         .insert({
           shift_id: selectedShift.id,
           caregiver_id: caregiverId,
           status: "scheduled",
-          assignment_method: "manual"
+          assignment_method: "ai_suggested"
         });
 
       if (assignError) throw assignError;
 
+      // Update shift status and caregiver_id
       const { error: updateError } = await supabase
         .from("shifts")
-        .update({ status: "assigned" })
+        .update({ 
+          status: "assigned",
+          caregiver_id: caregiverId
+        })
         .eq("id", selectedShift.id);
 
       if (updateError) throw updateError;
@@ -198,9 +206,9 @@ const QuickAssign = () => {
         setSelectedShift(null);
         setMatchedCaregivers([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
-      toast.error("Failed to assign shift");
+      toast.error(error.message || "Failed to assign shift");
     }
   };
 
