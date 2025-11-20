@@ -28,9 +28,11 @@ interface OpenShift {
 }
 
 interface MatchedCaregiver {
-  caregiverId: string;
-  matchScore: number;
-  reasoning: string;
+  caregiver_id: string;
+  match_score: number;
+  key_factors: string[];
+  warnings?: string[];
+  distance_miles?: number;
   caregiver?: {
     id: string;
     first_name: string;
@@ -168,8 +170,13 @@ const QuickAssign = () => {
   };
 
   const handleAssignCaregiver = async (caregiverId: string) => {
-    if (!selectedShift || !caregiverId) {
-      toast.error("Missing required information");
+    if (!selectedShift) {
+      toast.error("No shift selected");
+      return;
+    }
+    
+    if (!caregiverId) {
+      toast.error("No caregiver selected");
       return;
     }
 
