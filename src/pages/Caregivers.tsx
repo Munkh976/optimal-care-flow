@@ -92,7 +92,20 @@ const Caregivers = () => {
   }, [navigate]);
 
   const fetchCaregivers = async (userId: string) => {
-    const { data, error } = await supabase
+    // Fetch user's profile to get the correct agency_id
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("agency_id")
+      .eq("id", userId)
+      .single();
+
+    if (!userProfile) {
+      toast.error("Profile not found");
+      setLoading(false);
+      return;
+    }
+
+    const { data, error} = await supabase
       .from("caregivers")
       .select(`
         *,
@@ -111,7 +124,7 @@ const Caregivers = () => {
           care_types(code, name, category)
         )
       `)
-      .eq("agency_id", userId);
+      .eq("agency_id", userProfile.agency_id);
 
     if (error) {
       toast.error("Failed to load caregivers");

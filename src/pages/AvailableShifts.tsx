@@ -87,6 +87,11 @@ const AvailableShifts = () => {
       return;
     }
 
+    if (!shiftId) {
+      toast.error("Invalid shift");
+      return;
+    }
+
     try {
       // Create assignment
       const { error: assignError } = await supabase

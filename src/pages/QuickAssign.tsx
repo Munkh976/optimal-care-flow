@@ -28,9 +28,13 @@ interface OpenShift {
 }
 
 interface MatchedCaregiver {
-  caregiverId: string;
-  matchScore: number;
-  reasoning: string;
+  caregiver_id: string;
+  match_score: number;
+  key_factors: {
+    reasoning: string;
+    warnings?: string[];
+    distance_miles?: number;
+  };
   caregiver?: {
     id: string;
     first_name: string;
@@ -68,6 +72,19 @@ const QuickAssign = () => {
     try {
       setLoading(true);
 
+      // Get user's profile to fetch agency_id
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("agency_id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (!profileData?.agency_id) {
+        toast.error("Profile not found");
+        setLoading(false);
+        return;
+      }
+
       // First check if a specific shift was requested via URL
       let specificShift = null;
       if (shiftIdParam) {
@@ -93,7 +110,7 @@ const QuickAssign = () => {
           clients (first_name, last_name, city, address, state, zip_code),
           shift_assignments(id)
         `)
-        .eq("agency_id", userId)
+        .eq("agency_id", profileData.agency_id)
         .in("status", ["open", "unassigned"])
         .order("shift_date", { ascending: true })
         .limit(50);
@@ -155,23 +172,31 @@ const QuickAssign = () => {
   };
 
   const handleAssignCaregiver = async (caregiverId: string) => {
-    if (!selectedShift) return;
+    if (!selectedShift || !caregiverId) {
+      toast.error("Missing required information");
+      return;
+    }
 
     try {
+      // Create assignment
       const { error: assignError } = await supabase
         .from("shift_assignments")
         .insert({
           shift_id: selectedShift.id,
           caregiver_id: caregiverId,
           status: "scheduled",
-          assignment_method: "manual"
+          assignment_method: "ai_suggested"
         });
 
       if (assignError) throw assignError;
 
+      // Update shift status and caregiver_id
       const { error: updateError } = await supabase
         .from("shifts")
-        .update({ status: "assigned" })
+        .update({ 
+          status: "assigned",
+          caregiver_id: caregiverId
+        })
         .eq("id", selectedShift.id);
 
       if (updateError) throw updateError;
@@ -185,9 +210,9 @@ const QuickAssign = () => {
         setSelectedShift(null);
         setMatchedCaregivers([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
-      toast.error("Failed to assign shift");
+      toast.error(error.message || "Failed to assign shift");
     }
   };
 
@@ -277,7 +302,7 @@ const QuickAssign = () => {
                 ) : (
                   <div className="space-y-3">
                     {matchedCaregivers.map((match, index) => (
-                      <Card key={match.caregiverId} className="overflow-hidden">
+                      <Card key={match.caregiver_id} className="overflow-hidden">
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1 space-y-2">
@@ -307,19 +332,29 @@ const QuickAssign = () => {
                                 </div>
                               </div>
                               
-                              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full font-semibold ${getMatchScoreColor(match.matchScore)}`}>
+                              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full font-semibold ${getMatchScoreColor(match.match_score)}`}>
                                 <TrendingUp className="w-4 h-4" />
-                                <span>{match.matchScore}% Match</span>
+                                <span>{match.match_score}% Match</span>
                               </div>
 
                               <div className="bg-muted/50 p-3 rounded-lg">
                                 <p className="text-sm font-medium mb-1">AI Reasoning:</p>
-                                <p className="text-sm text-muted-foreground">{match.reasoning}</p>
+                                <p className="text-sm text-muted-foreground">{match.key_factors.reasoning}</p>
+                                {match.key_factors.warnings && match.key_factors.warnings.length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-border">
+                                    <p className="text-sm font-medium text-warning mb-1">Warnings:</p>
+                                    <ul className="text-sm text-muted-foreground list-disc list-inside">
+                                      {match.key_factors.warnings.map((warning, i) => (
+                                        <li key={i}>{warning}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
                             <Button 
-                              onClick={() => handleAssignCaregiver(match.caregiverId)}
+                              onClick={() => handleAssignCaregiver(match.caregiver_id)}
                               className="shrink-0"
                             >
                               Assign

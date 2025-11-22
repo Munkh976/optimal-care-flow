@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface CareType {
   id: string;
-  care_need_code: string;
+  care_type_code: string;
   care_types: {
     name: string;
     code: string;
@@ -122,7 +122,7 @@ export const OrdersManagement = ({
       if (!error && data) {
         const mapped: CareType[] = (data as any[]).map((ct: any) => ({
           id: ct.id,
-          care_need_code: ct.code,
+          care_type_code: ct.code,
           care_types: {
             name: ct.name,
             code: ct.code,
@@ -345,7 +345,7 @@ export const OrdersManagement = ({
             start_time: startTime,
             end_time: endTime,
             duration_hours: bookingData.duration,
-            care_type_code: bookingData.primaryService.care_need_code,
+            care_type_code: bookingData.primaryService.care_type_code,
             status: 'open',
             special_notes: bookingData.additionalService
               ? `Includes ${bookingData.additionalService.care_types.name}` 

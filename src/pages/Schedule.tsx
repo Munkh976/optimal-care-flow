@@ -34,6 +34,7 @@ import {
   Bath,
   ShoppingCart,
   UserCheck,
+  Zap,
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, isToday } from "date-fns";
 import { toast } from "sonner";
@@ -146,14 +147,13 @@ const Schedule = () => {
 
     if (profileData) {
       setProfile(profileData);
-      await fetchScheduleData(session.user.id);
+      await fetchScheduleData(profileData.agency_id);
     }
   };
 
-  const fetchScheduleData = async (userId) => {
+  const fetchScheduleData = async (agencyId: string) => {
     try {
       setLoading(true);
-      
       const startDate = startOfWeek(currentDate);
       const endDate = endOfWeek(currentDate);
 
@@ -183,7 +183,7 @@ const Schedule = () => {
             category
           )
         `)
-        .eq("agency_id", userId)
+        .eq("agency_id", agencyId)
         .gte("shift_date", format(startDate, "yyyy-MM-dd"))
         .lte("shift_date", format(endDate, "yyyy-MM-dd"))
         .order("shift_date", { ascending: true })
@@ -194,7 +194,7 @@ const Schedule = () => {
 
       // Fetch shift assignments
       if (shiftsData) {
-        const shiftIds = shiftsData.map(s => s.id);
+        const shiftIds = shiftsData.map((s) => s.id);
         const { data: assignmentsData } = await supabase
           .from("shift_assignments")
           .select("*")
@@ -206,7 +206,7 @@ const Schedule = () => {
       const { data: caregiversData } = await supabase
         .from("caregivers")
         .select("*")
-        .eq("agency_id", userId)
+        .eq("agency_id", agencyId)
         .eq("is_active", true);
       setCaregivers(caregiversData || []);
 
@@ -214,7 +214,7 @@ const Schedule = () => {
       const { data: clientsData } = await supabase
         .from("clients")
         .select("*")
-        .eq("agency_id", userId);
+        .eq("agency_id", agencyId);
       setClients(clientsData || []);
     } catch (error) {
       console.error("Error:", error);
@@ -276,8 +276,8 @@ const Schedule = () => {
       const { data: careNeeds, error } = await supabase
         .from("client_care_needs")
         .select(`
-          care_need_code,
-          care_types:care_need_code (
+          care_type_code,
+          care_types:care_type_code (
             id,
             code,
             name,
@@ -294,7 +294,7 @@ const Schedule = () => {
 
       const types = careNeeds?.map((cn: any) => ({
         ...cn.care_types,
-        care_need_code: cn.care_need_code
+        care_type_code: cn.care_type_code
       })) || [];
       
       setClientCareTypesForShift(types);
@@ -492,6 +492,44 @@ const Schedule = () => {
             </tr>
           </thead>
           <tbody className="bg-background">
+            {/* Add row for unassigned shifts */}
+            <tr className="border-t bg-muted/30">
+              <td className="p-4 font-medium sticky left-0 bg-muted/30">
+                <div>
+                  <div className="font-semibold text-warning">Unassigned Shifts</div>
+                  <div className="text-sm text-muted-foreground">Need assignment</div>
+                </div>
+              </td>
+              {timeSlots.map(time => {
+                const unassignedShifts = filteredShifts.filter(s => 
+                  !s.caregiver_id && 
+                  s.start_time.startsWith(time.split(':')[0])
+                );
+
+                return (
+                  <td key={time} className="p-2">
+                    {unassignedShifts.map(shift => {
+                      const category = getCategoryForShift(shift);
+                      return (
+                        <div 
+                          key={shift.id}
+                          className="rounded-lg p-2 text-xs mb-1 cursor-pointer hover:shadow-lg transition-all border-2 border-dashed border-warning/50"
+                          style={{ backgroundColor: `${category.color}88` }}
+                          onClick={() => navigate(`/quick-assign?shift=${shift.id}`)}
+                        >
+                          <div className="font-semibold flex items-center gap-1">
+                            <Zap className="h-3 w-3" />
+                            {shift.clients?.first_name}
+                          </div>
+                          <div className="opacity-90">{shift.care_types?.name}</div>
+                        </div>
+                      );
+                    })}
+                  </td>
+                );
+              })}
+            </tr>
+
             {uniqueCaregivers.map(caregiverId => {
               const caregiver = caregivers.find(c => c.id === caregiverId);
               if (!caregiver) return null;
@@ -650,11 +688,13 @@ const Schedule = () => {
                             return (
                               <div 
                                 key={shift.id}
-                                className="rounded p-1 text-xs text-white cursor-pointer hover:shadow-md transition-all"
+                                className="rounded p-1 text-xs text-white cursor-pointer hover:shadow-md transition-all group relative"
                                 style={{ backgroundColor: category.color }}
                                 onClick={() => setSelectedShift(shift)}
                               >
-                                <div className="font-medium">{shift.start_time}</div>
+                                <div className="font-medium flex items-center justify-between">
+                                  {shift.start_time}
+                                </div>
                                 <div className="truncate">{shift.clients?.first_name}</div>
                                 <div className="truncate opacity-80">{shift.care_types?.name}</div>
                               </div>
@@ -670,6 +710,67 @@ const Schedule = () => {
           </Card>
         );
       })}
+      
+      {/* Unassigned Shifts Section */}
+      {filteredShifts.filter(s => !s.caregiver_id).length > 0 && (
+        <Card className="border-dashed border-2 border-warning bg-warning/5">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-warning" />
+                  Unassigned Shifts
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {filteredShifts.filter(s => !s.caregiver_id).length} shifts need caregivers
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2">
+              {weekDays.map(day => {
+                const unassignedDayShifts = filteredShifts.filter(s => 
+                  !s.caregiver_id && isSameDay(new Date(s.shift_date), day)
+                );
+
+                return (
+                  <div key={day.toISOString()} className="border rounded-lg p-2 min-h-[100px] bg-background">
+                    <div className="text-xs font-medium text-muted-foreground mb-2">
+                      {format(day, 'EEE d')}
+                    </div>
+
+                    {unassignedDayShifts.length === 0 ? (
+                      <div className="text-xs text-muted-foreground text-center py-4">-</div>
+                    ) : (
+                      <div className="space-y-1">
+                        {unassignedDayShifts.map(shift => {
+                          const category = getCategoryForShift(shift);
+
+                          return (
+                            <div 
+                              key={shift.id}
+                              className="rounded p-1 text-xs text-white cursor-pointer hover:shadow-md transition-all border border-dashed border-warning"
+                              style={{ backgroundColor: category.color }}
+                              onClick={() => navigate(`/quick-assign?shift=${shift.id}`)}
+                            >
+                              <div className="font-medium flex items-center gap-1">
+                                <Zap className="h-3 w-3" />
+                                {shift.start_time}
+                              </div>
+                              <div className="truncate">{shift.clients?.first_name}</div>
+                              <div className="truncate opacity-80">{shift.care_types?.name}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 
@@ -735,11 +836,21 @@ const Schedule = () => {
                             return (
                               <div 
                                 key={shift.id}
-                                className="rounded p-1 text-xs text-white cursor-pointer hover:shadow-md transition-all"
+                                className="rounded p-1 text-xs text-white cursor-pointer hover:shadow-md transition-all group relative"
                                 style={{ backgroundColor: category.color }}
                                 onClick={() => setSelectedShift(shift)}
                               >
-                                <div className="font-medium">{shift.start_time}</div>
+                                <div className="font-medium flex items-center justify-between">
+                                  {shift.start_time}
+                                  {!caregiver && (
+                                    <Zap className="h-3 w-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/quick-assign?shift=${shift.id}`);
+                                      }}
+                                    />
+                                  )}
+                                </div>
                                 <div className="truncate">{caregiver?.first_name || 'Unassigned'}</div>
                                 <div className="truncate opacity-80">{shift.care_types?.name}</div>
                               </div>

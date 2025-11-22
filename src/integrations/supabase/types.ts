@@ -68,48 +68,6 @@ export type Database = {
         }
         Relationships: []
       }
-      care_needs: {
-        Row: {
-          category: string
-          code: string
-          created_at: string | null
-          description: string | null
-          duration_hours: number | null
-          id: string
-          is_active: boolean | null
-          name: string
-          related_care_type_codes: string[] | null
-          related_care_type_names: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          category: string
-          code: string
-          created_at?: string | null
-          description?: string | null
-          duration_hours?: number | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          related_care_type_codes?: string[] | null
-          related_care_type_names?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          category?: string
-          code?: string
-          created_at?: string | null
-          description?: string | null
-          duration_hours?: number | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          related_care_type_codes?: string[] | null
-          related_care_type_names?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       care_types: {
         Row: {
           category: string
@@ -456,7 +414,7 @@ export type Database = {
             foreignKeyName: "caregivers_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "agency"
             referencedColumns: ["id"]
           },
           {
@@ -470,7 +428,7 @@ export type Database = {
       }
       client_care_needs: {
         Row: {
-          care_need_code: string
+          care_type_code: string
           client_id: string
           created_at: string | null
           id: string
@@ -479,7 +437,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          care_need_code: string
+          care_type_code: string
           client_id: string
           created_at?: string | null
           id?: string
@@ -488,7 +446,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          care_need_code?: string
+          care_type_code?: string
           client_id?: string
           created_at?: string | null
           id?: string
@@ -498,8 +456,8 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "client_care_needs_care_need_code_fkey"
-            columns: ["care_need_code"]
+            foreignKeyName: "client_care_needs_care_type_code_fkey"
+            columns: ["care_type_code"]
             isOneToOne: false
             referencedRelation: "care_types"
             referencedColumns: ["code"]
@@ -557,6 +515,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_orders_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_orders_client_id_fkey"
             columns: ["client_id"]
@@ -641,7 +606,7 @@ export type Database = {
             foreignKeyName: "clients_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "agency"
             referencedColumns: ["id"]
           },
           {
@@ -965,7 +930,7 @@ export type Database = {
             foreignKeyName: "shifts_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "agency"
             referencedColumns: ["id"]
           },
           {

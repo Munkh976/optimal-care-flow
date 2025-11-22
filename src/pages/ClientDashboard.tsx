@@ -33,7 +33,7 @@ interface ClientProfile {
 
 interface CareType {
   id: string;
-  care_need_code: string;
+  care_type_code: string;
   priority: number;
   notes: string | null;
   care_types: {
@@ -166,10 +166,10 @@ const ClientDashboard = () => {
         .from("client_care_needs")
         .select(`
           id,
-          care_need_code,
+          care_type_code,
           priority,
           notes,
-          care_types:care_need_code(
+          care_types:care_type_code(
             name,
             code,
             category,
