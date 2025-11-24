@@ -97,11 +97,22 @@ const Dashboard = () => {
   };
 
   const fetchDashboardData = async (userId: string) => {
+    // Get user's agency from profile
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("agency_id")
+      .eq("id", userId)
+      .single();
+
+    if (!profileData?.agency_id) return;
+
+    const agencyId = profileData.agency_id;
+
     // Fetch stats
     const [clientsRes, caregiversRes, shiftsRes] = await Promise.all([
-      supabase.from("clients").select("*", { count: 'exact' }).eq("agency_id", userId).eq("is_active", true),
-      supabase.from("caregivers").select("*", { count: 'exact' }).eq("agency_id", userId),
-      supabase.from("shifts").select("*, clients(first_name, last_name)").eq("agency_id", userId)
+      supabase.from("clients").select("*", { count: 'exact' }).eq("agency_id", agencyId).eq("is_active", true),
+      supabase.from("caregivers").select("*", { count: 'exact' }).eq("agency_id", agencyId),
+      supabase.from("shifts").select("*, clients(first_name, last_name)").eq("agency_id", agencyId)
     ]);
 
     const activeCaregivers = caregiversRes.data?.filter(c => c.is_active).length || 0;
@@ -123,7 +134,7 @@ const Dashboard = () => {
     const { data: urgentShifts } = await supabase
       .from("shifts")
       .select("*, clients(first_name, last_name)")
-      .eq("agency_id", userId)
+      .eq("agency_id", agencyId)
       .eq("status", "open")
       .is("caregiver_id", null)
       .lte("shift_date", twoDaysFromNow.toISOString().split('T')[0])

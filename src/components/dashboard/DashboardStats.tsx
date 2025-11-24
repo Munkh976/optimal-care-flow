@@ -16,16 +16,26 @@ const DashboardStats = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Get user's agency from profile
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("agency_id")
+        .eq("id", user.id)
+        .single();
+
+      if (!profileData?.agency_id) return;
+      const agencyId = profileData.agency_id;
+
       // Fetch caregivers count
       const { count: totalCaregivers } = await supabase
         .from("caregivers")
         .select("*", { count: "exact", head: true })
-        .eq("agency_id", user.id);
+        .eq("agency_id", agencyId);
 
       const { count: activeCaregivers } = await supabase
         .from("caregivers")
         .select("*", { count: "exact", head: true })
-        .eq("agency_id", user.id)
+        .eq("agency_id", agencyId)
         .eq("is_active", true);
 
       // Fetch shifts count for this week
@@ -37,14 +47,14 @@ const DashboardStats = () => {
       const { count: totalShifts } = await supabase
         .from("shifts")
         .select("*", { count: "exact", head: true })
-        .eq("agency_id", user.id)
+        .eq("agency_id", agencyId)
         .gte("shift_date", weekStart.toISOString().split("T")[0])
         .lte("shift_date", weekEnd.toISOString().split("T")[0]);
 
       const { count: openShifts } = await supabase
         .from("shifts")
         .select("*", { count: "exact", head: true })
-        .eq("agency_id", user.id)
+        .eq("agency_id", agencyId)
         .eq("status", "open")
         .gte("shift_date", new Date().toISOString().split("T")[0]);
 
