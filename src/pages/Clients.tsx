@@ -145,12 +145,6 @@ const Clients = () => {
         .from("clients")
         .select(`
           *,
-          profiles!clients_user_id_fkey(
-            id,
-            full_name,
-            email,
-            phone
-          ),
           client_care_needs(
             care_type_code,
             priority,
@@ -223,7 +217,7 @@ const Clients = () => {
     setFormData({
       first_name: client.first_name || "",
       last_name: client.last_name || "",
-      email: client.profiles?.email || client.email || "",
+      email: client.email || "",
       phone: client.phone || "",
       address: client.address || "",
       city: client.city || "",

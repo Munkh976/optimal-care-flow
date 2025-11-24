@@ -111,12 +111,6 @@ const Caregivers = () => {
         .from("caregivers")
         .select(`
           *,
-          profiles!caregivers_user_id_fkey(
-            id,
-            full_name,
-            email,
-            phone
-          ),
           caregiver_skills(
             id,
             care_type_code,
@@ -132,15 +126,7 @@ const Caregivers = () => {
         console.error("Error loading caregivers:", error);
         toast.error("Failed to load caregivers");
       } else {
-        // Map data to include profile fields at caregiver level for backward compatibility
-        const mappedData = (data || []).map((caregiver: any) => ({
-          ...caregiver,
-          first_name: caregiver.profiles?.full_name?.split(' ')[0] || caregiver.first_name || '',
-          last_name: caregiver.profiles?.full_name?.split(' ').slice(1).join(' ') || caregiver.last_name || '',
-          email: caregiver.profiles?.email || caregiver.email || '',
-          phone: caregiver.profiles?.phone || caregiver.phone || '',
-        }));
-        setCaregivers(mappedData);
+        setCaregivers(data || []);
       }
     } catch (error) {
       console.error("Unexpected error:", error);
