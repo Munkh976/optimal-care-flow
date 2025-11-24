@@ -1,8 +1,0 @@
-id;role_name;role_code;description;access_level;is_active;created_at;updated_at
-8e180bad-06b9-4fe7-bb5b-6212f3b4738d;System Administrator;system_admin;Full system access with all privileges;100;true;2025-11-08 01:03:00.156806+00;2025-11-08 01:03:00.156806+00
-4d743a1a-a1e6-4b40-9d76-3ae5983730f8;Agency Administrator;agency_admin;Manage agency operations and users;80;true;2025-11-08 01:03:00.156806+00;2025-11-08 01:03:00.156806+00
-ed207263-08e5-417b-a95b-d42e5a9570dd;Manager;manager;Manage schedules, staff, and clients;60;true;2025-11-08 01:03:00.156806+00;2025-11-08 01:03:00.156806+00
-8968fbc3-e10a-4eaa-b087-4e573415fcf6;Scheduler;scheduler;Create and manage schedules;40;true;2025-11-08 01:03:00.156806+00;2025-11-08 01:03:00.156806+00
-92698c40-a2ca-44f1-b263-60bb97bd4c6b;HR Staff;hr_staff;Manage employee records and time off;40;true;2025-11-08 01:03:00.156806+00;2025-11-08 01:03:00.156806+00
-d23c926c-784b-4b8b-b1fa-05097003688f;Caregiver;caregiver;View assigned shifts and update availability;20;true;2025-11-08 01:03:00.156806+00;2025-11-08 01:03:00.156806+00
-bf51670c-1969-40f4-8d6a-5702d395744c;Client;client;View care schedule and manage preferences;10;true;2025-11-08 01:03:00.156806+00;2025-11-08 01:03:00.156806+00
