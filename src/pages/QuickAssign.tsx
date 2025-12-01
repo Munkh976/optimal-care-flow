@@ -30,11 +30,9 @@ interface OpenShift {
 interface MatchedCaregiver {
   caregiver_id: string;
   match_score: number;
-  key_factors: {
-    reasoning: string;
-    warnings?: string[];
-    distance_miles?: number;
-  };
+  key_factors: string[];
+  warnings?: string[];
+  distance_miles?: number;
   caregiver?: {
     id: string;
     first_name: string;
@@ -172,8 +170,13 @@ const QuickAssign = () => {
   };
 
   const handleAssignCaregiver = async (caregiverId: string) => {
-    if (!selectedShift || !caregiverId) {
-      toast.error("Missing required information");
+    if (!selectedShift) {
+      toast.error("No shift selected");
+      return;
+    }
+    
+    if (!caregiverId) {
+      toast.error("No caregiver selected");
       return;
     }
 
@@ -338,13 +341,17 @@ const QuickAssign = () => {
                               </div>
 
                               <div className="bg-muted/50 p-3 rounded-lg">
-                                <p className="text-sm font-medium mb-1">AI Reasoning:</p>
-                                <p className="text-sm text-muted-foreground">{match.key_factors.reasoning}</p>
-                                {match.key_factors.warnings && match.key_factors.warnings.length > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-border">
-                                    <p className="text-sm font-medium text-warning mb-1">Warnings:</p>
-                                    <ul className="text-sm text-muted-foreground list-disc list-inside">
-                                      {match.key_factors.warnings.map((warning, i) => (
+                                <p className="text-sm font-medium mb-1">Key Factors:</p>
+                                <ul className="text-sm text-muted-foreground list-disc list-inside">
+                                  {match.key_factors.map((factor, i) => (
+                                    <li key={i}>{factor}</li>
+                                  ))}
+                                </ul>
+                                {match.warnings && match.warnings.length > 0 && (
+                                  <div className="mt-2 text-sm text-amber-600">
+                                    <p className="font-medium">Warnings:</p>
+                                    <ul className="list-disc list-inside">
+                                      {match.warnings.map((warning, i) => (
                                         <li key={i}>{warning}</li>
                                       ))}
                                     </ul>
