@@ -140,31 +140,32 @@ const Clients = () => {
   };
 
   const fetchClients = async (agencyId: string) => {
-    const { data, error } = await supabase
-      .from("clients")
-      .select(`
-        *,
-        profiles!clients_user_id_fkey(
-          id,
-          full_name,
-          email,
-          phone
-        ),
-        client_care_needs(
-          care_type_code,
-          priority,
-          care_types!client_care_needs_care_type_code_fkey(code, name, category)
-        )
-      `)
-      .eq("agency_id", agencyId)
-      .order("first_name", { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from("clients")
+        .select(`
+          *,
+          client_care_needs(
+            care_type_code,
+            priority,
+            care_types!client_care_needs_care_type_code_fkey(code, name, category)
+          )
+        `)
+        .eq("agency_id", agencyId)
+        .order("first_name", { ascending: true });
 
-    if (error) {
-      toast.error("Failed to load clients");
-    } else {
-      setClients(data || []);
+      if (error) {
+        console.error("Error loading clients:", error);
+        toast.error("Failed to load clients");
+      } else {
+        setClients(data || []);
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
 
@@ -216,7 +217,7 @@ const Clients = () => {
     setFormData({
       first_name: client.first_name || "",
       last_name: client.last_name || "",
-      email: client.profiles?.email || client.email || "",
+      email: client.email || "",
       phone: client.phone || "",
       address: client.address || "",
       city: client.city || "",

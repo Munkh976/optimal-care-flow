@@ -92,54 +92,48 @@ const Caregivers = () => {
   }, [navigate]);
 
   const fetchCaregivers = async (userId: string) => {
-    // Fetch user's profile to get the correct agency_id
-    const { data: userProfile } = await supabase
-      .from("profiles")
-      .select("agency_id")
-      .eq("id", userId)
-      .single();
+    try {
+      // Fetch user's profile to get the correct agency_id
+      const { data: userProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("agency_id")
+        .eq("id", userId)
+        .single();
 
-    if (!userProfile) {
-      toast.error("Profile not found");
+      if (profileError || !userProfile) {
+        console.error("Profile error:", profileError);
+        toast.error("Profile not found");
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("caregivers")
+        .select(`
+          *,
+          caregiver_skills(
+            id,
+            care_type_code,
+            proficiency_level,
+            years_experience,
+            is_certified,
+            care_types(code, name, category)
+          )
+        `)
+        .eq("agency_id", userProfile.agency_id);
+
+      if (error) {
+        console.error("Error loading caregivers:", error);
+        toast.error("Failed to load caregivers");
+      } else {
+        setCaregivers(data || []);
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast.error("An unexpected error occurred");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data, error} = await supabase
-      .from("caregivers")
-      .select(`
-        *,
-        profiles!caregivers_user_id_fkey(
-          id,
-          full_name,
-          email,
-          phone
-        ),
-        caregiver_skills(
-          id,
-          care_type_code,
-          proficiency_level,
-          years_experience,
-          is_certified,
-          care_types(code, name, category)
-        )
-      `)
-      .eq("agency_id", userProfile.agency_id);
-
-    if (error) {
-      toast.error("Failed to load caregivers");
-    } else {
-      // Map data to include profile fields at caregiver level for backward compatibility
-      const mappedData = (data || []).map((caregiver: any) => ({
-        ...caregiver,
-        first_name: caregiver.profiles?.full_name?.split(' ')[0] || caregiver.first_name || '',
-        last_name: caregiver.profiles?.full_name?.split(' ').slice(1).join(' ') || caregiver.last_name || '',
-        email: caregiver.profiles?.email || caregiver.email || '',
-        phone: caregiver.profiles?.phone || caregiver.phone || '',
-      }));
-      setCaregivers(mappedData);
-    }
-    setLoading(false);
   };
 
   const fetchCareTypes = async () => {

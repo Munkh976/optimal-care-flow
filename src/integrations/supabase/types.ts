@@ -262,7 +262,15 @@ export type Database = {
           updated_at?: string | null
           zip_code?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "caregiver_registrations_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       caregiver_skills: {
         Row: {
@@ -417,13 +425,6 @@ export type Database = {
             referencedRelation: "agency"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "caregivers_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       client_care_needs: {
@@ -495,7 +496,7 @@ export type Database = {
           frequency?: string
           id?: string
           notes?: string | null
-          order_number: string
+          order_number?: string
           start_date: string
           status?: string | null
           updated_at?: string | null
@@ -614,13 +615,6 @@ export type Database = {
             columns: ["preferred_caregiver_id"]
             isOneToOne: false
             referencedRelation: "caregivers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clients_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
