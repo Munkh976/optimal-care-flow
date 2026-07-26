@@ -56,6 +56,7 @@ import {
 } from "date-fns";
 import { toast } from "sonner";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
+import { AssignShiftDialog } from "@/components/schedule/AssignShiftDialog";
 import { ShiftsListView } from "@/components/schedule/ShiftsListView";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -118,6 +119,7 @@ const Schedule = () => {
   const [rangeMode, setRangeMode] = useState<"day" | "week" | "month">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedShift, setSelectedShift] = useState(null);
+  const [shiftToAssign, setShiftToAssign] = useState<any>(null);
   const [careTypes, setCareTypes] = useState([]);
   const [caregivers, setCaregivers] = useState([]);
   const [clients, setClients] = useState([]);
@@ -554,7 +556,7 @@ const Schedule = () => {
                           key={shift.id}
                           className="rounded-lg p-2 text-xs mb-1 cursor-pointer hover:shadow-lg transition-all border-2 border-dashed border-warning/50"
                           style={{ backgroundColor: `${category.color}88` }}
-                          onClick={() => navigate(`/quick-assign?shift=${shift.id}`)}
+                          onClick={() => setShiftToAssign(shift)}
                         >
                           <div className="font-semibold flex items-center gap-1">
                             <Zap className="h-3 w-3" />
@@ -790,7 +792,7 @@ const Schedule = () => {
                               key={shift.id}
                               className="rounded p-1 text-xs text-white cursor-pointer hover:shadow-md transition-all border border-dashed border-warning"
                               style={{ backgroundColor: category.color }}
-                              onClick={() => navigate(`/quick-assign?shift=${shift.id}`)}
+                              onClick={() => setShiftToAssign(shift)}
                             >
                               <div className="font-medium flex items-center gap-1">
                                 <Zap className="h-3 w-3" />
@@ -885,7 +887,7 @@ const Schedule = () => {
                                     <Zap className="h-3 w-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        navigate(`/quick-assign?shift=${shift.id}`);
+                                        setShiftToAssign(shift);
                                       }}
                                     />
                                   )}
@@ -1067,7 +1069,10 @@ const Schedule = () => {
                 getAssignedCaregiver={getAssignedCaregiver}
                 getCategoryForShift={getCategoryForShift}
                 onSelectShift={setSelectedShift}
-                onQuickAssign={(id) => navigate(`/quick-assign?shift=${id}`)}
+                onQuickAssign={(id) => {
+                  const target = shifts.find((s) => s.id === id);
+                  if (target) setShiftToAssign(target);
+                }}
               />
             )}
             {scheduleView === "timeline" && <TimelineView />}
@@ -1110,6 +1115,20 @@ const Schedule = () => {
         shift={selectedShift}
         open={!!selectedShift}
         onOpenChange={(open) => !open && setSelectedShift(null)}
+        onAssign={(shift) => {
+          setSelectedShift(null);
+          setShiftToAssign(shift);
+        }}
+      />
+
+      <AssignShiftDialog
+        open={!!shiftToAssign}
+        onOpenChange={(open) => !open && setShiftToAssign(null)}
+        shift={shiftToAssign}
+        onAssigned={() => {
+          setShiftToAssign(null);
+          if (profile?.agency_id) fetchScheduleData(profile.agency_id);
+        }}
       />
 
       {/* Add Shift Dialog */}

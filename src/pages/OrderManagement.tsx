@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addWeeks, addMonths, addYears, subWeeks, subMonths, subYears } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
+import { durationHours } from "@/lib/shiftAssignment";
 
 type Order = {
   id: string;
@@ -66,10 +67,12 @@ const OrderManagement = () => {
     day: null as number | null,
     repeat: "once" as "once" | "weekly" | "biweekly" | "monthly",
     caregiver: null as any,
-    time: "",
+    startTime: "09:00",
+    endTime: "13:00",
     startDate: "",
     rate: 35,
   });
+  const [assignNow, setAssignNow] = useState(false);
 
   const [availableCaregivers, setAvailableCaregivers] = useState<any[]>([]);
   const [loadingCaregivers, setLoadingCaregivers] = useState(false);
@@ -177,9 +180,16 @@ const OrderManagement = () => {
   };
 
   const handleSaveOrder = async (status: "draft" | "submitted") => {
-    if (!bookingData.client_id || !bookingData.primaryService || !bookingData.caregiver ||
-        !bookingData.time || bookingData.day === null || !bookingData.startDate) {
+    if (!bookingData.client_id || !bookingData.primaryService ||
+        !bookingData.startTime || !bookingData.endTime ||
+        bookingData.day === null || !bookingData.startDate) {
       toast.error("Please complete all required fields");
+      return;
+    }
+
+    const shiftHours = durationHours(bookingData.startTime, bookingData.endTime);
+    if (shiftHours <= 0) {
+      toast.error("End time must be after start time");
       return;
     }
 
@@ -217,31 +227,24 @@ const OrderManagement = () => {
       if (orderError) throw orderError;
 
       const shiftsToCreate = [];
-      const [timeValue, period] = bookingData.time.split(' ');
-      let [hours] = timeValue.split(':').map(Number);
-      
-      if (period === 'PM' && hours !== 12) hours += 12;
-      if (period === 'AM' && hours === 12) hours = 0;
-      
-      const startTimeHours = hours;
-      const endTimeHours = hours + bookingData.duration;
-      const startTime = `${String(startTimeHours).padStart(2, '0')}:00`;
-      const endTime = `${String(endTimeHours % 24).padStart(2, '0')}:00`;
+      const startTime = `${bookingData.startTime}:00`;
+      const endTime = `${bookingData.endTime}:00`;
+      const assignedCaregiverId = bookingData.caregiver?.id || null;
 
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         if (d.getDay() === bookingData.day) {
           const shiftDate = d.toISOString().split('T')[0];
           shiftsToCreate.push({
             client_id: bookingData.client_id,
-            agency_id: user.id,
-            caregiver_id: bookingData.caregiver.id,
+            agency_id: profile?.agency_id,
+            caregiver_id: assignedCaregiverId,
             order_id: newOrder.id,
             shift_date: shiftDate,
             start_time: startTime,
             end_time: endTime,
-            duration_hours: bookingData.duration,
+            duration_hours: shiftHours,
             care_type_code: bookingData.primaryService.code,
-            status: 'open',
+            status: assignedCaregiverId ? 'assigned' : 'open',
             special_notes: bookingData.additionalService
               ? `Includes ${bookingData.additionalService.name}`
               : null,
@@ -250,12 +253,32 @@ const OrderManagement = () => {
         }
       }
 
-      const { error: shiftsError } = await supabase.from("shifts").insert(shiftsToCreate);
+      const { data: createdShifts, error: shiftsError } = await supabase
+        .from("shifts")
+        .insert(shiftsToCreate as any)
+        .select("id");
       if (shiftsError) throw shiftsError;
 
-      toast.success(status === "draft" ? "Order saved as draft" : "Order submitted successfully");
+      // Keep shift_assignments in sync when a caregiver was chosen up-front
+      if (assignedCaregiverId && createdShifts?.length) {
+        const { error: assignError } = await supabase.from("shift_assignments").insert(
+          createdShifts.map((sh: any) => ({
+            shift_id: sh.id,
+            caregiver_id: assignedCaregiverId,
+            status: "scheduled" as never,
+            assignment_method: "manual" as never,
+          }))
+        );
+        if (assignError) throw assignError;
+      }
+
+      toast.success(
+        assignedCaregiverId
+          ? status === "draft" ? "Order saved as draft" : "Order submitted successfully"
+          : `${status === "draft" ? "Draft saved" : "Order submitted"} — ${shiftsToCreate.length} unassigned shift${shiftsToCreate.length === 1 ? "" : "s"} created`
+      );
       handleCloseDialog();
-      if (user) fetchOrders(user.id);
+      if (profile?.agency_id) fetchOrders(profile.agency_id);
     } catch (error: any) {
       toast.error(error.message || "Failed to create order");
     }
@@ -273,10 +296,12 @@ const OrderManagement = () => {
       day: null,
       repeat: "once",
       caregiver: null,
-      time: "",
+      startTime: "09:00",
+      endTime: "13:00",
       startDate: "",
       rate: 35,
     });
+    setAssignNow(false);
     setAvailableCaregivers([]);
     setClientCareTypes([]);
   };
@@ -459,10 +484,24 @@ const OrderManagement = () => {
   };
 
   useEffect(() => {
-    if (step === 3 && bookingData.day !== null) {
+    if (step === 3 && assignNow && bookingData.day !== null) {
       loadAvailableCaregivers();
     }
-  }, [step, bookingData.day]);
+  }, [step, assignNow, bookingData.day]);
+
+  // Default the shift window from the selected service duration
+  useEffect(() => {
+    if (step === 3 && bookingData.primaryService) {
+      setBookingData(prev => {
+        const hrs = prev.duration || prev.primaryService?.duration_hours || 4;
+        const [h, m] = prev.startTime.split(":").map(Number);
+        const endMinutes = (h * 60 + m + hrs * 60) % (24 * 60);
+        const end = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
+        return { ...prev, endTime: end };
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, bookingData.primaryService?.id]);
 
   useEffect(() => {
     if (bookingData.client_id && step === 2) {
@@ -482,14 +521,10 @@ const OrderManagement = () => {
     return iconMap[category] || '💼';
   };
 
-  const timeSlots = {
-    morning: ['6:00', '7:00', '8:00', '9:00', '10:00'],
-    afternoon: ['12:00', '1:00', '2:00', '3:00', '4:00'],
-    evening: ['6:00', '7:00', '8:00'],
-  };
-
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  
+
+  const shiftDuration = durationHours(bookingData.startTime, bookingData.endTime);
+
   const servicesToShow = clientCareTypes.length > 0 ? clientCareTypes : careTypes;
   
   const primaryServices = servicesToShow.filter(
@@ -1028,8 +1063,10 @@ const OrderManagement = () => {
             {step === 3 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-2xl font-bold mb-2">Schedule & Caregiver</h3>
-                  <p className="text-sm text-muted-foreground">Choose day, time, and select a caregiver</p>
+                  <h3 className="text-2xl font-bold mb-2">Schedule</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Set the day, times and recurrence. Assigning a caregiver is optional — shifts can be assigned later from Schedule or Quick Assign.
+                  </p>
                 </div>
 
                 <div className="space-y-4">
@@ -1040,7 +1077,7 @@ const OrderManagement = () => {
                         <Button
                           key={day}
                           variant={bookingData.day === index ? "default" : "outline"}
-                          onClick={() => setBookingData(prev => ({ ...prev, day: index, caregiver: null, time: '' }))}
+                          onClick={() => setBookingData(prev => ({ ...prev, day: index, caregiver: null }))}
                           className="text-xs"
                         >
                           {day}
@@ -1049,17 +1086,100 @@ const OrderManagement = () => {
                     </div>
                   </div>
 
-                  {bookingData.day !== null && (
-                    <>
-                      <div>
-                        <Label>Select Caregiver *</Label>
-                        {loadingCaregivers ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Start Time *</Label>
+                      <Input
+                        type="time"
+                        value={bookingData.startTime}
+                        onChange={(e) => setBookingData(prev => ({ ...prev, startTime: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label>End Time *</Label>
+                      <Input
+                        type="time"
+                        value={bookingData.endTime}
+                        onChange={(e) => setBookingData(prev => ({ ...prev, endTime: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    {shiftDuration > 0 ? (
+                      <span>Duration: {shiftDuration} hour{shiftDuration === 1 ? "" : "s"}</span>
+                    ) : (
+                      <span className="text-destructive">End time must be after start time</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label>Schedule *</Label>
+                    <RadioGroup
+                      value={bookingData.repeat}
+                      onValueChange={(value: any) => setBookingData(prev => ({ ...prev, repeat: value }))}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="once" id="once" />
+                        <Label htmlFor="once" className="cursor-pointer">One Time Only</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="weekly" id="weekly" />
+                        <Label htmlFor="weekly" className="cursor-pointer">Weekly (3 months)</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="biweekly" id="biweekly" />
+                        <Label htmlFor="biweekly" className="cursor-pointer">Bi-weekly (6 months)</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="monthly" id="monthly" />
+                        <Label htmlFor="monthly" className="cursor-pointer">Monthly (12 months)</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  <div>
+                    <Label>Start Date *</Label>
+                    <Input
+                      type="date"
+                      value={bookingData.startDate}
+                      onChange={(e) => setBookingData(prev => ({ ...prev, startDate: e.target.value }))}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+
+                  {/* Optional caregiver assignment */}
+                  <Collapsible
+                    open={assignNow}
+                    onOpenChange={(open) => {
+                      setAssignNow(open);
+                      if (!open) setBookingData(prev => ({ ...prev, caregiver: null }));
+                    }}
+                  >
+                    <div className="rounded-lg border p-4">
+                      <CollapsibleTrigger asChild>
+                        <button type="button" className="flex w-full items-center justify-between text-left">
+                          <div>
+                            <div className="font-medium">Assign a caregiver now (optional)</div>
+                            <div className="text-sm text-muted-foreground">
+                              {bookingData.caregiver
+                                ? `${bookingData.caregiver.first_name} ${bookingData.caregiver.last_name} selected`
+                                : "Leave unassigned — assign later from Schedule or Quick Assign"}
+                            </div>
+                          </div>
+                          {assignNow ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-4">
+                        {bookingData.day === null ? (
+                          <p className="text-sm text-muted-foreground">Select a day first to see available caregivers.</p>
+                        ) : loadingCaregivers ? (
                           <div className="flex items-center justify-center py-8">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
                           </div>
                         ) : availableCaregivers.length === 0 ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            No caregivers available on {dayNames[bookingData.day]}
+                          <div className="text-center py-6 text-muted-foreground text-sm">
+                            No caregivers available on {dayNames[bookingData.day]} — the shifts will be created unassigned.
                           </div>
                         ) : (
                           <div className="grid gap-2 max-h-[250px] overflow-y-auto">
@@ -1071,107 +1191,42 @@ const OrderManagement = () => {
                                     ? 'border-primary bg-primary/5 ring-2 ring-primary'
                                     : 'hover:border-primary/50'
                                 }`}
-                                onClick={() => setBookingData(prev => ({ ...prev, caregiver: cg, time: '' }))}
+                                onClick={() => setBookingData(prev => ({
+                                  ...prev,
+                                  caregiver: prev.caregiver?.id === cg.id ? null : cg,
+                                  rate: prev.caregiver?.id === cg.id ? prev.rate : (cg.hourly_rate || prev.rate),
+                                }))}
                               >
                                 <CardContent className="p-3">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
-                                        {cg.first_name[0]}{cg.last_name[0]}
-                                      </div>
-                                      <div>
-                                        <div className="font-medium">{cg.first_name} {cg.last_name}</div>
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                          <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                                          {cg.performance_rating || 5.0}
-                                        </div>
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
+                                      {cg.first_name?.[0]}{cg.last_name?.[0]}
+                                    </div>
+                                    <div>
+                                      <div className="font-medium">{cg.first_name} {cg.last_name}</div>
+                                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                                        {cg.performance_rating || 5.0}
                                       </div>
                                     </div>
-                                    <Badge variant="secondary">${cg.hourly_rate}/hr</Badge>
                                   </div>
                                 </CardContent>
                               </Card>
                             ))}
                           </div>
                         )}
-                      </div>
-
-                      {bookingData.caregiver && (
-                        <>
-                          <div>
-                            <Label>Select Time *</Label>
-                            <div className="space-y-3">
-                              {Object.entries(timeSlots).map(([period, slots]) => (
-                                <div key={period}>
-                                  <div className="text-sm font-medium capitalize mb-2">{period}</div>
-                                  <div className="grid grid-cols-5 gap-2">
-                                    {slots.map((time) => (
-                                      <Button
-                                        key={time}
-                                        variant={bookingData.time === `${time} ${period.toUpperCase()}` ? "default" : "outline"}
-                                        onClick={() => setBookingData(prev => ({ 
-                                          ...prev, 
-                                          time: `${time} ${period.toUpperCase()}`,
-                                          rate: prev.caregiver?.hourly_rate || 35
-                                        }))}
-                                        className="text-xs"
-                                      >
-                                        {time}
-                                      </Button>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <Label>Schedule *</Label>
-                            <RadioGroup 
-                              value={bookingData.repeat}
-                              onValueChange={(value: any) => setBookingData(prev => ({ ...prev, repeat: value }))}
-                            >
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="once" id="once" />
-                                <Label htmlFor="once" className="cursor-pointer">One Time Only</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="weekly" id="weekly" />
-                                <Label htmlFor="weekly" className="cursor-pointer">Weekly (3 months)</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="biweekly" id="biweekly" />
-                                <Label htmlFor="biweekly" className="cursor-pointer">Bi-weekly (6 months)</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="monthly" id="monthly" />
-                                <Label htmlFor="monthly" className="cursor-pointer">Monthly (12 months)</Label>
-                              </div>
-                            </RadioGroup>
-                          </div>
-
-                          <div>
-                            <Label>Start Date *</Label>
-                            <Input
-                              type="date"
-                              value={bookingData.startDate}
-                              onChange={(e) => setBookingData(prev => ({ ...prev, startDate: e.target.value }))}
-                              min={new Date().toISOString().split('T')[0]}
-                            />
-                          </div>
-                        </>
-                      )}
-                    </>
-                  )}
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
                 </div>
 
                 <div className="flex justify-between gap-2">
                   <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
-                    <Button 
+                    <Button
                       onClick={() => setStep(4)}
-                      disabled={!bookingData.caregiver || !bookingData.time || !bookingData.startDate}
+                      disabled={bookingData.day === null || shiftDuration <= 0 || !bookingData.startDate}
                     >
                       Review Order
                     </Button>
@@ -1207,23 +1262,29 @@ const OrderManagement = () => {
                     <div>
                       <div className="text-sm text-muted-foreground">Schedule</div>
                       <div className="font-medium">
-                        {dayNames[bookingData.day!]} at {bookingData.time}
+                        {dayNames[bookingData.day!]} • {bookingData.startTime} - {bookingData.endTime}
                       </div>
                       <div className="text-sm">{bookingData.repeat.charAt(0).toUpperCase() + bookingData.repeat.slice(1)}</div>
                       <div className="text-sm">Starting {bookingData.startDate}</div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Caregiver</div>
-                      <div className="font-medium">
-                        {bookingData.caregiver?.first_name} {bookingData.caregiver?.last_name}
-                      </div>
+                      {bookingData.caregiver ? (
+                        <div className="font-medium">
+                          {bookingData.caregiver.first_name} {bookingData.caregiver.last_name}
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="border-dashed text-warning">
+                          Unassigned — will appear in Quick Assign
+                        </Badge>
+                      )}
                     </div>
                     <div className="border-t pt-4">
                       <div className="text-sm text-muted-foreground">Total Cost per Visit</div>
                       <div className="text-2xl font-bold text-primary">
-                        ${(bookingData.duration * bookingData.rate).toFixed(2)}
+                        ${(shiftDuration * bookingData.rate).toFixed(2)}
                       </div>
-                      <div className="text-sm text-muted-foreground">{bookingData.duration} hours @ ${bookingData.rate}/hr</div>
+                      <div className="text-sm text-muted-foreground">{shiftDuration} hours @ ${bookingData.rate}/hr</div>
                     </div>
                   </CardContent>
                 </Card>

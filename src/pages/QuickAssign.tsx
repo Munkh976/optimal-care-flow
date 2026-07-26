@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { AppLayout } from "@/components/AppLayout";
+import { AssignShiftDialog } from "@/components/schedule/AssignShiftDialog";
 
 interface OpenShift {
   id: string;
@@ -52,6 +53,7 @@ const QuickAssign = () => {
   const [matchedCaregivers, setMatchedCaregivers] = useState<MatchedCaregiver[]>([]);
   const [loading, setLoading] = useState(true);
   const [matching, setMatching] = useState(false);
+  const [pendingMatch, setPendingMatch] = useState<MatchedCaregiver | null>(null);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -169,53 +171,27 @@ const QuickAssign = () => {
     }
   };
 
-  const handleAssignCaregiver = async (caregiverId: string) => {
+  const handleAssignCaregiver = (match: MatchedCaregiver) => {
     if (!selectedShift) {
       toast.error("No shift selected");
       return;
     }
     
-    if (!caregiverId) {
+    if (!match?.caregiver_id) {
       toast.error("No caregiver selected");
       return;
     }
 
-    try {
-      // Create assignment
-      const { error: assignError } = await supabase
-        .from("shift_assignments")
-        .insert({
-          shift_id: selectedShift.id,
-          caregiver_id: caregiverId,
-          status: "scheduled",
-          assignment_method: "ai_suggested"
-        });
+    setPendingMatch(match);
+  };
 
-      if (assignError) throw assignError;
-
-      // Update shift status and caregiver_id
-      const { error: updateError } = await supabase
-        .from("shifts")
-        .update({ 
-          status: "assigned",
-          caregiver_id: caregiverId
-        })
-        .eq("id", selectedShift.id);
-
-      if (updateError) throw updateError;
-
-      toast.success("Shift assigned successfully!");
-      
-      // Refresh data
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await fetchData(user.id);
-        setSelectedShift(null);
-        setMatchedCaregivers([]);
-      }
-    } catch (error: any) {
-      console.error("Error:", error);
-      toast.error(error.message || "Failed to assign shift");
+  const handleAssigned = async () => {
+    setPendingMatch(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await fetchData(user.id);
+      setSelectedShift(null);
+      setMatchedCaregivers([]);
     }
   };
 
@@ -361,7 +337,7 @@ const QuickAssign = () => {
                             </div>
 
                             <Button 
-                              onClick={() => handleAssignCaregiver(match.caregiver_id)}
+                              onClick={() => handleAssignCaregiver(match)}
                               className="shrink-0"
                             >
                               Assign
@@ -377,6 +353,23 @@ const QuickAssign = () => {
           )}
           </div>
         )}
+
+        <AssignShiftDialog
+          open={!!pendingMatch}
+          onOpenChange={(open) => !open && setPendingMatch(null)}
+          shift={selectedShift}
+          defaultCaregiverId={pendingMatch?.caregiver_id}
+          matchContext={
+            pendingMatch
+              ? {
+                  score: pendingMatch.match_score,
+                  factors: pendingMatch.key_factors,
+                  warnings: pendingMatch.warnings,
+                }
+              : null
+          }
+          onAssigned={handleAssigned}
+        />
       </div>
     </AppLayout>
   );
