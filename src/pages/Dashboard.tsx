@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AppLayout } from "@/components/AppLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
+import { usePendingApprovals } from "@/hooks/usePendingApprovals";
 import { 
   Users, Clock, AlertTriangle, UserCheck, 
   Sparkles, ArrowRightLeft, Shield, Plus
@@ -39,6 +40,7 @@ interface Notification {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { pendingCount } = usePendingApprovals();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -224,6 +226,17 @@ const Dashboard = () => {
         </div>
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {pendingCount > 0 && (
+            <button type="button" onClick={() => navigate("/caregiver-approvals")} className="text-left">
+              <StatCard
+                title="Caregiver Applications"
+                value={pendingCount}
+                description="Awaiting your approval"
+                icon={UserCheck}
+                iconColor="text-warning"
+              />
+            </button>
+          )}
           <StatCard
             title="Active Clients"
             value={stats.activeClients}

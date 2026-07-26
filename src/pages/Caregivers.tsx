@@ -18,10 +18,12 @@ import { US_STATES } from "@/constants/usStates";
 import { Separator } from "@/components/ui/separator";
 import { AppLayout } from "@/components/AppLayout";
 import { caregiverFormSchema, passwordResetSchema } from "@/lib/validation";
+import { usePendingApprovals } from "@/hooks/usePendingApprovals";
 
 
 const Caregivers = () => {
   const navigate = useNavigate();
+  const { pendingCount } = usePendingApprovals();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [caregivers, setCaregivers] = useState<any[]>([]);
@@ -481,6 +483,13 @@ const Caregivers = () => {
             <p className="text-muted-foreground">Manage your caregiver roster</p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => navigate("/caregiver-approvals")}>
+              <Clock className="h-4 w-4" />
+              Applications
+              {pendingCount > 0 && (
+                <Badge variant="destructive" className="ml-1">{pendingCount}</Badge>
+              )}
+            </Button>
             <Button variant="outline" className="gap-2" onClick={handleBulkImport}>
               <Upload className="h-4 w-4" />
               Upload/Import Table

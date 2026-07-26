@@ -1,60 +1,54 @@
-## Recommendation: approval, not invitations
+## Why you can't see the approvals screen
 
-For a single-agency model, invitations add a mail dependency you don't have yet and a second identity path to maintain. Approval is simpler and matches how your app already works:
+The pages exist (`/caregiver-approvals`, `/notifications-outbox`) but the sidebar is built **only** from the module registry in the database. That registry currently has 8 modules (dashboard, schedule, caregivers, clients, orders, users, settings, reports). Caregiver Approvals, Notification Outbox, Care Types, Time Off, Live Ops, Quick Assign, Auto Schedule, Available Shifts, User Roles, System Roles, Role Permissions are **not registered**, so no role — including agency admin/manager — ever sees a link to them. Nothing is broken in the pages; the menu just doesn't know they exist.
 
-- Caregivers self-register (they already do) → manager approves → account activates.
-- Clients don't self-register in practice, so staff creates their account directly (already possible via `create-user`), and a one-time password is shown on screen instead of emailed.
+## Plan
 
-No email is sent anywhere. Anything that would have been an email is recorded in the database and shown in the UI, so switching to real email later is one function call, not a redesign.
+### 1. Register the missing modules
+Add the missing modules to the registry with proper categories, and grant them to the right roles:
 
-## How it works
+| Module | Category | Roles with read |
+|---|---|---|
+| Caregiver Approvals | operations | agency_admin, manager, hr_staff |
+| Notification Outbox | operations | agency_admin, manager |
+| Time Off, Shift Trades, Live Ops, Quick Assign, Auto Schedule, Available Shifts | operations | agency_admin, manager, scheduler |
+| Care Types, Agency Settings | administration (agency) | agency_admin, manager |
+| User Roles, System Roles, Role Permissions, Admin Utilities | platform | system_admin only |
+
+Approve/reject rights map to create/update on the approvals module, so the buttons on the page respect permissions.
+
+### 2. Surface approvals where you'd expect it
+- Sidebar entry under Operations for agency admin / manager / HR.
+- A **pending approvals count badge** on the sidebar item and a card on the Agency dashboard linking straight to it.
+- A secondary "Applications" tab/button on the Caregivers page, so caregiver management and approvals live together.
+
+### 3. Separate the two portals
+Split the navigation into two distinct shells driven by role, rather than one merged list:
 
 ```text
-Caregiver:  self-register  ->  pending  ->  manager approves
-            (auth account created at registration, but no role)
-            approval grants 'caregiver' role + creates/links caregivers row
-
-Client:     staff creates client  ->  optional "create login" toggle
-            account created immediately, temp password shown once on screen
+System Admin portal (system_admin)      Agency portal (agency_admin & below)
+- Platform overview & health            - Agency dashboard (ops KPIs)
+- System users (all agencies)           - Agency staff/users
+- System roles & access levels          - Caregivers / Applications
+- Role permissions matrix               - Clients / Orders
+- Module configuration                  - Schedule, Live Ops, Quick Assign
+- Admin utilities / backfills           - Time off, Trades, Care types
+- Platform analytics                    - Agency analytics & reports
+- Notification outbox (all)             - Agency settings
 ```
 
-### Caregiver approval flow
-1. Self-registration keeps creating the auth user (as today) and a `caregiver_registrations` row with status `pending`. No role is assigned, so login lands on "pending approval" — that's already the behavior.
-2. Caregiver Approvals page gets an **Approve** action that calls a new backend function:
-   - grants the `caregiver` role,
-   - creates a `caregivers` row (or links an existing unlinked one matched by email),
-   - sets registration status to `approved`.
-3. **Reject** sets status `rejected` with a reason; the user can still sign in but sees the pending/rejected screen.
-4. Approving matches an existing roster caregiver by email when one exists, so you don't get duplicates.
+- Nav groups become `platform` vs agency categories; system admin sees the platform group, agency roles never do.
+- Post-login landing: system admin → `/system-admin`, agency roles → `/dashboard`, caregiver/client → their own dashboards.
+- Optional visual cue: portal label under the "CareMuch" logo ("System Administration" vs the agency name).
 
-### Client accounts
-1. New `client` role plus permissions so clients can read only their own data.
-2. On the Clients page, an **Enable login** action creates the auth account for that client, links `clients.user_id`, and assigns the `client` role.
-3. The temporary password is generated and shown once in the dialog with a copy button — nothing is emailed.
+### 4. Split the analytics
+- **Agency reports** (`/reports`) stays operational: shift fill rate, caregiver utilisation, client hours, time-off trends — scoped to the agency.
+- **Platform analytics** (new section on the System Admin dashboard): user/account counts by role, accounts without logins, module & permission coverage, registration funnel (pending/approved/rejected), edge-function and data-integrity checks. No care-delivery metrics.
 
-### Pretend-invite record (future-proofing)
-A `pending_notifications` table records what *would* have been sent (recipient, type, payload, `sent_at` null). The approval/creation flows write to it, and an admin screen lists them. When you go to production, a real sender reads the same table — no flow changes.
+### 5. Guardrails
+Each admin route already checks the signed-in role server-side via the role function; I'll make the platform routes consistently reject non-system-admins and redirect agency users back to `/dashboard`, so hiding the menu isn't the only protection.
 
-### Account status in the lists
-Both Caregivers and Clients lists get a status column: **Linked** (has login), **Pending approval**, or **No login**, with the relevant action inline.
-
-## Technical details
-
-Database:
-- Add `client` to the `app_role` enum; add `role_permissions` rows for it.
-- New table `client_users` is **not** needed — `clients.user_id` already exists; keep it nullable and enforce linkage in policies.
-- New table `pending_notifications` (recipient email, kind, payload jsonb, created_at, sent_at) with GRANTs, RLS restricted to staff roles and service_role.
-- Add `caregiver_registrations.reviewed_by`, `reviewed_at`, `rejection_reason`.
-- RLS: caregivers/clients may read and act only on rows where `user_id = auth.uid()`; staff keep agency-scoped access.
-
-Backend functions (service role, caller role-checked):
-- `approve-caregiver-registration` — role grant, caregiver row create/link, status update, notification record.
-- `enable-client-login` — creates auth user with a generated temp password, links `clients.user_id`, assigns `client` role, returns the password once.
-
-Frontend:
-- Caregiver Approvals: approve/reject with confirmation and result toast.
-- Clients + Caregivers lists: account-status column and inline action.
-- Auth routing: `client` role → `/client-dashboard`; no role → existing pending-approval message.
-- Backfill helper in Admin Utilities to link existing 5 caregivers / 5 clients to accounts by email where one exists.
-
-Deliberately out of scope: sending real email, multi-agency invitations, self-registration for clients.
+## Technical notes
+- Module/permission additions go in one database migration (registry rows + role grants); route mapping added in `usePermissions`.
+- `AppLayout` gains category ordering and a portal-mode split; no page rewrites needed.
+- Approvals badge uses a count query on pending registrations.
