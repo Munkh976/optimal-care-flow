@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 
 const AdminUtilities = () => {
   const [loading, setLoading] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
@@ -239,6 +240,22 @@ const AdminUtilities = () => {
     }
   };
 
+  const handleLinkExistingAccounts = async () => {
+    setLinking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("link-existing-accounts", {});
+      if (error) throw new Error((await (error as any)?.context?.text?.()) || error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(
+        `Linked ${(data as any).caregiversLinked} caregiver(s) and ${(data as any).clientsLinked} client(s) to existing logins`
+      );
+    } catch (error: any) {
+      toast.error(error.message || "Failed to link accounts");
+    } finally {
+      setLinking(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="container mx-auto py-8 space-y-6">
@@ -264,6 +281,25 @@ const AdminUtilities = () => {
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create User Accounts
               </Button>
+            </div>
+
+            {/* Link existing records to logins */}
+            <div className="border-b pb-6">
+              <h3 className="text-lg font-semibold mb-2">Link Records to Existing Logins</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Matches caregivers and clients that have no login yet to existing accounts with the
+                same email address, and assigns the matching role. No new accounts are created and no
+                emails are sent.
+              </p>
+              <div className="flex gap-2">
+                <Button onClick={handleLinkExistingAccounts} disabled={linking}>
+                  {linking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Link Existing Accounts
+                </Button>
+                <Button variant="outline" onClick={() => navigate("/notifications-outbox")}>
+                  Open Notification Outbox
+                </Button>
+              </div>
             </div>
 
             {/* Data Export/Import */}
