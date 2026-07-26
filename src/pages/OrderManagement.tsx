@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addWeeks, addMonths, addYears, subWeeks, subMonths, subYears } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
+import { durationHours } from "@/lib/shiftAssignment";
 
 type Order = {
   id: string;
@@ -66,10 +67,12 @@ const OrderManagement = () => {
     day: null as number | null,
     repeat: "once" as "once" | "weekly" | "biweekly" | "monthly",
     caregiver: null as any,
-    time: "",
+    startTime: "09:00",
+    endTime: "13:00",
     startDate: "",
     rate: 35,
   });
+  const [assignNow, setAssignNow] = useState(false);
 
   const [availableCaregivers, setAvailableCaregivers] = useState<any[]>([]);
   const [loadingCaregivers, setLoadingCaregivers] = useState(false);
@@ -177,9 +180,16 @@ const OrderManagement = () => {
   };
 
   const handleSaveOrder = async (status: "draft" | "submitted") => {
-    if (!bookingData.client_id || !bookingData.primaryService || !bookingData.caregiver ||
-        !bookingData.time || bookingData.day === null || !bookingData.startDate) {
+    if (!bookingData.client_id || !bookingData.primaryService ||
+        !bookingData.startTime || !bookingData.endTime ||
+        bookingData.day === null || !bookingData.startDate) {
       toast.error("Please complete all required fields");
+      return;
+    }
+
+    const shiftHours = durationHours(bookingData.startTime, bookingData.endTime);
+    if (shiftHours <= 0) {
+      toast.error("End time must be after start time");
       return;
     }
 
@@ -217,31 +227,24 @@ const OrderManagement = () => {
       if (orderError) throw orderError;
 
       const shiftsToCreate = [];
-      const [timeValue, period] = bookingData.time.split(' ');
-      let [hours] = timeValue.split(':').map(Number);
-      
-      if (period === 'PM' && hours !== 12) hours += 12;
-      if (period === 'AM' && hours === 12) hours = 0;
-      
-      const startTimeHours = hours;
-      const endTimeHours = hours + bookingData.duration;
-      const startTime = `${String(startTimeHours).padStart(2, '0')}:00`;
-      const endTime = `${String(endTimeHours % 24).padStart(2, '0')}:00`;
+      const startTime = `${bookingData.startTime}:00`;
+      const endTime = `${bookingData.endTime}:00`;
+      const assignedCaregiverId = bookingData.caregiver?.id || null;
 
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         if (d.getDay() === bookingData.day) {
           const shiftDate = d.toISOString().split('T')[0];
           shiftsToCreate.push({
             client_id: bookingData.client_id,
-            agency_id: user.id,
-            caregiver_id: bookingData.caregiver.id,
+            agency_id: profile?.agency_id,
+            caregiver_id: assignedCaregiverId,
             order_id: newOrder.id,
             shift_date: shiftDate,
             start_time: startTime,
             end_time: endTime,
-            duration_hours: bookingData.duration,
+            duration_hours: shiftHours,
             care_type_code: bookingData.primaryService.code,
-            status: 'open',
+            status: assignedCaregiverId ? 'assigned' : 'open',
             special_notes: bookingData.additionalService
               ? `Includes ${bookingData.additionalService.name}`
               : null,
@@ -250,12 +253,32 @@ const OrderManagement = () => {
         }
       }
 
-      const { error: shiftsError } = await supabase.from("shifts").insert(shiftsToCreate);
+      const { data: createdShifts, error: shiftsError } = await supabase
+        .from("shifts")
+        .insert(shiftsToCreate as any)
+        .select("id");
       if (shiftsError) throw shiftsError;
 
-      toast.success(status === "draft" ? "Order saved as draft" : "Order submitted successfully");
+      // Keep shift_assignments in sync when a caregiver was chosen up-front
+      if (assignedCaregiverId && createdShifts?.length) {
+        const { error: assignError } = await supabase.from("shift_assignments").insert(
+          createdShifts.map((sh: any) => ({
+            shift_id: sh.id,
+            caregiver_id: assignedCaregiverId,
+            status: "scheduled" as never,
+            assignment_method: "manual" as never,
+          }))
+        );
+        if (assignError) throw assignError;
+      }
+
+      toast.success(
+        assignedCaregiverId
+          ? status === "draft" ? "Order saved as draft" : "Order submitted successfully"
+          : `${status === "draft" ? "Draft saved" : "Order submitted"} — ${shiftsToCreate.length} unassigned shift${shiftsToCreate.length === 1 ? "" : "s"} created`
+      );
       handleCloseDialog();
-      if (user) fetchOrders(user.id);
+      if (profile?.agency_id) fetchOrders(profile.agency_id);
     } catch (error: any) {
       toast.error(error.message || "Failed to create order");
     }
@@ -273,10 +296,12 @@ const OrderManagement = () => {
       day: null,
       repeat: "once",
       caregiver: null,
-      time: "",
+      startTime: "09:00",
+      endTime: "13:00",
       startDate: "",
       rate: 35,
     });
+    setAssignNow(false);
     setAvailableCaregivers([]);
     setClientCareTypes([]);
   };
