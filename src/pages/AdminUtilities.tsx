@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,22 @@ import { Input } from "@/components/ui/input";
 const AdminUtilities = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const guard = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/auth");
+        return;
+      }
+      const { data: roleData } = await supabase.rpc("get_user_role", { _user_id: session.user.id });
+      if (roleData !== "system_admin") {
+        toast.error("Access denied. System admin role required.");
+        navigate("/dashboard");
+      }
+    };
+    guard();
+  }, [navigate]);
   const [linking, setLinking] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
