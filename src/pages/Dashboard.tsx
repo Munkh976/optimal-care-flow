@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AppLayout } from "@/components/AppLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
+import { usePendingApprovals } from "@/hooks/usePendingApprovals";
 import { 
   Users, Clock, AlertTriangle, UserCheck, 
   Sparkles, ArrowRightLeft, Shield, Plus
@@ -39,6 +40,7 @@ interface Notification {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { pendingCount } = usePendingApprovals();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
