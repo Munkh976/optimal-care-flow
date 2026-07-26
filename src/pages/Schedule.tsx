@@ -36,9 +36,27 @@ import {
   UserCheck,
   Zap,
 } from "lucide-react";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, isToday } from "date-fns";
+import {
+  format,
+  startOfWeek,
+  endOfWeek,
+  addWeeks,
+  subWeeks,
+  addDays,
+  subDays,
+  addMonths,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  startOfDay,
+  endOfDay,
+  eachDayOfInterval,
+  isSameDay,
+  isToday,
+} from "date-fns";
 import { toast } from "sonner";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
+import { ShiftsListView } from "@/components/schedule/ShiftsListView";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -96,7 +114,8 @@ const Schedule = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [shifts, setShifts] = useState<any[]>([]);
-  const [scheduleView, setScheduleView] = useState<"timeline" | "density" | "caregiver" | "client">("timeline");
+  const [scheduleView, setScheduleView] = useState<"list" | "timeline" | "density" | "caregiver" | "client">("timeline");
+  const [rangeMode, setRangeMode] = useState<"day" | "week" | "month">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedShift, setSelectedShift] = useState(null);
   const [careTypes, setCareTypes] = useState([]);
@@ -127,7 +146,13 @@ const Schedule = () => {
 
   useEffect(() => {
     checkAuth();
-  }, [currentDate]);
+  }, [currentDate, rangeMode]);
+
+  const getRange = (date: Date, mode: "day" | "week" | "month") => {
+    if (mode === "day") return { start: startOfDay(date), end: endOfDay(date) };
+    if (mode === "month") return { start: startOfMonth(date), end: endOfMonth(date) };
+    return { start: startOfWeek(date), end: endOfWeek(date) };
+  };
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -154,8 +179,7 @@ const Schedule = () => {
   const fetchScheduleData = async (agencyId: string) => {
     try {
       setLoading(true);
-      const startDate = startOfWeek(currentDate);
-      const endDate = endOfWeek(currentDate);
+      const { start: startDate, end: endDate } = getRange(currentDate, rangeMode);
 
       // Fetch care types
       const { data: careTypesData } = await supabase
@@ -225,11 +249,15 @@ const Schedule = () => {
   };
 
   const goToPrevious = () => {
-    setCurrentDate(subWeeks(currentDate, 1));
+    if (rangeMode === "day") setCurrentDate(subDays(currentDate, 1));
+    else if (rangeMode === "month") setCurrentDate(subMonths(currentDate, 1));
+    else setCurrentDate(subWeeks(currentDate, 1));
   };
 
   const goToNext = () => {
-    setCurrentDate(addWeeks(currentDate, 1));
+    if (rangeMode === "day") setCurrentDate(addDays(currentDate, 1));
+    else if (rangeMode === "month") setCurrentDate(addMonths(currentDate, 1));
+    else setCurrentDate(addWeeks(currentDate, 1));
   };
 
   const goToToday = () => {
@@ -242,6 +270,17 @@ const Schedule = () => {
       end: endOfWeek(currentDate)
     });
   }, [currentDate]);
+
+  const rangeDays = useMemo(() => {
+    const { start, end } = getRange(currentDate, rangeMode);
+    return eachDayOfInterval({ start, end });
+  }, [currentDate, rangeMode]);
+
+  const rangeLabel = useMemo(() => {
+    if (rangeMode === "day") return format(currentDate, "EEEE, MMM d, yyyy");
+    if (rangeMode === "month") return format(currentDate, "MMMM yyyy");
+    return `${format(startOfWeek(currentDate), "MMM d")} - ${format(endOfWeek(currentDate), "MMM d, yyyy")}`;
+  }, [currentDate, rangeMode]);
 
   const getCategoryForShift = (shift) => {
     const category = shift.care_types?.category;
