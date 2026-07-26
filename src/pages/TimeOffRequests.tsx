@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AppLayout } from "@/components/AppLayout";
+import { timeOffRequestSchema, firstError } from "@/lib/validation";
+
+const APPROVER_ROLES = ["manager", "agency_admin", "system_admin"];
 
 interface TimeOffRequest {
   id: string;
@@ -36,6 +39,8 @@ const TimeOffRequests = () => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [caregivers, setCaregivers] = useState<any[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const canApprove = userRole !== null && APPROVER_ROLES.includes(userRole);
   
   const [formData, setFormData] = useState({
     caregiver_id: "",
@@ -55,6 +60,8 @@ const TimeOffRequests = () => {
       navigate("/auth");
       return;
     }
+    const { data: roleData } = await supabase.rpc("get_user_role", { _user_id: user.id });
+    setUserRole((roleData as string) ?? null);
     fetchRequests();
     fetchCaregivers();
   };
@@ -89,10 +96,21 @@ const TimeOffRequests = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("agency_id")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!profile?.agency_id) {
+      setCaregivers([]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("caregivers")
       .select("id, first_name, last_name")
-      .eq("agency_id", user.id)
+      .eq("agency_id", profile.agency_id)
       .eq("is_active", true);
 
     if (!error && data) {
@@ -103,20 +121,11 @@ const TimeOffRequests = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
-    if (!formData.caregiver_id || !formData.start_date || !formData.end_date) {
+    const parsed = timeOffRequestSchema.safeParse(formData);
+    if (!parsed.success) {
       toast({
         title: "Validation Error",
-        description: "All fields are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (new Date(formData.end_date) < new Date(formData.start_date)) {
-      toast({
-        title: "Validation Error",
-        description: "End date must be after start date",
+        description: firstError(parsed) ?? "Invalid input",
         variant: "destructive",
       });
       return;
@@ -125,11 +134,11 @@ const TimeOffRequests = () => {
     const { error } = await supabase
       .from("time_off_requests")
       .insert([{
-        caregiver_id: formData.caregiver_id,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-        request_type: formData.request_type as 'vacation' | 'medical' | 'personal' | 'emergency',
-        reason: formData.reason,
+        caregiver_id: parsed.data.caregiver_id,
+        start_date: parsed.data.start_date,
+        end_date: parsed.data.end_date,
+        request_type: parsed.data.request_type,
+        reason: parsed.data.reason ?? "",
         status: "pending" as const
       }]);
 
@@ -157,6 +166,14 @@ const TimeOffRequests = () => {
   };
 
   const handleApprove = async (id: string) => {
+    if (!canApprove) {
+      toast({
+        title: "Not allowed",
+        description: "Only managers and admins can approve requests",
+        variant: "destructive",
+      });
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     
     const { error } = await supabase
@@ -180,6 +197,14 @@ const TimeOffRequests = () => {
   };
 
   const handleDeny = async (id: string) => {
+    if (!canApprove) {
+      toast({
+        title: "Not allowed",
+        description: "Only managers and admins can deny requests",
+        variant: "destructive",
+      });
+      return;
+    }
     const { error } = await supabase
       .from("time_off_requests")
       .update({ status: "denied" })
@@ -360,7 +385,7 @@ const TimeOffRequests = () => {
                   {request.notes && (
                     <p className="text-sm text-muted-foreground mb-4 italic">Note: {request.notes}</p>
                   )}
-                  {request.status === "pending" && (
+                  {request.status === "pending" && canApprove && (
                     <div className="flex gap-2">
                       <Button
                         size="sm"
