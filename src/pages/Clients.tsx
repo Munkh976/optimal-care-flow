@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, Plus, Phone, MapPin, Heart, AlertCircle, User, Search, Upload, Eye, Trash2, Edit, Key } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,6 +41,8 @@ const Clients = () => {
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [newPassword, setNewPassword] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [enablingLoginId, setEnablingLoginId] = useState<string | null>(null);
+  const [newCredentials, setNewCredentials] = useState<{ email: string; password: string | null } | null>(null);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -709,6 +712,7 @@ const Clients = () => {
                     <TableHead>Age</TableHead>
                     <TableHead>Care Needs</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Account</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -755,6 +759,11 @@ const Clients = () => {
                           {client.is_active ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <Badge variant={client.user_id ? "default" : "outline"}>
+                          {client.user_id ? "Linked" : "No login"}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
@@ -766,6 +775,17 @@ const Clients = () => {
                           </Button>
                           {canManageClients && (
                             <>
+                              {!client.user_id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={enablingLoginId === client.id}
+                                  title="Enable login for this client"
+                                  onClick={() => handleEnableLogin(client)}
+                                >
+                                  <UserPlus className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
