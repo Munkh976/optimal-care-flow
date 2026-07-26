@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,9 @@ import { Activity, Sparkles } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const rawNext = searchParams.get("next");
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,6 +21,10 @@ const Auth = () => {
   const [agencyName, setAgencyName] = useState("");
 
   const routeByRole = async (userId: string) => {
+    if (nextPath) {
+      window.location.href = nextPath;
+      return;
+    }
     const { data } = await supabase.rpc('get_user_role', { _user_id: userId });
     if (data === 'caregiver') {
       navigate('/caregiver-dashboard');
@@ -63,7 +70,7 @@ const Auth = () => {
             full_name: fullName,
             agency_name: agencyName,
           },
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}${nextPath ?? "/dashboard"}`,
         },
       });
 
