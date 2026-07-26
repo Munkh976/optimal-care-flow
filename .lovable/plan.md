@@ -1,54 +1,47 @@
-## Why you can't see the approvals screen
+## What I understand
 
-The pages exist (`/caregiver-approvals`, `/notifications-outbox`) but the sidebar is built **only** from the module registry in the database. That registry currently has 8 modules (dashboard, schedule, caregivers, clients, orders, users, settings, reports). Caregiver Approvals, Notification Outbox, Care Types, Time Off, Live Ops, Quick Assign, Auto Schedule, Available Shifts, User Roles, System Roles, Role Permissions are **not registered**, so no role — including agency admin/manager — ever sees a link to them. Nothing is broken in the pages; the menu just doesn't know they exist.
+1. **Order creation should not force picking a caregiver.** Today the Create Order wizard (Step 3) requires selecting a caregiver available on the chosen weekday before you can pick a time or continue. Orders are created by the agency admin/manager, so they should be able to generate the shifts *unassigned* and let scheduling happen later (Quick Assign / Schedule).
+2. **Assignment needs a proper confirmation step.** Instead of a bare "Assign" button, managers should get a drawer/modal where they confirm caregiver, care type, and start/end time before the assignment is saved.
+3. **Quick Assign workflow needs review** — it currently writes to two places and can drift out of sync.
+
+## Bugs found while reviewing
+
+- Order shift creation writes `agency_id: user.id` (the user's auth id) instead of `profile.agency_id` — wrong tenant value on every shift created from an order.
+- Shifts created with a caregiver still get `status: 'open'`, so they show as unassigned in Schedule but have a `caregiver_id`.
+- Order creation writes `shifts.caregiver_id` directly but never creates a `shift_assignments` row, while Quick Assign creates both — two inconsistent representations of "assigned".
+- After saving an order, the list refresh uses `fetchOrders(user.id)` instead of the agency id, so the table doesn't refresh correctly.
+- Time slots are label-only ("6:00 evening" → 18:00 via a hand-rolled AM/PM parse); end time is `start + duration` with no explicit control and can silently roll past midnight.
 
 ## Plan
 
-### 1. Register the missing modules
-Add the missing modules to the registry with proper categories, and grant them to the right roles:
+### 1. New `AssignShiftDialog` component (`src/components/schedule/AssignShiftDialog.tsx`)
+A single reusable confirmation modal used by Quick Assign, the Shifts list view, and the shift details dialog:
+- Shows client, date and location as read-only context.
+- **Caregiver** — preselected (from the AI match or the row action) but changeable via a searchable select of active agency caregivers; shows match score / rating when available.
+- **Care type** — select, defaulted from the shift.
+- **Start / end time** — time inputs defaulted from the shift, with live duration calculation and validation (end after start, duration > 0).
+- Optional note field.
+- Conflict check on confirm: warns if the caregiver already has an overlapping shift that day, and if there is an approved time-off request covering the date.
+- On confirm: single write path — update the shift (`caregiver_id`, `care_type_code`, `start_time`, `end_time`, `duration_hours`, `status: 'assigned'`) and upsert one `shift_assignments` row.
 
-| Module | Category | Roles with read |
-|---|---|---|
-| Caregiver Approvals | operations | agency_admin, manager, hr_staff |
-| Notification Outbox | operations | agency_admin, manager |
-| Time Off, Shift Trades, Live Ops, Quick Assign, Auto Schedule, Available Shifts | operations | agency_admin, manager, scheduler |
-| Care Types, Agency Settings | administration (agency) | agency_admin, manager |
-| User Roles, System Roles, Role Permissions, Admin Utilities | platform | system_admin only |
+### 2. Centralise assignment logic
+Add `src/lib/shiftAssignment.ts` with `assignShift()` used by every caller so shift + assignment rows never diverge. Quick Assign's inline insert/update is replaced by this.
 
-Approve/reject rights map to create/update on the approvals module, so the buttons on the page respect permissions.
+### 3. Quick Assign workflow fixes
+- "Assign" opens the new dialog instead of writing immediately.
+- Preserve the AI match score / factors in the dialog as decision context.
+- Keep the `?shift=` deep link working from Schedule and the shift details dialog.
 
-### 2. Surface approvals where you'd expect it
-- Sidebar entry under Operations for agency admin / manager / HR.
-- A **pending approvals count badge** on the sidebar item and a card on the Agency dashboard linking straight to it.
-- A secondary "Applications" tab/button on the Caregivers page, so caregiver management and approvals live together.
+### 4. Order Management: caregiver becomes optional
+- Step 3 renamed "Schedule" — day, time and recurrence only; caregiver moves to an optional "Assign a caregiver now (optional)" section that stays collapsed by default with a clear "Leave unassigned — assign later from Schedule" default.
+- Available-caregiver lookup still runs on weekday selection, but only when the manager opens that optional section, and it never blocks the Next button.
+- Time selection no longer requires a caregiver.
+- Explicit **Start time** and **End time** controls (defaulted from the service duration) replace the AM/PM slot-string parsing, so the saved times are unambiguous.
+- Step 4 review shows "Unassigned — will appear in Quick Assign" when no caregiver is chosen.
+- Shift insert fixed: correct `agency_id` from the profile, `status` = `'assigned'` only when a caregiver is chosen (otherwise `'open'`), and a matching `shift_assignments` row created when a caregiver is chosen.
+- Post-save refresh uses `profile.agency_id`.
 
-### 3. Separate the two portals
-Split the navigation into two distinct shells driven by role, rather than one merged list:
+### 5. Entry points
+Wire the new dialog into the Shifts list view "Assign" button and the Quick Assign button in `ShiftDetailsDialog` so managers get the same confirmation everywhere.
 
-```text
-System Admin portal (system_admin)      Agency portal (agency_admin & below)
-- Platform overview & health            - Agency dashboard (ops KPIs)
-- System users (all agencies)           - Agency staff/users
-- System roles & access levels          - Caregivers / Applications
-- Role permissions matrix               - Clients / Orders
-- Module configuration                  - Schedule, Live Ops, Quick Assign
-- Admin utilities / backfills           - Time off, Trades, Care types
-- Platform analytics                    - Agency analytics & reports
-- Notification outbox (all)             - Agency settings
-```
-
-- Nav groups become `platform` vs agency categories; system admin sees the platform group, agency roles never do.
-- Post-login landing: system admin → `/system-admin`, agency roles → `/dashboard`, caregiver/client → their own dashboards.
-- Optional visual cue: portal label under the "CareMuch" logo ("System Administration" vs the agency name).
-
-### 4. Split the analytics
-- **Agency reports** (`/reports`) stays operational: shift fill rate, caregiver utilisation, client hours, time-off trends — scoped to the agency.
-- **Platform analytics** (new section on the System Admin dashboard): user/account counts by role, accounts without logins, module & permission coverage, registration funnel (pending/approved/rejected), edge-function and data-integrity checks. No care-delivery metrics.
-
-### 5. Guardrails
-Each admin route already checks the signed-in role server-side via the role function; I'll make the platform routes consistently reject non-system-admins and redirect agency users back to `/dashboard`, so hiding the menu isn't the only protection.
-
-## Technical notes
-- Module/permission additions go in one database migration (registry rows + role grants); route mapping added in `usePermissions`.
-- `AppLayout` gains category ordering and a portal-mode split; no page rewrites needed.
-- Approvals badge uses a count query on pending registrations.
+CSV batch order import is out of scope for this change, as you noted — I'll leave the order-creation code structured so it can feed the same shift-generation helper later.
