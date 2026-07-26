@@ -10,6 +10,7 @@ import {
   UserCheck, Clock, Shield, Settings, UserCog, FileText, List, Tag
 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { PlatformAnalytics } from "@/components/admin/PlatformAnalytics";
 
 interface SystemStats {
   totalAgencies: number;
@@ -221,6 +222,19 @@ const SystemAdminDashboard = () => {
           </Card>
         </div>
 
+        {/* Platform analytics */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Platform Analytics</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Account, access and configuration health — agency care metrics live in Agency Reports
+            </p>
+          </CardHeader>
+          <CardContent>
+            <PlatformAnalytics />
+          </CardContent>
+        </Card>
+
         {/* System Administration Modules */}
         <Card>
           <CardHeader>
@@ -229,12 +243,13 @@ const SystemAdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {getModulesByCategory("administration").map((module) => {
+              {[...getModulesByCategory("platform"), ...getModulesByCategory("administration")].map((module) => {
                 const iconMap: Record<string, any> = {
                   users: Users,
                   user_roles: UserCog,
                   system_roles: Shield,
                   role_permissions: Settings,
+                  admin_utilities: Settings,
                 };
                 const Icon = iconMap[module.module_code] || Settings;
                 
