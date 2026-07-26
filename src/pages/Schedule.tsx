@@ -946,7 +946,7 @@ const Schedule = () => {
             <Button
               variant={scheduleView === "timeline" ? "default" : "outline"}
               size="sm"
-              onClick={() => setScheduleView("timeline")}
+              onClick={() => { setScheduleView("timeline"); setRangeMode("week"); }}
               className="gap-2"
             >
               <Clock className="w-4 h-4" />
@@ -955,7 +955,7 @@ const Schedule = () => {
             <Button
               variant={scheduleView === "density" ? "default" : "outline"}
               size="sm"
-              onClick={() => setScheduleView("density")}
+              onClick={() => { setScheduleView("density"); setRangeMode("week"); }}
               className="gap-2"
             >
               <Grid className="w-4 h-4" />
@@ -964,7 +964,7 @@ const Schedule = () => {
             <Button
               variant={scheduleView === "caregiver" ? "default" : "outline"}
               size="sm"
-              onClick={() => setScheduleView("caregiver")}
+              onClick={() => { setScheduleView("caregiver"); setRangeMode("week"); }}
               className="gap-2"
             >
               <Users className="w-4 h-4" />
@@ -973,7 +973,7 @@ const Schedule = () => {
             <Button
               variant={scheduleView === "client" ? "default" : "outline"}
               size="sm"
-              onClick={() => setScheduleView("client")}
+              onClick={() => { setScheduleView("client"); setRangeMode("week"); }}
               className="gap-2"
             >
               <UserCheck className="w-4 h-4" />
