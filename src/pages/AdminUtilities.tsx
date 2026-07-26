@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 
 const AdminUtilities = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [linking, setLinking] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
