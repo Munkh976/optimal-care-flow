@@ -9,14 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Activity, ArrowLeft } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { caregiverRegistrationSchema, firstError } from "@/lib/validation";
 
 const CaregiverRegistration = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
-    password: "",
     phone: "",
     firstName: "",
     lastName: "",
@@ -26,7 +25,6 @@ const CaregiverRegistration = () => {
     zipCode: "",
     employmentType: "full_time",
     hourlyRate: "",
-    agencyId: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,44 +32,31 @@ const CaregiverRegistration = () => {
     setLoading(true);
 
     try {
-      // Create auth user first
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-          }
-        }
-      });
+      const parsed = caregiverRegistrationSchema.safeParse(formData);
+      if (!parsed.success) {
+        toast.error(firstError(parsed));
+        return;
+      }
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("Failed to create user account");
+      const values = parsed.data;
 
-      // Create registration record
       const { error: regError } = await supabase.from("caregiver_registrations").insert({
-        email: formData.email,
-    phone: formData.phone,
-    first_name: formData.firstName,
-    last_name: formData.lastName,
-    address: formData.address,
-    city: formData.city,
-    state: formData.state,
-    zip_code: formData.zipCode,
-    employment_type: formData.employmentType,
-    hourly_rate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
-    agency_id: formData.agencyId || null,
-    status: "pending",
-  });
+        email: values.email,
+        phone: values.phone,
+        first_name: values.firstName,
+        last_name: values.lastName,
+        address: values.address || null,
+        city: values.city || null,
+        state: values.state || null,
+        zip_code: values.zipCode || null,
+        employment_type: values.employmentType,
+        hourly_rate: values.hourlyRate ? parseFloat(values.hourlyRate) : null,
+        status: "pending",
+      });
 
       if (regError) throw regError;
 
-      // Sign out the user immediately after registration
-      await supabase.auth.signOut();
-
-      toast.success("Registration submitted successfully! You can log in once your application is approved.");
+      toast.success("Application submitted successfully. You can sign in after a manager approves your application.");
       navigate("/auth");
     } catch (error: any) {
       toast.error(error.message || "Failed to submit registration");
@@ -104,7 +89,7 @@ const CaregiverRegistration = () => {
           <CardHeader>
             <CardTitle>Apply to Join CareMuch</CardTitle>
             <CardDescription>
-              Fill out the form below to register as a caregiver. Your application will be reviewed by an agency manager.
+              Submit your caregiver application for manager review. Login access is created only after approval.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -130,8 +115,7 @@ const CaregiverRegistration = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
                   <Input
                     id="email"
@@ -140,18 +124,6 @@ const CaregiverRegistration = () => {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    minLength={6}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  />
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -230,18 +202,9 @@ const CaregiverRegistration = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="agencyId">Agency Code (Optional)</Label>
-                <Input
-                  id="agencyId"
-                  placeholder="Enter agency code if you were referred"
-                  value={formData.agencyId}
-                  onChange={(e) => setFormData({ ...formData, agencyId: e.target.value })}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Skills and certifications can be added after your registration is approved.
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Skills and certifications can be added after your registration is approved.
+              </p>
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Submitting..." : "Submit Registration"}

@@ -146,6 +146,29 @@ export const caregiverFormSchema = z.object({
   care_type_codes: z.array(z.string().max(30)).max(50).optional(),
 });
 
+export const caregiverRegistrationSchema = z.object({
+  firstName: requiredText(60, "First name"),
+  lastName: requiredText(60, "Last name"),
+  email: emailSchema,
+  phone: z
+    .string()
+    .trim()
+    .min(1, { message: "Phone is required" })
+    .max(30, { message: "Phone must be less than 30 characters" })
+    .regex(/^[0-9+()\-.\s]*$/, { message: "Phone contains invalid characters" }),
+  address: optionalText(200, "Address"),
+  city: optionalText(100, "City"),
+  state: optionalText(50, "State"),
+  zipCode: optionalText(20, "ZIP code"),
+  employmentType: z.enum(["full_time", "part_time", "on_call"]),
+  hourlyRate: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || (!Number.isNaN(Number(v)) && Number(v) >= 0 && Number(v) <= 1000), {
+      message: "Hourly rate must be between 0 and 1000",
+    }),
+});
+
 export const clientFormSchema = z.object({
   first_name: requiredText(60, "First name"),
   last_name: requiredText(60, "Last name"),

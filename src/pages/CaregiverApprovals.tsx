@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AppLayout } from "@/components/AppLayout";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface CaregiverRegistration {
   id: string;
@@ -36,6 +37,7 @@ interface CaregiverRegistration {
 const CaregiverApprovals = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { userRole, hasPermission } = usePermissions();
   const [registrations, setRegistrations] = useState<CaregiverRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -148,6 +150,10 @@ const CaregiverApprovals = () => {
     if (filter === 'all') return true;
     return reg.status === filter;
   });
+  const canReviewApplications =
+    !!userRole &&
+    ["agency_admin", "manager", "hr_staff"].includes(userRole) &&
+    hasPermission("caregiver_approvals", "update");
 
   if (loading) {
     return (
@@ -255,11 +261,11 @@ const CaregiverApprovals = () => {
                     </div>
                   )}
 
-                  {registration.status === "pending" && (
+                  {registration.status === "pending" && canReviewApplications && (
                     <div className="flex gap-2 pt-2">
                       <Button
                         size="sm"
-                        className="bg-success hover:bg-success/90 text-white"
+                        className="bg-success hover:bg-success/90 text-primary-foreground"
                         disabled={processingId === registration.id}
                         onClick={() => handleApprove(registration)}
                       >
@@ -339,7 +345,11 @@ const CaregiverApprovals = () => {
               {credentials?.password && (
                 <Button
                   variant="outline"
-                  onClick={() => navigator.clipboard.writeText(credentials.password!)}
+                  onClick={() => {
+                    if (credentials.password) {
+                      navigator.clipboard.writeText(credentials.password);
+                    }
+                  }}
                 >
                   Copy password
                 </Button>
