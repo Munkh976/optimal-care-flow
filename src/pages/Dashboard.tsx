@@ -224,6 +224,17 @@ const Dashboard = () => {
         </div>
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {pendingCount > 0 && (
+            <button type="button" onClick={() => navigate("/caregiver-approvals")} className="text-left">
+              <StatCard
+                title="Caregiver Applications"
+                value={pendingCount}
+                description="Awaiting your approval"
+                icon={UserCheck}
+                iconColor="text-warning"
+              />
+            </button>
+          )}
           <StatCard
             title="Active Clients"
             value={stats.activeClients}
