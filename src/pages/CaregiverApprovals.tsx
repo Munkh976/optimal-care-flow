@@ -260,10 +260,11 @@ const CaregiverApprovals = () => {
                       <Button
                         size="sm"
                         className="bg-success hover:bg-success/90 text-white"
+                        disabled={processingId === registration.id}
                         onClick={() => handleApprove(registration)}
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Approve
+                        {processingId === registration.id ? "Approving..." : "Approve"}
                       </Button>
                       <Button
                         size="sm"
@@ -309,6 +310,41 @@ const CaregiverApprovals = () => {
               <Button variant="destructive" onClick={handleReject} disabled={!rejectDialog.reason.trim()}>
                 Reject Application
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!credentials} onOpenChange={(open) => !open && setCredentials(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Account activated</DialogTitle>
+              <DialogDescription>
+                No email is sent yet — this notice is stored in the notification outbox. Share these
+                details with the caregiver directly.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="font-medium">Email: </span>
+                <span className="text-muted-foreground">{credentials?.email}</span>
+              </div>
+              <div>
+                <span className="font-medium">Password: </span>
+                <span className="text-muted-foreground">
+                  {credentials?.password ?? "the password chosen during registration"}
+                </span>
+              </div>
+            </div>
+            <DialogFooter>
+              {credentials?.password && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigator.clipboard.writeText(credentials.password!)}
+                >
+                  Copy password
+                </Button>
+              )}
+              <Button onClick={() => setCredentials(null)}>Done</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
