@@ -525,14 +525,6 @@ const OrderManagement = () => {
 
   const shiftDuration = durationHours(bookingData.startTime, bookingData.endTime);
 
-  const timeSlots = {
-    morning: ['6:00', '7:00', '8:00', '9:00', '10:00'],
-    afternoon: ['12:00', '1:00', '2:00', '3:00', '4:00'],
-    evening: ['6:00', '7:00', '8:00'],
-  };
-
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  
   const servicesToShow = clientCareTypes.length > 0 ? clientCareTypes : careTypes;
   
   const primaryServices = servicesToShow.filter(
