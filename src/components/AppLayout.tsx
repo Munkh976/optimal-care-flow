@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
+import { usePendingApprovals } from "@/hooks/usePendingApprovals";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -35,6 +36,9 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { permissions, userRole, loading } = usePermissions();
+  const { pendingCount } = usePendingApprovals();
+
+  const isSystemAdmin = userRole === "system_admin";
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -72,26 +76,34 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     caregiver_time_off: Clock,
     caregiver_settings: Settings,
     client_dashboard: LayoutDashboard,
+    notifications_outbox: FileText,
+    admin_utilities: Settings,
+    settings: Settings,
+    schedule: Calendar,
   };
 
-  // Build menu items from permissions
+  // Build menu items from permissions.
+  // System admins see the platform portal only; agency/staff roles never see it.
   const dynamicMenuItems = permissions
     .filter(p => p.route && p.can_read)
+    .filter(p => (isSystemAdmin ? p.category === "platform" : p.category !== "platform"))
     .map(p => ({
       label: p.module_name,
       icon: iconMap[p.module_code] || FileText,
       path: p.route!,
       category: p.category,
+      badge: p.module_code === "caregiver_approvals" ? pendingCount : 0,
     }));
 
   // Add dashboard as first item based on role
   const menuItems = userRole === "system_admin" 
     ? [
         {
-          label: "System Admin",
+          label: "Platform Overview",
           icon: Shield,
           path: "/system-admin",
-          category: "dashboard",
+          category: "platform",
+          badge: 0,
         },
         ...dynamicMenuItems,
       ]
@@ -105,18 +117,26 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           icon: LayoutDashboard,
           path: "/dashboard",
           category: "dashboard",
+          badge: 0,
         },
         ...dynamicMenuItems,
       ];
 
   // Group by category
-  const groupedItems = menuItems.reduce((acc, item) => {
+  const grouped = menuItems.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
     }
     acc[item.category].push(item);
     return acc;
   }, {} as Record<string, typeof menuItems>);
+
+  const categoryOrder = ["platform", "dashboard", "core", "operations", "caregiver", "configuration", "administration", "analytics"];
+  const groupedItems = Object.entries(grouped).sort(
+    ([a], [b]) =>
+      (categoryOrder.indexOf(a) === -1 ? 99 : categoryOrder.indexOf(a)) -
+      (categoryOrder.indexOf(b) === -1 ? 99 : categoryOrder.indexOf(b))
+  );
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -139,7 +159,10 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         <div className="flex h-full flex-col">
           <div className="border-b p-6">
             <h1 className="text-2xl font-bold text-primary">CareMuch</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-xs font-medium text-foreground/80 mt-1">
+              {isSystemAdmin ? "System Administration" : "Agency Portal"}
+            </p>
+            <p className="text-sm text-muted-foreground">
               {userRole?.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
             </p>
           </div>
@@ -148,7 +171,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             {loading ? (
               <div className="text-center text-muted-foreground text-sm">Loading...</div>
             ) : (
-              Object.entries(groupedItems).map(([category, items]) => (
+              groupedItems.map(([category, items]) => (
                 <div key={category}>
                   <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase">
                     {category}
@@ -167,7 +190,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                           }`}
                         >
                           <Icon className="h-4 w-4" />
-                          {item.label}
+                          <span className="flex-1">{item.label}</span>
+                          {item.badge > 0 && (
+                            <span className="rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+                              {item.badge}
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
