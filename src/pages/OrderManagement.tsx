@@ -804,7 +804,7 @@ const OrderManagement = () => {
                             <div className="p-4">
                               <h4 className="font-semibold mb-3 flex items-center gap-2">
                                 <Package className="h-4 w-4" />
-                                Order Items (Shifts)
+                                Order Shifts
                               </h4>
                               {orderShifts[order.id] && orderShifts[order.id].length > 0 ? (
                                 <div className="space-y-2">
@@ -847,7 +847,7 @@ const OrderManagement = () => {
                                 </div>
                               ) : (
                                 <div className="text-center py-4 text-muted-foreground">
-                                  Loading shifts...
+                                  {orderShifts[order.id] ? "No shifts on this order." : "Loading shifts..."}
                                 </div>
                               )}
                             </div>
