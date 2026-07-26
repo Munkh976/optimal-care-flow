@@ -1160,6 +1160,41 @@ const Clients = () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!newCredentials} onOpenChange={(open) => !open && setNewCredentials(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Client login created</DialogTitle>
+            <DialogDescription>
+              No email is sent yet — this notice is stored in the notification outbox. Share these
+              details with the client directly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div>
+              <span className="font-medium">Email: </span>
+              <span className="text-muted-foreground">{newCredentials?.email}</span>
+            </div>
+            <div>
+              <span className="font-medium">Temporary password: </span>
+              <span className="text-muted-foreground">
+                {newCredentials?.password ?? "existing account — password unchanged"}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            {newCredentials?.password && (
+              <Button
+                variant="outline"
+                onClick={() => navigator.clipboard.writeText(newCredentials.password!)}
+              >
+                Copy password
+              </Button>
+            )}
+            <Button onClick={() => setNewCredentials(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteClient} onOpenChange={() => setDeleteClient(null)}>
         <AlertDialogContent>

@@ -822,6 +822,7 @@ const Caregivers = () => {
                     <TableHead>Employment</TableHead>
                     <TableHead>Rate</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Account</TableHead>
                       <TableHead>Care Types</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -856,6 +857,11 @@ const Caregivers = () => {
                       <TableCell>
                         <Badge variant={caregiver.is_active ? "default" : "secondary"}>
                           {caregiver.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={caregiver.user_id ? "default" : "outline"}>
+                          {caregiver.user_id ? "Linked" : "No login"}
                         </Badge>
                       </TableCell>
                       <TableCell>
