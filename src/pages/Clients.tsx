@@ -210,6 +210,28 @@ const Clients = () => {
     setIsAddDialogOpen(true);
   };
 
+  const handleEnableLogin = async (client: any) => {
+    setEnablingLoginId(client.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("enable-client-login", {
+        body: { clientId: client.id },
+      });
+      if (error) throw new Error((await (error as any)?.context?.text?.()) || error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      setNewCredentials({
+        email: (data as any)?.email ?? client.email,
+        password: (data as any)?.tempPassword ?? null,
+      });
+      toast.success("Login enabled for this client");
+      if (profile) fetchClients(profile.agency_id);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to enable login");
+    } finally {
+      setEnablingLoginId(null);
+    }
+  };
+
   const handleOpenEditDialog = (client: any) => {
     if (!canManageClients) {
       toast.error("You don't have permission to edit clients");
