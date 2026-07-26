@@ -259,7 +259,7 @@ const CaregiverApprovals = () => {
                     <div className="flex gap-2 pt-2">
                       <Button
                         size="sm"
-                        className="bg-success hover:bg-success/90 text-white"
+                        className="bg-success hover:bg-success/90 text-primary-foreground"
                         disabled={processingId === registration.id}
                         onClick={() => handleApprove(registration)}
                       >
@@ -339,7 +339,11 @@ const CaregiverApprovals = () => {
               {credentials?.password && (
                 <Button
                   variant="outline"
-                  onClick={() => navigator.clipboard.writeText(credentials.password!)}
+                  onClick={() => {
+                    if (credentials.password) {
+                      navigator.clipboard.writeText(credentials.password);
+                    }
+                  }}
                 >
                   Copy password
                 </Button>
