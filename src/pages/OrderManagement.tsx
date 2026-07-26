@@ -474,8 +474,6 @@ const OrderManagement = () => {
       setAvailableCaregivers(filtered);
       if (filtered.length === 0) {
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  const shiftDuration = durationHours(bookingData.startTime, bookingData.endTime);
         toast.info(`No caregivers available on ${dayNames[bookingData.day]}`);
       }
     } catch (error: any) {
@@ -526,52 +524,6 @@ const OrderManagement = () => {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const shiftDuration = durationHours(bookingData.startTime, bookingData.endTime);
-        toast.info(`No caregivers available on ${dayNames[bookingData.day]}`);
-      }
-    } catch (error: any) {
-      toast.error("Failed to fetch caregivers");
-    } finally {
-      setLoadingCaregivers(false);
-    }
-  };
-
-  useEffect(() => {
-    if (step === 3 && assignNow && bookingData.day !== null) {
-      loadAvailableCaregivers();
-    }
-  }, [step, assignNow, bookingData.day]);
-
-  // Default the shift window from the selected service duration
-  useEffect(() => {
-    if (step === 3 && bookingData.primaryService) {
-      setBookingData(prev => {
-        const hrs = prev.duration || prev.primaryService?.duration_hours || 4;
-        const [h, m] = prev.startTime.split(":").map(Number);
-        const endMinutes = (h * 60 + m + hrs * 60) % (24 * 60);
-        const end = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
-        return { ...prev, endTime: end };
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, bookingData.primaryService?.id]);
-
-  useEffect(() => {
-    if (bookingData.client_id && step === 2) {
-      loadClientCareTypes(bookingData.client_id);
-    }
-  }, [bookingData.client_id, step]);
-
-  const getServiceIcon = (category: string) => {
-    const iconMap: Record<string, string> = {
-      'Activities of Daily Living (ADL)': '🛁',
-      'Instrumental Activities of Daily Living (IADL)': '🏠',
-      'Health Monitoring & Care': '❤️',
-      'Cognitive & Emotional Support': '🧠',
-      'Safety & Transportation': '🚗',
-      'Specialized Care': '⚕️',
-    };
-    return iconMap[category] || '💼';
-  };
 
   const timeSlots = {
     morning: ['6:00', '7:00', '8:00', '9:00', '10:00'],
