@@ -171,13 +171,13 @@ const QuickAssign = () => {
     }
   };
 
-  const handleAssignCaregiver = async (caregiverId: string) => {
+  const handleAssignCaregiver = (match: MatchedCaregiver) => {
     if (!selectedShift) {
       toast.error("No shift selected");
       return;
     }
     
-    if (!caregiverId) {
+    if (!match?.caregiver_id) {
       toast.error("No caregiver selected");
       return;
     }
