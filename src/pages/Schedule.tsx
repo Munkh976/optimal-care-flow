@@ -935,12 +935,21 @@ const Schedule = () => {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Button
+              variant={scheduleView === "list" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setScheduleView("list")}
+              className="gap-2"
+            >
+              <List className="w-4 h-4" />
+              Shifts
+            </Button>
+            <Button
               variant={scheduleView === "timeline" ? "default" : "outline"}
               size="sm"
               onClick={() => setScheduleView("timeline")}
               className="gap-2"
             >
-              <List className="w-4 h-4" />
+              <Clock className="w-4 h-4" />
               Timeline
             </Button>
             <Button
@@ -973,6 +982,21 @@ const Schedule = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {scheduleView === "list" && (
+              <div className="flex items-center rounded-md border p-0.5">
+                {(["day", "week", "month"] as const).map((mode) => (
+                  <Button
+                    key={mode}
+                    variant={rangeMode === mode ? "secondary" : "ghost"}
+                    size="sm"
+                    className="capitalize"
+                    onClick={() => setRangeMode(mode)}
+                  >
+                    {mode}
+                  </Button>
+                ))}
+              </div>
+            )}
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by category" />
@@ -1009,7 +1033,9 @@ const Schedule = () => {
               Today
             </Button>
             <h2 className="text-lg font-semibold">
-              {format(startOfWeek(currentDate), 'MMM d')} - {format(endOfWeek(currentDate), 'MMM d, yyyy')}
+              {scheduleView === "list"
+                ? rangeLabel
+                : `${format(startOfWeek(currentDate), "MMM d")} - ${format(endOfWeek(currentDate), "MMM d, yyyy")}`}
             </h2>
           </div>
 
@@ -1034,6 +1060,16 @@ const Schedule = () => {
         {/* View Content */}
         <Card className="mb-6">
           <CardContent className="p-6">
+            {scheduleView === "list" && (
+              <ShiftsListView
+                shifts={filteredShifts}
+                days={rangeDays}
+                getAssignedCaregiver={getAssignedCaregiver}
+                getCategoryForShift={getCategoryForShift}
+                onSelectShift={setSelectedShift}
+                onQuickAssign={(id) => navigate(`/quick-assign?shift=${id}`)}
+              />
+            )}
             {scheduleView === "timeline" && <TimelineView />}
             {scheduleView === "density" && <DensityGridView />}
             {scheduleView === "caregiver" && <ByCaregiverView />}
