@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Activity, Sparkles } from "lucide-react";
+import { signInSchema, signUpSchema, firstError } from "@/lib/validation";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -59,16 +60,23 @@ const Auth = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const parsed = signUpSchema.safeParse({ email, password, fullName, agencyName });
+    if (!parsed.success) {
+      toast.error(firstError(parsed));
+      return;
+    }
+
     setLoading(true);
 
     try {
       const { error } = await supabase.auth.signUp({
-        email,
-        password,
+        email: parsed.data.email,
+        password: parsed.data.password,
         options: {
           data: {
-            full_name: fullName,
-            agency_name: agencyName,
+            full_name: parsed.data.fullName,
+            agency_name: parsed.data.agencyName ?? "",
           },
           emailRedirectTo: `${window.location.origin}${nextPath ?? "/dashboard"}`,
         },
@@ -86,12 +94,19 @@ const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const parsed = signInSchema.safeParse({ email, password });
+    if (!parsed.success) {
+      toast.error(firstError(parsed));
+      return;
+    }
+
     setLoading(true);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: parsed.data.email,
+        password: parsed.data.password,
       });
 
       if (error) throw error;
