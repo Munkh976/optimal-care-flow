@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, Plus, Phone, MapPin, Heart, AlertCircle, User, Search, Upload, Eye, Trash2, Edit, Key } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,6 +41,8 @@ const Clients = () => {
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [newPassword, setNewPassword] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [enablingLoginId, setEnablingLoginId] = useState<string | null>(null);
+  const [newCredentials, setNewCredentials] = useState<{ email: string; password: string | null } | null>(null);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -205,6 +208,28 @@ const Clients = () => {
       notes: "",
     });
     setIsAddDialogOpen(true);
+  };
+
+  const handleEnableLogin = async (client: any) => {
+    setEnablingLoginId(client.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("enable-client-login", {
+        body: { clientId: client.id },
+      });
+      if (error) throw new Error((await (error as any)?.context?.text?.()) || error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      setNewCredentials({
+        email: (data as any)?.email ?? client.email,
+        password: (data as any)?.tempPassword ?? null,
+      });
+      toast.success("Login enabled for this client");
+      if (profile) fetchClients(profile.agency_id);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to enable login");
+    } finally {
+      setEnablingLoginId(null);
+    }
   };
 
   const handleOpenEditDialog = (client: any) => {
@@ -709,6 +734,7 @@ const Clients = () => {
                     <TableHead>Age</TableHead>
                     <TableHead>Care Needs</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Account</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -755,6 +781,11 @@ const Clients = () => {
                           {client.is_active ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <Badge variant={client.user_id ? "default" : "outline"}>
+                          {client.user_id ? "Linked" : "No login"}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
@@ -766,6 +797,17 @@ const Clients = () => {
                           </Button>
                           {canManageClients && (
                             <>
+                              {!client.user_id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={enablingLoginId === client.id}
+                                  title="Enable login for this client"
+                                  onClick={() => handleEnableLogin(client)}
+                                >
+                                  <UserPlus className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1114,6 +1156,41 @@ const Clients = () => {
             >
               {resetting ? "Resetting..." : "Reset Password"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!newCredentials} onOpenChange={(open) => !open && setNewCredentials(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Client login created</DialogTitle>
+            <DialogDescription>
+              No email is sent yet — this notice is stored in the notification outbox. Share these
+              details with the client directly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div>
+              <span className="font-medium">Email: </span>
+              <span className="text-muted-foreground">{newCredentials?.email}</span>
+            </div>
+            <div>
+              <span className="font-medium">Temporary password: </span>
+              <span className="text-muted-foreground">
+                {newCredentials?.password ?? "existing account — password unchanged"}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            {newCredentials?.password && (
+              <Button
+                variant="outline"
+                onClick={() => navigator.clipboard.writeText(newCredentials.password!)}
+              >
+                Copy password
+              </Button>
+            )}
+            <Button onClick={() => setNewCredentials(null)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

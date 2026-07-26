@@ -619,6 +619,56 @@ export type Database = {
           },
         ]
       }
+      pending_notifications: {
+        Row: {
+          agency_id: string | null
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          payload: Json
+          recipient_email: string
+          recipient_name: string | null
+          sent_at: string | null
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          kind: string
+          payload?: Json
+          recipient_email: string
+          recipient_name?: string | null
+          sent_at?: string | null
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          recipient_email?: string
+          recipient_name?: string | null
+          sent_at?: string | null
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_notifications_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           agency_id: string

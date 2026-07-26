@@ -38,6 +38,8 @@ const CaregiverApprovals = () => {
   const { toast } = useToast();
   const [registrations, setRegistrations] = useState<CaregiverRegistration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [credentials, setCredentials] = useState<{ email: string; password: string | null } | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; registrationId: string | null; reason: string }>({
     open: false,
@@ -79,50 +81,18 @@ const CaregiverApprovals = () => {
   };
 
   const handleApprove = async (registration: CaregiverRegistration) => {
+    setProcessingId(registration.id);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Find the auth user ID for this caregiver
-      const { data: userData, error: userError } = await supabase.rpc('assign_caregiver_role', {
-        caregiver_email: registration.email
+      const { data, error } = await supabase.functions.invoke("approve-caregiver-registration", {
+        body: { registrationId: registration.id, action: "approve" },
       });
+      if (error) throw new Error((await (error as any)?.context?.text?.()) || error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
 
-      if (userError) throw userError;
-
-      // Create caregiver in caregivers table
-      const { error: caregiverError } = await supabase.from("caregivers").insert({
-        email: registration.email,
-        phone: registration.phone,
-        first_name: registration.first_name,
-        last_name: registration.last_name,
-        address: registration.address,
-        city: registration.city,
-        state: registration.state,
-        zip_code: registration.zip_code,
-        employment_type: registration.employment_type,
-        hourly_rate: registration.hourly_rate,
-        agency_id: user.id,
-        is_active: true,
-      });
-
-      if (caregiverError) throw caregiverError;
-
-      // Update registration status
-      const { error: updateError } = await supabase
-        .from("caregiver_registrations")
-        .update({
-          status: "approved",
-          reviewed_by: user.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", registration.id);
-
-      if (updateError) throw updateError;
-
+      setCredentials({ email: registration.email, password: (data as any)?.tempPassword ?? null });
       toast({
-        title: "Success",
-        description: "Caregiver approved and added to your team",
+        title: "Caregiver approved",
+        description: "Their login is active and they were added to your team",
       });
       fetchRegistrations();
     } catch (error: any) {
@@ -131,6 +101,8 @@ const CaregiverApprovals = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -138,24 +110,19 @@ const CaregiverApprovals = () => {
     if (!rejectDialog.registrationId) return;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase
-        .from("caregiver_registrations")
-        .update({
-          status: "rejected",
-          reviewed_by: user.id,
-          reviewed_at: new Date().toISOString(),
-          rejection_reason: rejectDialog.reason,
-        })
-        .eq("id", rejectDialog.registrationId);
-
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("approve-caregiver-registration", {
+        body: {
+          registrationId: rejectDialog.registrationId,
+          action: "reject",
+          rejectionReason: rejectDialog.reason,
+        },
+      });
+      if (error) throw new Error((await (error as any)?.context?.text?.()) || error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
 
       toast({
         title: "Registration Rejected",
-        description: "The applicant has been notified",
+        description: "A notice was recorded in the notification outbox",
       });
       setRejectDialog({ open: false, registrationId: null, reason: "" });
       fetchRegistrations();
@@ -293,10 +260,11 @@ const CaregiverApprovals = () => {
                       <Button
                         size="sm"
                         className="bg-success hover:bg-success/90 text-white"
+                        disabled={processingId === registration.id}
                         onClick={() => handleApprove(registration)}
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Approve
+                        {processingId === registration.id ? "Approving..." : "Approve"}
                       </Button>
                       <Button
                         size="sm"
@@ -342,6 +310,41 @@ const CaregiverApprovals = () => {
               <Button variant="destructive" onClick={handleReject} disabled={!rejectDialog.reason.trim()}>
                 Reject Application
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!credentials} onOpenChange={(open) => !open && setCredentials(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Account activated</DialogTitle>
+              <DialogDescription>
+                No email is sent yet — this notice is stored in the notification outbox. Share these
+                details with the caregiver directly.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="font-medium">Email: </span>
+                <span className="text-muted-foreground">{credentials?.email}</span>
+              </div>
+              <div>
+                <span className="font-medium">Password: </span>
+                <span className="text-muted-foreground">
+                  {credentials?.password ?? "the password chosen during registration"}
+                </span>
+              </div>
+            </div>
+            <DialogFooter>
+              {credentials?.password && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigator.clipboard.writeText(credentials.password!)}
+                >
+                  Copy password
+                </Button>
+              )}
+              <Button onClick={() => setCredentials(null)}>Done</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

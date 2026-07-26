@@ -36,6 +36,7 @@ import AutoSchedule from "./pages/AutoSchedule";
 import Reports from "./pages/Reports";
 import AdminUserManagement from "./pages/AdminUserManagement";
 import OAuthConsent from "./pages/OAuthConsent";
+import NotificationsOutbox from "./pages/NotificationsOutbox";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const App = () => (
           <Route path="/shift-trades" element={<ShiftTrades />} />
           <Route path="/caregiver-registration" element={<CaregiverRegistration />} />
           <Route path="/caregiver-approvals" element={<CaregiverApprovals />} />
+          <Route path="/notifications-outbox" element={<NotificationsOutbox />} />
           <Route path="/caregiver-dashboard" element={<CaregiverDashboard />} />
           <Route path="/client-dashboard" element={<ClientDashboard />} />
           <Route path="/users" element={<Users />} />
