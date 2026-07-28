@@ -1,24 +1,29 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AppLayout } from "@/components/AppLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { usePendingApprovals } from "@/hooks/usePendingApprovals";
-import { 
-  Users, Clock, AlertTriangle, UserCheck, 
-  Sparkles, ArrowRightLeft, Shield, Plus
+import {
+  Clock, AlertTriangle, UserCheck, CalendarDays,
+  Sparkles, ArrowRightLeft, Shield, Plus, ClipboardList, BadgeCheck
 } from "lucide-react";
 
 interface Stats {
   activeClients: number;
   availableCaregivers: number;
   totalCaregivers: number;
-  pendingOrders: number;
-  unfilledShifts: number;
+  todayShifts: number;
+  todayUnassigned: number;
+  weekUnassigned: number;
+  activeOrders: number;
+  pendingTimeOff: number;
+  pendingTrades: number;
+  expiringCerts: number;
+  coverageRate: number;
 }
 
 interface UrgentRequest {
@@ -29,14 +34,16 @@ interface UrgentRequest {
   start_time: string;
 }
 
-interface Notification {
+interface ActionItem {
   id: string;
-  type: 'warning' | 'success' | 'danger' | 'info';
+  type: 'warning' | 'danger' | 'info';
   title: string;
   message: string;
-  time: string;
-  actionLabel?: string;
+  actionLabel: string;
+  to: string;
 }
+
+const iso = (d: Date) => d.toISOString().split("T")[0];
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -48,11 +55,17 @@ const Dashboard = () => {
     activeClients: 0,
     availableCaregivers: 0,
     totalCaregivers: 0,
-    pendingOrders: 0,
-    unfilledShifts: 0,
+    todayShifts: 0,
+    todayUnassigned: 0,
+    weekUnassigned: 0,
+    activeOrders: 0,
+    pendingTimeOff: 0,
+    pendingTrades: 0,
+    expiringCerts: 0,
+    coverageRate: 100,
   });
   const [urgentRequests, setUrgentRequests] = useState<UrgentRequest[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
 
   useEffect(() => {
     checkAuth();
@@ -92,12 +105,6 @@ const Dashboard = () => {
     setLoading(false);
   };
 
-  const refreshData = async () => {
-    if (user) {
-      await fetchDashboardData(user.id);
-    }
-  };
-
   const fetchDashboardData = async (userId: string) => {
     // Get user's agency from profile
     const { data: profileData } = await supabase
@@ -109,24 +116,49 @@ const Dashboard = () => {
     if (!profileData?.agency_id) return;
 
     const agencyId = profileData.agency_id;
+    const today = iso(new Date());
+    const weekEnd = new Date();
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const in30 = new Date();
+    in30.setDate(in30.getDate() + 30);
 
-    // Fetch stats
-    const [clientsRes, caregiversRes, shiftsRes] = await Promise.all([
-      supabase.from("clients").select("*", { count: 'exact' }).eq("agency_id", agencyId).eq("is_active", true),
-      supabase.from("caregivers").select("*", { count: 'exact' }).eq("agency_id", agencyId),
-      supabase.from("shifts").select("*, clients(first_name, last_name)").eq("agency_id", agencyId)
-    ]);
+    const [clientsRes, caregiversRes, weekShiftsRes, ordersRes, timeOffRes, tradesRes, certsRes] =
+      await Promise.all([
+        supabase.from("clients").select("id", { count: "exact", head: true })
+          .eq("agency_id", agencyId).eq("is_active", true),
+        supabase.from("caregivers").select("id, is_active").eq("agency_id", agencyId),
+        supabase.from("shifts").select("id, shift_date, status, caregiver_id")
+          .eq("agency_id", agencyId).gte("shift_date", today).lte("shift_date", iso(weekEnd)),
+        supabase.from("client_orders").select("id", { count: "exact", head: true })
+          .eq("agency_id", agencyId).is("archived_at", null).neq("status", "completed"),
+        supabase.from("time_off_requests").select("id", { count: "exact", head: true })
+          .eq("status", "pending"),
+        supabase.from("shift_trades").select("id", { count: "exact", head: true })
+          .eq("status", "pending"),
+        supabase.from("caregiver_certifications").select("id", { count: "exact", head: true })
+          .lte("expiry_date", iso(in30)).gte("expiry_date", today),
+      ]);
 
-    const activeCaregivers = caregiversRes.data?.filter(c => c.is_active).length || 0;
-    const openShifts = shiftsRes.data?.filter(s => s.status === 'open' && !s.caregiver_id).length || 0;
-    const unassignedShifts = shiftsRes.data?.filter(s => s.status === 'unassigned').length || 0;
+    const caregivers = caregiversRes.data || [];
+    const weekShifts = weekShiftsRes.data || [];
+    const todays = weekShifts.filter((s: any) => s.shift_date === today);
+    const todayUnassigned = todays.filter((s: any) => !s.caregiver_id).length;
+    const weekUnassigned = weekShifts.filter((s: any) => !s.caregiver_id).length;
 
     setStats({
       activeClients: clientsRes.count || 0,
-      availableCaregivers: activeCaregivers,
-      totalCaregivers: caregiversRes.count || 0,
-      pendingOrders: unassignedShifts,
-      unfilledShifts: openShifts,
+      availableCaregivers: caregivers.filter((c: any) => c.is_active).length,
+      totalCaregivers: caregivers.length,
+      todayShifts: todays.length,
+      todayUnassigned,
+      weekUnassigned,
+      activeOrders: ordersRes.count || 0,
+      pendingTimeOff: timeOffRes.count || 0,
+      pendingTrades: tradesRes.count || 0,
+      expiringCerts: certsRes.count || 0,
+      coverageRate: weekShifts.length
+        ? Math.round(((weekShifts.length - weekUnassigned) / weekShifts.length) * 100)
+        : 100,
     });
 
     // Fetch urgent requests (open shifts within next 48 hours)
@@ -135,62 +167,64 @@ const Dashboard = () => {
     
     const { data: urgentShifts } = await supabase
       .from("shifts")
-      .select("*, clients(first_name, last_name)")
+      .select("id, shift_date, start_time, care_type_code, order_title, clients(first_name, last_name), care_types(name)")
       .eq("agency_id", agencyId)
-      .eq("status", "open")
       .is("caregiver_id", null)
+      .gte("shift_date", today)
       .lte("shift_date", twoDaysFromNow.toISOString().split('T')[0])
       .order("shift_date", { ascending: true })
-      .limit(3);
+      .limit(5);
 
-    setUrgentRequests((urgentShifts || []).map(shift => ({
+    setUrgentRequests((urgentShifts || []).map((shift: any) => ({
       id: shift.id,
       client_name: `${shift.clients?.first_name || ''} ${shift.clients?.last_name || ''}`,
-      care_type: shift.care_type_code,
+      care_type: shift.care_types?.name || shift.order_title || shift.care_type_code,
       shift_date: shift.shift_date,
       start_time: shift.start_time,
     })));
 
-    // Create mock notifications (you can replace with real data)
-    setNotifications([
-      {
-        id: '1',
-        type: 'warning',
-        title: 'Shift Trade Request',
-        message: 'A caregiver has requested to trade a shift',
-        time: '5 minutes ago',
-        actionLabel: 'Review'
-      },
-      {
-        id: '2',
-        type: 'success',
-        title: 'Schedule Confirmed',
-        message: "Next week's schedule has been confirmed by all caregivers",
-        time: '1 hour ago'
-      },
-      {
-        id: '3',
-        type: 'danger',
-        title: 'Certification Expiring',
-        message: "A caregiver's certification expires in 7 days",
-        time: '2 hours ago',
-        actionLabel: 'Action Required'
-      }
-    ]);
-  };
-
-  const handleQuickAction = (action: string) => {
-    switch (action) {
-      case 'quick-assign':
-        navigate("/quick-assign");
-        break;
-      case 'shift-trades':
-        navigate("/shift-trades");
-        break;
-      case 'compliance':
-        toast.info("Compliance check coming soon!");
-        break;
+    const items: ActionItem[] = [];
+    if (weekUnassigned > 0) {
+      items.push({
+        id: "unassigned",
+        type: "danger",
+        title: `${weekUnassigned} unassigned shift${weekUnassigned === 1 ? "" : "s"}`,
+        message: "Shifts in the next 7 days still need a caregiver.",
+        actionLabel: "Fill shifts",
+        to: "/schedule?tab=unassigned",
+      });
     }
+    if ((timeOffRes.count || 0) > 0) {
+      items.push({
+        id: "timeoff",
+        type: "warning",
+        title: `${timeOffRes.count} time-off request${timeOffRes.count === 1 ? "" : "s"} pending`,
+        message: "Approve or deny to keep the schedule accurate.",
+        actionLabel: "Review",
+        to: "/time-off-requests",
+      });
+    }
+    if ((tradesRes.count || 0) > 0) {
+      items.push({
+        id: "trades",
+        type: "warning",
+        title: `${tradesRes.count} shift trade${tradesRes.count === 1 ? "" : "s"} pending`,
+        message: "Caregivers are waiting on a coverage decision.",
+        actionLabel: "Review",
+        to: "/shift-trades",
+      });
+    }
+    if ((certsRes.count || 0) > 0) {
+      items.push({
+        id: "certs",
+        type: "danger",
+        title: `${certsRes.count} certification${certsRes.count === 1 ? "" : "s"} expiring`,
+        message: "Expiring within the next 30 days.",
+        actionLabel: "View caregivers",
+        to: "/caregivers",
+      });
+    }
+    setActionItems(items);
   };
 
   if (loading) {
@@ -218,6 +252,10 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate("/schedule?tab=today")}>
+              <CalendarDays className="h-4 w-4 mr-2" />
+              Today's Board
+            </Button>
             <Button size="sm" onClick={() => navigate("/order-management")}>
               <Plus className="h-4 w-4 mr-2" />
               New Care Order
@@ -237,34 +275,42 @@ const Dashboard = () => {
               />
             </button>
           )}
-          <StatCard
-            title="Active Clients"
-            value={stats.activeClients}
-            description="+3 this week"
-            icon={Users}
-            iconColor="text-primary"
-          />
-          <StatCard
-            title="Available Caregivers"
-            value={`${stats.availableCaregivers}/${stats.totalCaregivers}`}
-            description={`${Math.round((stats.availableCaregivers / Math.max(stats.totalCaregivers, 1)) * 100)}% availability`}
-            icon={UserCheck}
-            iconColor="text-success"
-          />
-          <StatCard
-            title="Pending Orders"
-            value={stats.pendingOrders}
-            description="Requires attention"
-            icon={Clock}
-            iconColor="text-warning"
-          />
-          <StatCard
-            title="Unfilled Shifts"
-            value={stats.unfilledShifts}
-            description="Next 48 hours"
-            icon={AlertTriangle}
-            iconColor="text-destructive"
-          />
+          <button type="button" onClick={() => navigate("/schedule?tab=today")} className="text-left">
+            <StatCard
+              title="Today's Shifts"
+              value={stats.todayShifts}
+              description={`${stats.todayUnassigned} still unassigned`}
+              icon={CalendarDays}
+              iconColor="text-primary"
+            />
+          </button>
+          <button type="button" onClick={() => navigate("/schedule?tab=unassigned")} className="text-left">
+            <StatCard
+              title="Unassigned (7 days)"
+              value={stats.weekUnassigned}
+              description={`${stats.coverageRate}% coverage this week`}
+              icon={AlertTriangle}
+              iconColor="text-destructive"
+            />
+          </button>
+          <button type="button" onClick={() => navigate("/order-management")} className="text-left">
+            <StatCard
+              title="Active Orders"
+              value={stats.activeOrders}
+              description="Not completed or archived"
+              icon={ClipboardList}
+              iconColor="text-warning"
+            />
+          </button>
+          <button type="button" onClick={() => navigate("/caregivers")} className="text-left">
+            <StatCard
+              title="Active Caregivers"
+              value={`${stats.availableCaregivers}/${stats.totalCaregivers}`}
+              description={`${stats.activeClients} active clients`}
+              icon={UserCheck}
+              iconColor="text-success"
+            />
+          </button>
         </div>
 
         {/* Quick Actions */}
@@ -274,17 +320,27 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3">
-              <Button variant="outline" onClick={() => handleQuickAction('quick-assign')}>
+              <Button variant="outline" onClick={() => navigate("/schedule?tab=unassigned")}>
                 <Sparkles className="mr-2 h-4 w-4" />
-                Quick Assign
+                Assign Shifts
               </Button>
-              <Button variant="outline" onClick={() => handleQuickAction('shift-trades')}>
+              <Button variant="outline" onClick={() => navigate("/shift-trades")}>
                 <ArrowRightLeft className="mr-2 h-4 w-4" />
-                View Shift Trades
+                Shift Trades
+                {stats.pendingTrades > 0 && (
+                  <Badge variant="secondary" className="ml-2">{stats.pendingTrades}</Badge>
+                )}
               </Button>
-              <Button variant="outline" onClick={() => handleQuickAction('compliance')}>
+              <Button variant="outline" onClick={() => navigate("/time-off-requests")}>
                 <Shield className="mr-2 h-4 w-4" />
-                Compliance Check
+                Time Off
+                {stats.pendingTimeOff > 0 && (
+                  <Badge variant="secondary" className="ml-2">{stats.pendingTimeOff}</Badge>
+                )}
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/care-types")}>
+                <BadgeCheck className="mr-2 h-4 w-4" />
+                Care Services & Categories
               </Button>
             </div>
           </CardContent>
@@ -305,13 +361,13 @@ const Dashboard = () => {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <h6 className="font-semibold">{request.client_name}</h6>
-                        <p className="text-sm text-muted-foreground">{request.care_type.replace('_', ' ')}</p>
+                        <p className="text-sm text-muted-foreground">{request.care_type}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           <Clock className="inline h-3 w-3 mr-1" />
                           {new Date(request.shift_date).toLocaleDateString()} at {request.start_time}
                         </p>
                       </div>
-                      <Button size="sm" variant="destructive" onClick={() => navigate(`/quick-assign?shift=${request.id}`)}>
+                      <Button size="sm" variant="destructive" onClick={() => navigate(`/schedule?tab=unassigned`)}>
                         Assign
                       </Button>
                     </div>
@@ -323,30 +379,32 @@ const Dashboard = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Recent Notifications</CardTitle>
+              <CardTitle>Needs Your Attention</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {notifications.map((notif) => (
-                <div key={notif.id} className={`p-3 rounded-lg border-l-4 ${
-                  notif.type === 'danger' ? 'border-l-destructive bg-destructive/5' :
-                  notif.type === 'warning' ? 'border-l-warning bg-warning/5' :
-                  notif.type === 'success' ? 'border-l-success bg-success/5' :
-                  'border-l-primary bg-primary/5'
-                }`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h6 className="font-semibold text-sm">{notif.title}</h6>
-                      <p className="text-xs text-muted-foreground mt-1">{notif.message}</p>
-                      <p className="text-xs text-muted-foreground mt-2">{notif.time}</p>
-                    </div>
-                    {notif.actionLabel && (
-                      <Button size="sm" variant="outline">
-                        {notif.actionLabel}
+              {actionItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  All caught up — nothing needs your attention.
+                </p>
+              ) : (
+                actionItems.map((item) => (
+                  <div key={item.id} className={`p-3 rounded-lg border-l-4 ${
+                    item.type === 'danger' ? 'border-l-destructive bg-destructive/5' :
+                    item.type === 'warning' ? 'border-l-warning bg-warning/5' :
+                    'border-l-primary bg-primary/5'
+                  }`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <h6 className="font-semibold text-sm">{item.title}</h6>
+                        <p className="text-xs text-muted-foreground mt-1">{item.message}</p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => navigate(item.to)}>
+                        {item.actionLabel}
                       </Button>
-                    )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

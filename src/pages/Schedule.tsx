@@ -107,7 +107,7 @@ const Schedule = () => {
         const { data: shiftsData, error } = await supabase
           .from("shifts")
           .select(
-            `*, clients ( first_name, last_name, address, city, state, zip_code ), care_types ( name, code, category )`
+            `*, clients ( first_name, last_name, phone, address, city, state, zip_code, care_requirements ), care_types ( name, code, category )`
           )
           .eq("agency_id", agency)
           .gte("shift_date", format(start, "yyyy-MM-dd"))
