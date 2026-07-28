@@ -26,6 +26,18 @@ interface ReportStats {
   activeClients: number;
   totalHours: number;
   growthRate: number;
+  unassignedShifts: number;
+  coverageRate: number;
+}
+
+interface CaregiverMetric {
+  caregiver: string;
+  shifts: number;
+  hours: number;
+  completionRate: number;
+  onTimeRate: number;
+  avgRating: number | null;
+  overtimeHours: number;
 }
 
 const Reports = () => {
@@ -36,6 +48,8 @@ const Reports = () => {
   const [stats, setStats] = useState<ReportStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [shiftData, setShiftData] = useState<any[]>([]);
+  const [workforce, setWorkforce] = useState<CaregiverMetric[]>([]);
+  const [serviceMix, setServiceMix] = useState<{ service: string; shifts: number; hours: number }[]>([]);
 
   useEffect(() => {
     fetchReportData();
