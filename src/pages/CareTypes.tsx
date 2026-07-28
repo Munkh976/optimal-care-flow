@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Search, Eye, Trash2, Pencil } from "lucide-react";
+import { Plus, Search, Eye, Trash2, Pencil, Tags } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from "@/components/ui/textarea";
 import { AppLayout } from "@/components/AppLayout";
 import { careTypeFormSchema } from "@/lib/validation";
+import { ManageCategoriesDialog } from "@/components/care-types/ManageCategoriesDialog";
 
 const CareTypes = () => {
   const queryClient = useQueryClient();
@@ -24,6 +25,7 @@ const CareTypes = () => {
   const [selectedCareType, setSelectedCareType] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewCareType, setViewCareType] = useState<any>(null);
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [formData, setFormData] = useState({
     code: "",
     category: "",
@@ -44,6 +46,20 @@ const CareTypes = () => {
       
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ["care-service-categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("care_service_categories" as never)
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order")
+        .order("name");
+      if (error) throw error;
+      return (data || []) as any[];
     },
   });
 
@@ -78,12 +94,21 @@ const CareTypes = () => {
         .delete()
         .eq("id", deleteId);
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === "23503" || /foreign key/i.test(error.message)) {
+          toast.error(
+            "This care service is already used by shifts, caregiver skills or client care needs, so it can't be deleted. Edit it instead, or mark it inactive to hide it from new bookings."
+          );
+        } else {
+          toast.error("Could not delete this care service. Please try again.");
+        }
+        return;
+      }
 
       toast.success("Care type deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["care-types"] });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete care type");
+    } catch {
+      toast.error("Could not delete this care service. Please try again.");
     } finally {
       setDeleteId(null);
     }
@@ -177,17 +202,23 @@ const CareTypes = () => {
           <h2 className="text-3xl font-bold mb-2">Care Services</h2>
           <p className="text-muted-foreground">Manage standardized care service catalog</p>
         </div>
-        <Button
-          className="gap-2"
-          onClick={() => {
-            setSelectedCareType(null);
-            setFormData({ code: "", category: "", name: "", description: "", keywords: "", price: "35.00", duration: "4" });
-            setIsDialogOpen(true);
-          }}
-        >
-          <Plus className="h-4 w-4" />
-          Add Care Service
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setIsCategoriesOpen(true)}>
+            <Tags className="h-4 w-4" />
+            Manage Categories
+          </Button>
+          <Button
+            className="gap-2"
+            onClick={() => {
+              setSelectedCareType(null);
+              setFormData({ code: "", category: "", name: "", description: "", keywords: "", price: "35.00", duration: "4" });
+              setIsDialogOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Add Care Service
+          </Button>
+        </div>
       </div>
 
       <Card className="p-6">
@@ -311,12 +342,11 @@ const CareTypes = () => {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Activities of Daily Living (ADL)">Activities of Daily Living (ADL)</SelectItem>
-                    <SelectItem value="Instrumental Activities of Daily Living (IADL)">Instrumental Activities of Daily Living (IADL)</SelectItem>
-                  <SelectItem value="Health Monitoring & Care">Health Monitoring & Care</SelectItem>
-                  <SelectItem value="Cognitive & Emotional Support">Cognitive & Emotional Support</SelectItem>
-                  <SelectItem value="Safety & Transportation">Safety & Transportation</SelectItem>
-                  <SelectItem value="Specialized Care">Specialized Care</SelectItem>
+                    {(categories || []).map((cat: any) => (
+                      <SelectItem key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -449,6 +479,8 @@ const CareTypes = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ManageCategoriesDialog open={isCategoriesOpen} onOpenChange={setIsCategoriesOpen} />
       </div>
     </AppLayout>
   );
