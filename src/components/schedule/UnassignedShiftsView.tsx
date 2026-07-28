@@ -12,13 +12,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertTriangle, CalendarDays, Clock, MapPin, Search, Zap } from "lucide-react";
+import { AlertTriangle, CalendarDays, Clock, MapPin, Search, Sparkles, Zap } from "lucide-react";
 
 interface Props {
   shifts: any[];
   getCategoryForShift: (shift: any) => any;
   onSelectShift: (shift: any) => void;
   onAssign: (shift: any) => void;
+  onSmartAssign?: (shift: any) => void;
+  onAutoFill?: () => void;
 }
 
 export const UnassignedShiftsView = ({
@@ -26,6 +28,8 @@ export const UnassignedShiftsView = ({
   getCategoryForShift,
   onSelectShift,
   onAssign,
+  onSmartAssign,
+  onAutoFill,
 }: Props) => {
   const [search, setSearch] = useState("");
 
@@ -64,6 +68,12 @@ export const UnassignedShiftsView = ({
           <AlertTriangle className="h-3.5 w-3.5" />
           {results.length} unassigned
         </Badge>
+        {onAutoFill && shifts.length > 0 && (
+          <Button variant="outline" className="gap-2 ml-auto" onClick={onAutoFill}>
+            <Sparkles className="h-4 w-4" />
+            Auto-fill this period
+          </Button>
+        )}
       </div>
 
       {results.length === 0 ? (
@@ -82,7 +92,7 @@ export const UnassignedShiftsView = ({
                 <TableHead>Client</TableHead>
                 <TableHead>Service</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Quick assign</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -133,17 +143,33 @@ export const UnassignedShiftsView = ({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        className="gap-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAssign(shift);
-                        }}
-                      >
-                        <Zap className="h-3.5 w-3.5" />
-                        Assign
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAssign(shift);
+                          }}
+                        >
+                          <Zap className="h-3.5 w-3.5" />
+                          Assign
+                        </Button>
+                        {onSmartAssign && (
+                          <Button
+                            size="sm"
+                            className="gap-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSmartAssign(shift);
+                            }}
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Smart assign
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

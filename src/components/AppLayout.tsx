@@ -84,16 +84,27 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   // Build menu items from permissions.
   // System admins see the platform portal only; agency/staff roles never see it.
-  const dynamicMenuItems = permissions
+  // Scheduling modules were consolidated into the single Schedule workspace,
+  // so they must not appear as separate sidebar entries.
+  const MERGED_INTO_SCHEDULE = ["shifts", "quick_assign", "auto_schedule", "live_operations"];
+
+  const readable = permissions
     .filter(p => p.route && p.can_read)
-    .filter(p => (isSystemAdmin ? p.category === "platform" : p.category !== "platform"))
+    .filter(p => (isSystemAdmin ? p.category === "platform" : p.category !== "platform"));
+
+  const hasSchedule = readable.some(p => p.module_code === "schedule");
+
+  const dynamicMenuItems = readable
+    .filter(p => !(hasSchedule && MERGED_INTO_SCHEDULE.includes(p.module_code)))
     .map(p => ({
-      label: p.module_name,
+      label: p.module_code === "schedule" ? "Schedule" : p.module_name,
       icon: iconMap[p.module_code] || FileText,
       path: p.route!,
       category: p.category,
       badge: p.module_code === "caregiver_approvals" ? pendingCount : 0,
-    }));
+    }))
+    // de-duplicate any remaining entries that resolve to the same destination
+    .filter((item, i, arr) => arr.findIndex(o => o.path === item.path) === i);
 
   // Add dashboard as first item based on role
   const menuItems = userRole === "system_admin" 

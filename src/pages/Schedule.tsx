@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Clock,
   List,
+  Radio,
   Users,
   UserCheck,
 } from "lucide-react";
@@ -47,6 +48,9 @@ import { UnassignedShiftsView } from "@/components/schedule/UnassignedShiftsView
 import { CaregiverGridView } from "@/components/schedule/CaregiverGridView";
 import { ClientGridView } from "@/components/schedule/ClientGridView";
 import { PickShiftDialog } from "@/components/schedule/PickShiftDialog";
+import { LiveOpsView } from "@/components/schedule/LiveOpsView";
+import { SmartAssignSheet } from "@/components/schedule/SmartAssignSheet";
+import { AutoFillDialog } from "@/components/schedule/AutoFillDialog";
 
 const SERVICE_CATEGORIES: Record<string, { name: string; color: string }> = {
   ADL: { name: "Activities of Daily Living", color: "hsl(217, 91%, 60%)" },
@@ -58,7 +62,9 @@ const SERVICE_CATEGORIES: Record<string, { name: string; color: string }> = {
 };
 
 type RangeMode = "day" | "week" | "month";
-type TabKey = "shifts" | "unassigned" | "caregivers" | "clients";
+type TabKey = "today" | "shifts" | "unassigned" | "caregivers" | "clients";
+
+const TAB_KEYS: TabKey[] = ["today", "shifts", "unassigned", "caregivers", "clients"];
 
 const getRange = (date: Date, mode: RangeMode) => {
   if (mode === "day") return { start: startOfDay(date), end: endOfDay(date) };
@@ -68,6 +74,7 @@ const getRange = (date: Date, mode: RangeMode) => {
 
 const Schedule = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [agencyId, setAgencyId] = useState<string | null>(null);
   const [shifts, setShifts] = useState<any[]>([]);
@@ -75,7 +82,10 @@ const Schedule = () => {
   const [caregivers, setCaregivers] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
 
-  const [tab, setTab] = useState<TabKey>("shifts");
+  const initialTab = (searchParams.get("tab") as TabKey) || "shifts";
+  const [tab, setTab] = useState<TabKey>(
+    TAB_KEYS.includes(initialTab) ? initialTab : "shifts"
+  );
   const [rangeMode, setRangeMode] = useState<RangeMode>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -85,6 +95,8 @@ const Schedule = () => {
   const [shiftToAssign, setShiftToAssign] = useState<any>(null);
   const [assignDefaultCaregiver, setAssignDefaultCaregiver] = useState<string | null>(null);
   const [pickForCaregiver, setPickForCaregiver] = useState<any>(null);
+  const [smartAssignShift, setSmartAssignShift] = useState<any>(null);
+  const [autoFillOpen, setAutoFillOpen] = useState(false);
 
   const fetchScheduleData = useCallback(
     async (agency: string) => {
@@ -160,6 +172,14 @@ const Schedule = () => {
     };
     init();
   }, [fetchScheduleData, navigate]);
+
+  const changeTab = (value: string) => {
+    const next = (TAB_KEYS.includes(value as TabKey) ? value : "shifts") as TabKey;
+    setTab(next);
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", next);
+    setSearchParams(params, { replace: true });
+  };
 
   const refresh = () => {
     if (agencyId) fetchScheduleData(agencyId);
@@ -333,8 +353,12 @@ const Schedule = () => {
         {loading ? (
           <div className="py-20 text-center text-muted-foreground">Loading schedule...</div>
         ) : (
-          <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
+          <Tabs value={tab} onValueChange={changeTab}>
             <TabsList>
+              <TabsTrigger value="today" className="gap-2">
+                <Radio className="h-4 w-4" />
+                Today (Live)
+              </TabsTrigger>
               <TabsTrigger value="shifts" className="gap-2">
                 <List className="h-4 w-4" />
                 Shifts
@@ -358,6 +382,10 @@ const Schedule = () => {
               </TabsTrigger>
             </TabsList>
 
+            <TabsContent value="today" className="mt-6">
+              <LiveOpsView agencyId={agencyId} onAssign={(shift) => setSmartAssignShift(shift)} />
+            </TabsContent>
+
             <TabsContent value="shifts" className="mt-6">
               <ShiftsListView
                 shifts={filteredShifts}
@@ -378,6 +406,8 @@ const Schedule = () => {
                 getCategoryForShift={getCategoryForShift}
                 onSelectShift={setSelectedShift}
                 onAssign={(shift) => openAssign(shift)}
+                onSmartAssign={(shift) => setSmartAssignShift(shift)}
+                onAutoFill={() => setAutoFillOpen(true)}
               />
             </TabsContent>
 
@@ -424,6 +454,24 @@ const Schedule = () => {
           setPickForCaregiver(null);
           openAssign(shift, caregiverId);
         }}
+      />
+
+      <SmartAssignSheet
+        open={!!smartAssignShift}
+        onOpenChange={(open) => !open && setSmartAssignShift(null)}
+        shift={smartAssignShift}
+        onAssigned={() => {
+          setSmartAssignShift(null);
+          refresh();
+        }}
+      />
+
+      <AutoFillDialog
+        open={autoFillOpen}
+        onOpenChange={setAutoFillOpen}
+        shifts={unassignedShifts}
+        rangeLabel={rangeLabel}
+        onCommitted={refresh}
       />
 
       <AssignShiftDialog
