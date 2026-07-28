@@ -41,19 +41,18 @@ export const ShiftFilters = ({
 
       {onCategoryFilterChange && (
         <div className="flex-1 min-w-[200px]">
-          <Label className="text-sm font-medium">Care Type</Label>
+          <Label className="text-sm font-medium">Care Service Category</Label>
           <Select value={categoryFilter} onValueChange={onCategoryFilterChange}>
             <SelectTrigger className="mt-1">
-              <SelectValue placeholder="All types" />
+              <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="ADL">Activities of Daily Living</SelectItem>
-              <SelectItem value="IADL">Instrumental Activities</SelectItem>
-              <SelectItem value="Health">Health Monitoring</SelectItem>
-              <SelectItem value="Cognitive">Cognitive Support</SelectItem>
-              <SelectItem value="Safety">Safety & Transportation</SelectItem>
-              <SelectItem value="Specialized">Specialized Care</SelectItem>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categoryNames.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
