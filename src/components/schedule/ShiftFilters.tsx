@@ -1,5 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { useCareServices } from "@/hooks/useCareServices";
 
 interface ShiftFiltersProps {
   statusFilter?: string;
@@ -20,6 +21,7 @@ export const ShiftFilters = ({
   onCaregiverFilterChange,
   caregivers
 }: ShiftFiltersProps) => {
+  const { categoryNames } = useCareServices();
   return (
     <div className="flex flex-wrap gap-4">
       {onStatusFilterChange && (
