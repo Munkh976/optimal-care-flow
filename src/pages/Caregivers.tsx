@@ -147,7 +147,7 @@ const Caregivers = () => {
       .order("name", { ascending: true });
 
     if (error) {
-      toast.error("Failed to load care types");
+      toast.error("Failed to load care services");
     } else {
       setCareTypes(data || []);
     }
