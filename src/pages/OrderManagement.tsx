@@ -92,7 +92,7 @@ const OrderManagement = () => {
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast.error("Failed to load orders");
+      toast.error("Failed to load care plans");
       setLoading(false);
       return;
     }
@@ -128,7 +128,7 @@ const OrderManagement = () => {
 
   const handleArchiveOrder = async (order: Order) => {
     const archiving = !order.archived_at;
-    if (archiving && !confirm("Archive this order? It stays in the Archived tab with all of its shifts — nothing is deleted.")) return;
+    if (archiving && !confirm("Archive this care plan? It stays in the Archived tab with all of its shifts — nothing is deleted.")) return;
 
     const { error } = await supabase
       .from("client_orders")
@@ -138,9 +138,9 @@ const OrderManagement = () => {
       } as never)
       .eq("id", order.id);
 
-    if (error) toast.error(archiving ? "Failed to archive order" : "Failed to restore order");
+    if (error) toast.error(archiving ? "Failed to archive care plan" : "Failed to restore care plan");
     else {
-      toast.success(archiving ? "Order archived" : "Order restored");
+      toast.success(archiving ? "Care plan archived" : "Care plan restored");
       if (profile?.agency_id) fetchOrders(profile.agency_id);
     }
   };
@@ -216,14 +216,14 @@ const OrderManagement = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h2 className="text-3xl font-bold">Order Management</h2>
+            <h2 className="text-3xl font-bold">Care Plans</h2>
             <p className="text-muted-foreground mt-1">
               Care plans with recurring service lines. Shifts are generated unassigned and filled from Schedule.
             </p>
           </div>
           <Button onClick={() => { setEditingOrder(null); setWizardOpen(true); }}>
             <Plus className="mr-2 h-4 w-4" />
-            Create Order
+            Create Care Plan
           </Button>
         </div>
 
@@ -251,7 +251,7 @@ const OrderManagement = () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by order # or client name..."
+                  placeholder="Search by plan # or client name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -299,7 +299,7 @@ const OrderManagement = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
               <div className="text-center">
                 <div className="text-2xl font-bold text-primary">{orders.length}</div>
-                <div className="text-sm text-muted-foreground">Total Orders</div>
+                <div className="text-sm text-muted-foreground">Total Care Plans</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
@@ -326,14 +326,14 @@ const OrderManagement = () => {
           <CardContent className="p-0">
             {filteredOrders.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
-                {orders.length === 0 ? "No orders found. Create your first order to get started." : "No orders match your filters."}
+                {orders.length === 0 ? "No care plans found. Create your first care plan to get started." : "No care plans match your filters."}
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
-                    <TableHead>Order #</TableHead>
+                    <TableHead>Plan #</TableHead>
                     <TableHead>Client</TableHead>
                     <TableHead>Period</TableHead>
                     <TableHead>Services</TableHead>
@@ -399,7 +399,7 @@ const OrderManagement = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                title="Edit order"
+                                title="Edit care plan"
                                 onClick={() => { setEditingOrder(order); setWizardOpen(true); }}
                               >
                                 <Edit className="h-4 w-4" />
@@ -409,7 +409,7 @@ const OrderManagement = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleArchiveOrder(order)}
-                              title={order.archived_at ? "Restore order" : "Archive order"}
+                              title={order.archived_at ? "Restore care plan" : "Archive care plan"}
                             >
                               {order.archived_at ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
                             </Button>
@@ -437,7 +437,7 @@ const OrderManagement = () => {
                               <div>
                                 <h4 className="font-semibold mb-3 flex items-center gap-2">
                                   <Package className="h-4 w-4" />
-                                  Order Shifts
+                                  Plan Shifts
                                 </h4>
                                 {orderShifts[order.id]?.length ? (
                                   <div className="space-y-2">
@@ -478,7 +478,7 @@ const OrderManagement = () => {
                                   </div>
                                 ) : (
                                   <div className="text-center py-4 text-muted-foreground">
-                                    {orderShifts[order.id] ? "No shifts on this order." : "Loading shifts..."}
+                                    {orderShifts[order.id] ? "No shifts on this care plan." : "Loading shifts..."}
                                   </div>
                                 )}
                               </div>

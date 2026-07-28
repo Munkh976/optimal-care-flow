@@ -35,7 +35,7 @@ export const Overview = ({ clientProfile, stats, onCreateOrder, onViewSchedule }
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="hover-scale">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Care Plans</CardTitle>
             <Package className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
@@ -87,7 +87,7 @@ export const Overview = ({ clientProfile, stats, onCreateOrder, onViewSchedule }
         <CardContent className="grid gap-4 md:grid-cols-2">
           <Button onClick={onCreateOrder} className="h-auto flex-col gap-2 py-4">
             <Plus className="h-6 w-6" />
-            <span className="font-semibold">Create New Order</span>
+            <span className="font-semibold">Create New Care Plan</span>
             <span className="text-xs opacity-90">Start a new care order</span>
           </Button>
           <Button onClick={onViewSchedule} variant="outline" className="h-auto flex-col gap-2 py-4">
@@ -109,7 +109,7 @@ export const Overview = ({ clientProfile, stats, onCreateOrder, onViewSchedule }
             <div className="flex items-start gap-4 pb-4 border-b last:border-0">
               <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
               <div className="flex-1">
-                <p className="text-sm font-medium">Order Created</p>
+                <p className="text-sm font-medium">Care Plan Created</p>
                 <p className="text-xs text-muted-foreground">Weekly care order for next month</p>
                 <p className="text-xs text-muted-foreground mt-1">2 hours ago</p>
               </div>

@@ -361,11 +361,11 @@ export const OrdersManagement = ({
 
       if (shiftsError) throw shiftsError;
 
-      toast.success("Order submitted successfully!");
+      toast.success("Care plan submitted successfully!");
       setStep(3);
       onRefresh();
     } catch (error: any) {
-      toast.error(error.message || "Failed to submit order");
+      toast.error(error.message || "Failed to submit care plan");
       console.error(error);
     } finally {
       setLoading(false);
@@ -405,7 +405,7 @@ export const OrdersManagement = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Orders Management</h2>
+          <h2 className="text-2xl font-bold">Care Plans</h2>
           <p className="text-sm text-muted-foreground">Create and manage your care orders</p>
         </div>
         {!showOrderForm && (
@@ -422,7 +422,7 @@ export const OrdersManagement = ({
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Create Care Order</CardTitle>
+                <CardTitle>Create Care Plan</CardTitle>
                 <CardDescription>Step {step} of 3</CardDescription>
               </div>
               <Button variant="ghost" size="sm" onClick={resetForm}>
@@ -928,8 +928,8 @@ export const OrdersManagement = ({
       {!showOrderForm && (
         <Card>
           <CardHeader>
-            <CardTitle>Your Orders</CardTitle>
-            <CardDescription>{allOrders.length} active order{allOrders.length !== 1 ? 's' : ''}</CardDescription>
+            <CardTitle>Your Care Plans</CardTitle>
+            <CardDescription>{allOrders.length} active care plan{allOrders.length !== 1 ? 's' : ''}</CardDescription>
           </CardHeader>
           <CardContent>
             {allOrders.length === 0 ? (

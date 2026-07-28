@@ -224,7 +224,7 @@ const ClientDashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="orders" className="gap-2">
               <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Orders</span>
+              <span className="hidden sm:inline">Care Plans</span>
             </TabsTrigger>
             <TabsTrigger value="schedule" className="gap-2">
               <Calendar className="h-4 w-4" />
