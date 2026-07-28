@@ -369,6 +369,8 @@ const Reports = () => {
               <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="shifts">Shifts</TabsTrigger>
+                <TabsTrigger value="workforce">Workforce</TabsTrigger>
+                <TabsTrigger value="clients">Clients</TabsTrigger>
                 <TabsTrigger value="performance">Performance</TabsTrigger>
               </TabsList>
 
@@ -440,6 +442,102 @@ const Reports = () => {
                 </Card>
               </TabsContent>
 
+              <TabsContent value="workforce" className="space-y-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Caregiver scorecard</CardTitle>
+                    <Button variant="outline" size="sm" onClick={() => exportToCSV(workforce, "workforce_report")}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {workforce.length === 0 ? (
+                      <p className="text-muted-foreground py-8 text-center">No assigned shifts in this period</p>
+                    ) : (
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Caregiver</TableHead>
+                              <TableHead className="text-right">Shifts</TableHead>
+                              <TableHead className="text-right">Hours</TableHead>
+                              <TableHead className="text-right">Overtime</TableHead>
+                              <TableHead className="text-right">Completion</TableHead>
+                              <TableHead className="text-right">On-time</TableHead>
+                              <TableHead className="text-right">Rating</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {workforce.map((w) => (
+                              <TableRow key={w.caregiver}>
+                                <TableCell className="font-medium">{w.caregiver}</TableCell>
+                                <TableCell className="text-right">{w.shifts}</TableCell>
+                                <TableCell className="text-right">{w.hours}</TableCell>
+                                <TableCell className="text-right">
+                                  {w.overtimeHours > 0 ? (
+                                    <span className="text-destructive font-medium">{w.overtimeHours}</span>
+                                  ) : (
+                                    "—"
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">{w.completionRate.toFixed(0)}%</TableCell>
+                                <TableCell className="text-right">
+                                  {w.onTimeRate ? `${w.onTimeRate.toFixed(0)}%` : "—"}
+                                </TableCell>
+                                <TableCell className="text-right">{w.avgRating ?? "—"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="clients" className="space-y-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Service mix</CardTitle>
+                    <Button variant="outline" size="sm" onClick={() => exportToCSV(serviceMix, "service_mix")}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {serviceMix.length === 0 ? (
+                      <p className="text-muted-foreground py-8 text-center">No services delivered in this period</p>
+                    ) : (
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Care service</TableHead>
+                              <TableHead className="text-right">Shifts</TableHead>
+                              <TableHead className="text-right">Hours</TableHead>
+                              <TableHead className="text-right">Share</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {serviceMix.map((m) => (
+                              <TableRow key={m.service}>
+                                <TableCell className="font-medium">{m.service}</TableCell>
+                                <TableCell className="text-right">{m.shifts}</TableCell>
+                                <TableCell className="text-right">{m.hours}</TableCell>
+                                <TableCell className="text-right">
+                                  {stats.totalShifts ? ((m.shifts / stats.totalShifts) * 100).toFixed(0) : 0}%
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
               <TabsContent value="performance" className="space-y-6">
                 <Card>
                   <CardHeader>
@@ -454,6 +552,14 @@ const Reports = () => {
                             ? `${((stats.completedShifts / stats.totalShifts) * 100).toFixed(1)}%`
                             : "N/A"}
                         </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Coverage Rate</span>
+                        <span className="text-lg font-bold">{stats.coverageRate.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Unfilled Shifts</span>
+                        <span className="text-lg font-bold">{stats.unassignedShifts}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Avg Hours per Shift</span>
