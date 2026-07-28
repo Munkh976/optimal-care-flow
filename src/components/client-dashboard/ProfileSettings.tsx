@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCareServices } from "@/hooks/useCareServices";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -68,13 +69,13 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
   });
   const [showPasswordSection, setShowPasswordSection] = useState(false);
   const [clientCareTypes, setClientCareTypes] = useState<ClientCareType[]>([]);
-  const [availableCareTypes, setAvailableCareTypes] = useState<CareType[]>([]);
+  const { groupedOptions, optionFor } = useCareServices();
   const [selectedCareTypes, setSelectedCareTypes] = useState<string[]>([]);
 
   useEffect(() => {
     if (clientProfile?.id) {
       fetchClientCareTypes();
-      fetchAvailableCareTypes();
+      // Care services come from the shared useCareServices hook.
     }
   }, [clientProfile?.id]);
 
@@ -113,30 +114,15 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
     }
   };
 
-  const fetchAvailableCareTypes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("care_types")
-        .select("*")
-        .eq("is_active", true)
-        .order("category", { ascending: true });
-
-      if (error) throw error;
-      setAvailableCareTypes(data || []);
-    } catch (error: any) {
-      console.error("Error fetching care types:", error);
-    }
-  };
-
   const handleAddCareTypes = async () => {
     if (!selectedCareTypes.length || !clientProfile?.id) return;
 
-    // Filter out already existing care types
+    // Filter out care services that are already on the client
     const existingCodes = clientCareTypes.map(cn => cn.care_type_code);
     const newCareTypes = selectedCareTypes.filter(code => !existingCodes.includes(code));
 
     if (!newCareTypes.length) {
-      toast.error("All selected care types are already added");
+      toast.error("All selected care services are already added");
       return;
     }
 
@@ -153,12 +139,12 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
 
       if (error) throw error;
 
-      toast.success(`${newCareTypes.length} care type(s) added successfully`);
+      toast.success(`${newCareTypes.length} care service(s) added successfully`);
       setSelectedCareTypes([]);
       await fetchClientCareTypes();
       onRefresh(); // Refresh parent data
     } catch (error: any) {
-      toast.error(error.message || "Failed to add care types");
+      toast.error(error.message || "Failed to add care services");
     }
   };
 
