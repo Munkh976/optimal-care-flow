@@ -592,7 +592,7 @@ useEffect(() => {
                 <Briefcase className="h-5 w-5 text-primary" />
                 Skills & Certifications
               </CardTitle>
-              <CardDescription>Manage your care type skills</CardDescription>
+              <CardDescription>Manage the care services you can deliver</CardDescription>
             </div>
             <Button
               variant="outline"
@@ -631,16 +631,23 @@ useEffect(() => {
             <>
               <Separator />
               <div className="space-y-3">
-                <Label>Add New Skill</Label>
+                <Label>Add Care Service</Label>
                 <Select value={selectedCareType} onValueChange={setSelectedCareType}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select care type" />
+                    <SelectValue placeholder="Select care service" />
                   </SelectTrigger>
                   <SelectContent>
-                    {careTypes.map((careType) => (
-                      <SelectItem key={careType.code} value={careType.code}>
-                        {careType.name} ({careType.category})
-                      </SelectItem>
+                    {categoryNames.map((category) => (
+                      <SelectGroup key={category}>
+                        <SelectLabel>{category}</SelectLabel>
+                        {services
+                          .filter((s) => s.category === category)
+                          .map((s) => (
+                            <SelectItem key={s.code} value={s.code}>
+                              {s.name} · {s.code}
+                            </SelectItem>
+                          ))}
+                      </SelectGroup>
                     ))}
                   </SelectContent>
                 </Select>
