@@ -146,16 +146,17 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
         });
         if (insertError) console.error("Could not save answer", insertError);
 
-        const { error: updateError } = await supabase
-          .from("conversation_sessions")
-          .update({ current_node_id: result.state.currentNodeId })
-          .eq("id", sessionId);
+        const { error: updateError } = await supabase.rpc("flow_session_progress", {
+          p_session_id: sessionId,
+          p_token: sessionToken ?? "",
+          p_node_id: result.state.currentNodeId,
+        });
         if (updateError) console.error("Could not update session", updateError);
       } finally {
         setSaving(false);
       }
     },
-    [flow, state, sessionId, persist]
+    [flow, state, sessionId, sessionToken, persist]
   );
 
   const back = useCallback(async () => {
@@ -164,16 +165,14 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
     if (!removed) return;
     setState(previous);
     if (!persist || !sessionId) return;
-    await supabase
-      .from("conversation_answers")
-      .update({ is_active: false })
-      .eq("session_id", sessionId)
-      .gte("sequence_index", removed.sequenceIndex);
-    await supabase
-      .from("conversation_sessions")
-      .update({ current_node_id: previous.currentNodeId })
-      .eq("id", sessionId);
-  }, [state, sessionId, persist]);
+    const { error: trimError } = await supabase.rpc("flow_session_trim_answers", {
+      p_session_id: sessionId,
+      p_token: sessionToken ?? "",
+      p_from_index: removed.sequenceIndex,
+      p_node_id: previous.currentNodeId,
+    });
+    if (trimError) console.error("Could not rewind session", trimError);
+  }, [state, sessionId, sessionToken, persist]);
 
   /** Mark the session complete, store the score, and return it. */
   const complete = useCallback(
@@ -181,23 +180,20 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
       if (!flow || !state) return null;
       const finalScore = computeScore(flow, state.answers);
       if (!persist || !sessionId) return finalScore;
-      const { error: completeError } = await supabase
-        .from("conversation_sessions")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          total_score: finalScore.total,
-          trait_scores: finalScore.traits,
-          band: finalScore.band,
-          contact_name: contact?.name ?? null,
-          contact_email: contact?.email ?? null,
-          contact_phone: contact?.phone ?? null,
-        })
-        .eq("id", sessionId);
+      const { error: completeError } = await supabase.rpc("flow_session_complete", {
+        p_session_id: sessionId,
+        p_token: sessionToken ?? "",
+        p_total_score: finalScore.total,
+        p_trait_scores: finalScore.traits as never,
+        p_band: finalScore.band,
+        p_contact_name: contact?.name ?? null,
+        p_contact_email: contact?.email ?? null,
+        p_contact_phone: contact?.phone ?? null,
+      });
       if (completeError) console.error("Could not complete session", completeError);
       return finalScore;
     },
-    [flow, state, sessionId, persist]
+    [flow, state, sessionId, sessionToken, persist]
   );
 
   const restart = useCallback(() => {
