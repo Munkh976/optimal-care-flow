@@ -416,19 +416,18 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
         <CardContent className="space-y-4">
           {editMode && (
             <div className="space-y-3">
-              <Label>Add Care Needs</Label>
+              <Label>Add Care Services</Label>
               <ReactSelect
                 isMulti
-                options={availableCareTypes
-                  .filter(type => !clientCareTypes.some(cn => cn.care_type_code === type.code))
-                  .map(type => ({
-                    value: type.code,
-                    label: `${type.name} (${type.category})`
-                  }))}
-                value={selectedCareTypes.map(code => {
-                  const type = availableCareTypes.find(n => n.code === code);
-                  return type ? { value: code, label: `${type.name} (${type.category})` } : null;
-                }).filter(Boolean)}
+                options={groupedOptions
+                  .map(group => ({
+                    label: group.label,
+                    options: group.options.filter(
+                      o => !clientCareTypes.some(cn => cn.care_type_code === o.value)
+                    ),
+                  }))
+                  .filter(group => group.options.length > 0)}
+                value={selectedCareTypes.map(optionFor)}
                 onChange={(selected) => {
                   setSelectedCareTypes(selected ? selected.map(s => s.value) : []);
                 }}
