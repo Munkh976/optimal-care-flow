@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package, Zap, Star, CheckCircle2, Loader2 } from "lucide-react";
+import { Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Archive, ArchiveRestore, Eye, ChevronDown, ChevronUp, Package, Zap, Star, CheckCircle2, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,6 +29,7 @@ type Order = {
   days_of_week: string;
   status: string;
   notes?: string;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
   clients?: {
@@ -55,6 +56,7 @@ const OrderManagement = () => {
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [scope, setScope] = useState<"active" | "completed" | "archived" | "all">("active");
   const [view, setView] = useState<"week" | "month" | "year">("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   
