@@ -185,7 +185,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
         p_token: sessionToken ?? "",
         p_total_score: finalScore.total,
         p_trait_scores: finalScore.traits as never,
-        p_band: finalScore.band,
+        p_band: audience === "caregiver_screening" ? finalScore.band : null,
         p_contact_name: contact?.name ?? null,
         p_contact_email: contact?.email ?? null,
         p_contact_phone: contact?.phone ?? null,
@@ -193,7 +193,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
       if (completeError) console.error("Could not complete session", completeError);
       return finalScore;
     },
-    [flow, state, sessionId, sessionToken, persist]
+    [flow, state, sessionId, sessionToken, persist, audience]
   );
 
   const restart = useCallback(() => {
