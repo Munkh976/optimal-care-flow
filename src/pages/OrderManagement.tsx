@@ -587,6 +587,23 @@ const OrderManagement = () => {
         {/* Search and Filters */}
         <Card className="mb-6">
           <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-2 mb-4">
+              {([
+                { key: "active", label: "Active" },
+                { key: "completed", label: "Completed" },
+                { key: "archived", label: "Archived" },
+                { key: "all", label: "All" },
+              ] as const).map(tab => (
+                <Button
+                  key={tab.key}
+                  size="sm"
+                  variant={scope === tab.key ? "default" : "outline"}
+                  onClick={() => setScope(tab.key)}
+                >
+                  {tab.label}
+                </Button>
+              ))}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <div className="relative">
