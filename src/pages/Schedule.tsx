@@ -52,14 +52,14 @@ import { LiveOpsView } from "@/components/schedule/LiveOpsView";
 import { SmartAssignSheet } from "@/components/schedule/SmartAssignSheet";
 import { AutoFillDialog } from "@/components/schedule/AutoFillDialog";
 
-const SERVICE_CATEGORIES: Record<string, { name: string; color: string }> = {
-  ADL: { name: "Activities of Daily Living", color: "hsl(217, 91%, 60%)" },
-  IADL: { name: "Instrumental Activities", color: "hsl(142, 76%, 36%)" },
-  Health: { name: "Health Monitoring", color: "hsl(0, 84%, 60%)" },
-  Cognitive: { name: "Cognitive Support", color: "hsl(262, 83%, 58%)" },
-  Safety: { name: "Safety & Transportation", color: "hsl(38, 92%, 50%)" },
-  Specialized: { name: "Specialized Care", color: "hsl(330, 81%, 60%)" },
-};
+const CATEGORY_COLORS = [
+  "hsl(217, 91%, 60%)",
+  "hsl(142, 76%, 36%)",
+  "hsl(0, 84%, 60%)",
+  "hsl(262, 83%, 58%)",
+  "hsl(38, 92%, 50%)",
+  "hsl(330, 81%, 60%)",
+];
 
 type RangeMode = "day" | "week" | "month";
 type TabKey = "today" | "shifts" | "unassigned" | "caregivers" | "clients";
@@ -211,9 +211,25 @@ const Schedule = () => {
     )}`;
   }, [currentDate, rangeMode]);
 
+  const categoryStyles = useMemo(() => {
+    const map: Record<string, { name: string; color: string }> = {};
+    categoryNames.forEach((name, i) => {
+      map[name] = { name, color: CATEGORY_COLORS[i % CATEGORY_COLORS.length] };
+    });
+    return map;
+  }, [categoryNames]);
+
   const getCategoryForShift = useCallback(
-    (shift: any) => SERVICE_CATEGORIES[shift?.care_types?.category] || SERVICE_CATEGORIES.ADL,
-    []
+    (shift: any) => {
+      const category = shift?.care_types?.category;
+      return (
+        categoryStyles[category] || {
+          name: category || "Uncategorized",
+          color: "hsl(var(--muted-foreground))",
+        }
+      );
+    },
+    [categoryStyles]
   );
 
   const getAssignedCaregiver = useCallback(
@@ -322,13 +338,13 @@ const Schedule = () => {
             <div className="flex flex-wrap items-center gap-2">
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="w-[190px]">
-                  <SelectValue placeholder="All care types" />
+                  <SelectValue placeholder="All care services" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All care types</SelectItem>
-                  {Object.entries(SERVICE_CATEGORIES).map(([key, val]) => (
-                    <SelectItem key={key} value={key}>
-                      {val.name}
+                  <SelectItem value="all">All care services</SelectItem>
+                  {categoryNames.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
                     </SelectItem>
                   ))}
                 </SelectContent>
