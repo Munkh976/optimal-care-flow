@@ -808,10 +808,15 @@ const OrderManagement = () => {
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteOrder(order.id);
+                                handleArchiveOrder(order);
                               }}
+                              title={order.archived_at ? "Restore order" : "Archive order"}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              {order.archived_at ? (
+                                <ArchiveRestore className="h-4 w-4" />
+                              ) : (
+                                <Archive className="h-4 w-4" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>
