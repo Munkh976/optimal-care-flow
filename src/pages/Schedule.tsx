@@ -73,6 +73,7 @@ const getRange = (date: Date, mode: RangeMode) => {
 };
 
 const Schedule = () => {
+  const { categoryNames } = useCareServices();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
