@@ -549,6 +549,7 @@ export type Database = {
           client_id: string
           created_at: string | null
           days_of_week: string | null
+          duration_months: number | null
           end_date: string
           frequency: string
           id: string
@@ -565,6 +566,7 @@ export type Database = {
           client_id: string
           created_at?: string | null
           days_of_week?: string | null
+          duration_months?: number | null
           end_date: string
           frequency?: string
           id?: string
@@ -581,6 +583,7 @@ export type Database = {
           client_id?: string
           created_at?: string | null
           days_of_week?: string | null
+          duration_months?: number | null
           end_date?: string
           frequency?: string
           id?: string
@@ -697,6 +700,66 @@ export type Database = {
             columns: ["preferred_caregiver_id"]
             isOneToOne: false
             referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_services: {
+        Row: {
+          care_type_code: string
+          created_at: string
+          days_of_week: number[]
+          end_time: string
+          frequency: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          order_id: string
+          start_time: string
+          updated_at: string
+          week_of_month: number | null
+        }
+        Insert: {
+          care_type_code: string
+          created_at?: string
+          days_of_week?: number[]
+          end_time: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          order_id: string
+          start_time: string
+          updated_at?: string
+          week_of_month?: number | null
+        }
+        Update: {
+          care_type_code?: string
+          created_at?: string
+          days_of_week?: number[]
+          end_time?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          order_id?: string
+          start_time?: string
+          updated_at?: string
+          week_of_month?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_services_care_type_code_fkey"
+            columns: ["care_type_code"]
+            isOneToOne: false
+            referencedRelation: "care_types"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "order_services_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "client_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1116,6 +1179,7 @@ export type Database = {
           id: string
           is_recurring: boolean | null
           order_id: string | null
+          order_service_id: string | null
           order_title: string
           pay_rate: number | null
           recurrence_pattern: string | null
@@ -1139,6 +1203,7 @@ export type Database = {
           id?: string
           is_recurring?: boolean | null
           order_id?: string | null
+          order_service_id?: string | null
           order_title?: string
           pay_rate?: number | null
           recurrence_pattern?: string | null
@@ -1162,6 +1227,7 @@ export type Database = {
           id?: string
           is_recurring?: boolean | null
           order_id?: string | null
+          order_service_id?: string | null
           order_title?: string
           pay_rate?: number | null
           recurrence_pattern?: string | null
@@ -1214,6 +1280,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "client_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_order_service_id_fkey"
+            columns: ["order_service_id"]
+            isOneToOne: false
+            referencedRelation: "order_services"
             referencedColumns: ["id"]
           },
         ]

@@ -1,96 +1,68 @@
-## What's wrong today (verified)
+## Assessment of what exists today
 
-- **Labels**: the caregiver form still says "Care Types / Skills" (`Caregivers.tsx` line 619) and the table/detail panes say "Care Types" / "Care Types & Skills". The rest of the app was renamed to "Care Services".
-- **Categories look different**: they are actually in sync — `care_types.category` stores the full category name and matches `care_service_categories`. What differs is presentation: the skills dropdown renders `Service Name (Full Category Name)`, so it looks unlike the Care Services list which shows a short category badge. Only 4 of the 6 categories currently have any services, so the skills list looks shorter than the category list.
+The current order flow is internally inconsistent:
 
----
+- The wizard lets you pick a **Primary Care Service + one optional additional service**, but the additional service is never scheduled — it is dumped into `special_notes` as text. It creates no shifts, no hours, no billing trace.
+- The schedule step allows **exactly one weekday and one time slot**, yet the recurrence selector offers One Time / Weekly / Bi-Weekly / Monthly. Bi-weekly and monthly are not actually honored: generation loops every day and matches `d.getDay() === day`, so bi-weekly produces *weekly* shifts and monthly produces *weekly* shifts for 12 months.
+- Order length is **implied by the frequency** (weekly → 3 months, biweekly → 6, monthly → 12). The customer never chooses a duration.
+- The order row stores `frequency` and `days_of_week` (text), but `days_of_week` is never written — the real schedule only survives as generated shift rows, so an order cannot be meaningfully edited or re-generated.
 
-## Phase 1 — Naming and skills UX (small, do first)
+So: the data model is a single-slot booking wearing an "order" label, and it cannot express your requirement.
 
-- Rename in `Caregivers.tsx` and `CaregiverProfileSettings.tsx`: "Care Types / Skills" → **Care Services / Skills**, "Care Types" column → **Care Services**, detail header → **Care Services & Skills**.
-- Group the skills multi-select by category (section headers) instead of appending the category in parentheses, and show the service **code** as a muted suffix — matching the Care Services table.
-- Show inactive services as disabled/hidden so caregivers can't hold skills for retired services.
+## Should orders exist at all?
 
----
+Keep them. Most competing platforms do have an authorization/care-plan layer above shifts — they just don't call it an "order". Shift-only entry breaks down as soon as you need "this client is authorized for 20h/week of personal care through March", recurring regeneration, per-client service history, and later billing/invoicing. The fix is not to delete orders, it is to make the order a **Care Plan with service lines** and keep shifts as the generated, assignable execution records.
 
-## Phase 2 — Time Off (foundation for trades)
+```text
+Client
+  └── Order (care plan)         start date, duration, status
+        ├── Service line 1      service, days [Mon,Wed,Fri], 09:00-13:00, weekly
+        ├── Service line 2      service, days [Tue], 14:00-16:00, biweekly
+        └── Service line 3      service, days [Mon], 18:00-20:00, weekly
+              └── generates → Shifts (one row per date) → Assignments
+```
 
-Approve/deny with manager note; on approval, detect assigned shifts inside the range and offer: release to Unassigned, or push to the Trade Board. Overlap validation, `pending_notifications` entry to the caregiver. Nothing else in scheduling is trustworthy until approved absence releases shifts.
+This directly satisfies both requirements: same service across all or selected weekdays for 1/2/3/6/12 months, and two or more services on different days *or different times on the same day* (each is its own line).
 
----
+## Target architecture
 
-## Phase 3 — Shift Trades with an eligibility engine
+**Database**
 
-Yes to your model: **if a caregiver meets every hard rule, the trade auto-approves without a manager.** Manager review is only for exceptions.
+1. New table `order_services` (the service lines):
+   - `order_id`, `care_type_code`, `days_of_week` (int array 0–6), `start_time`, `end_time`, `duration_hours` (generated), `frequency` (`once` | `weekly` | `biweekly` | `monthly`), `week_of_month` (for monthly), `notes`, `is_active`.
+   - GRANTs + RLS scoped by the parent order's `agency_id`, matching existing order policies.
+2. `client_orders`: add `duration_months` (1, 2, 3, 6, 12, or custom end date) and keep `end_date` as the derived stop point. `frequency`/`days_of_week` on the order become legacy/summary only.
+3. `shifts`: add `order_service_id` so every generated shift traces back to its line — enables safe regeneration ("replace future shifts of this line" without touching completed ones).
+4. Backfill: existing orders get one `order_services` row reconstructed from their shifts; existing shifts get linked.
 
-### Hard rules (block the pickup entirely)
-1. **Skill match** — the taker must hold the shift's `care_type_code` in `caregiver_skills` (and any `required_skills` on the shift).
-2. **Certification valid** — no cert required by the service is expired on the shift date.
-3. **Double-booking** — no overlapping assigned shift (plus a configurable travel buffer, default 30 min).
-4. **Weekly hours cap** — assigned hours for that caregiver's week (Mon–Sun) + this shift must not exceed **40h**; over the agency `overtime_threshold` it is blocked outright for self-serve.
-5. **Approved time off / availability** — the shift must fall inside the caregiver's declared availability and outside approved time off.
-6. **Active status** — caregiver must be active and not in a pending/rejected registration state.
-7. **Service area** — shift ZIP within the caregiver's `service_zipcodes` / radius.
+**Generation logic** (new `src/lib/orderScheduling.ts`, pure and unit-testable)
 
-### Cases that require manager approval (soft flags → routes to review instead of blocking)
-- Overtime between the agency threshold and 40h, or any hours push for a part-time caregiver below/above `custom_min_hours`.
-- Pay-rate delta: the taker's `hourly_rate` is materially higher than the original (cost impact), or the trade carries surge pay.
-- **Client-preferred caregiver** shift, or a client with a locked/continuity-of-care assignment.
-- Shift starts within **24 hours** (late trade) or is already `in_progress`.
-- Specialized-care services (e.g. hospice, dementia, medication management) — configurable per care service via a new `requires_approval` flag.
-- Caregiver reliability score below threshold, or 2+ no-shows in the last 30 days.
-- Trade would leave the giver below their contracted minimum hours.
+- Input: order start date, duration months, list of service lines. Output: shift rows.
+- `weekly` → every matching weekday. `biweekly` → matching weekdays on alternating weeks anchored to the start date. `monthly` → matching weekday of the Nth week of each month. `once` → first matching date only.
+- Overlap detection across lines for the same client (same date, overlapping times) surfaced as a warning before save.
+- Preview: the wizard shows total shifts, total hours, hours/week, and the first ~10 dates before anything is written.
 
-### Manager powers (always)
-Agency admins/managers can **reassign any caregiver on any shift at any time**, overriding soft flags with a recorded reason. Hard conflicts (double-booking, expired cert) still show a blocking confirmation with an explicit override checkbox, and every override is logged.
+**Order Management UI rebuild**
 
-### UI
-- **Trade Board** tab in the Schedule workspace: open offers, filters (date, service, distance, pay), "Pick up" button that runs the eligibility engine live and shows exactly why it's blocked or flagged.
-- Caregiver side: "Give up shift" from My Shifts → posts to board (or direct-offer to one colleague).
-- Manager side: "Trades needing approval" queue on the dashboard.
-
----
-
-## Phase 4 — Caregiver performance metrics (DoorDash-style)
-
-Tracked per caregiver, rolling 30-day + lifetime, computed from `shift_assignments`:
-
-| Metric | Definition | Use |
-|---|---|---|
-| Completion rate | completed ÷ (completed + no_show + late-cancel) | hard gate below ~85% |
-| On-time rate | clock-in ≤ 5 min after start | smart-match ranking |
-| Acceptance rate | offers accepted ÷ offers sent | ranking + trade eligibility |
-| Reliability score | composite of the three above, 0–100 | already a column; make it computed |
-| Client rating | 1–5 post-shift rating (new `shift_ratings` table) | ranking, client preference |
-| Shifts last 30d / lifetime | volume | tenure weighting, tie-break |
-| Avg hours/week & OT exposure | rolling | cap enforcement |
-| Cancellation lead time | avg hours notice | flag chronic late cancels |
-| Continuity | % of shifts with repeat clients | client-satisfaction proxy |
-| Travel distance | ZIP distance | cost + punctuality prediction |
-
-Smart-assign score = weighted blend (skill match 30, availability/conflict 25, reliability 15, client history/continuity 10, rating 10, distance 5, cost/OT 5), with the weights stored in agency settings so you can tune them.
-
----
-
-## Phase 5 — Reports redesign
-
-Four tabs, all agency-scoped, all with date-range + CSV export:
-
-1. **Operations** — coverage rate (filled ÷ total), time-to-fill, unfilled-shift trend, fill method split (manual / smart / auto / trade), same-day cancellations.
-2. **Workforce** — hours by caregiver, overtime exposure vs threshold, utilization vs availability, no-show/late leaderboard, cert-expiry pipeline, headcount by employment type.
-3. **Clients & Service** — service mix by care service and category, hours per client, order fulfilment %, client rating trend, churn/inactivity signals.
-4. **Financial** — billable hours × service price vs caregiver cost, margin by service and by client, OT cost, surge/trade premiums.
-
-Each tab leads with 3–4 KPI cards with period-over-period deltas, then one trend chart, then a drillable table. Every number links back into Schedule/Caregivers filtered to those rows. This stays separate from the System Admin platform analytics.
-
----
+- Step 1 — Client.
+- Step 2 — Service lines. Add as many lines as needed; each line = service picker (grouped by managed categories via `useCareServices`), weekday multi-select chips (with "All days" / "Weekdays" / "Weekends" shortcuts), start/end time, frequency. Lines are addable, editable, removable.
+- Step 3 — Duration. Start date + duration (1, 2, 3, 6, 12 months, or explicit end date).
+- Step 4 — Review. Per-line summary, generated-shift preview, conflict warnings, then Save draft / Submit.
+- Caregiver selection stays out of the wizard — shifts are created unassigned and filled from Schedule (this matches what we already agreed).
+- **Edit order**: same wizard, pre-filled. Saving regenerates only future, unassigned/open shifts for changed lines; past and completed shifts are preserved untouched. Removing a line cancels its future shifts.
+- Order list rows show the line summary ("Personal Care · Mon/Wed/Fri 9–1 · weekly" + "+2 services") instead of a single service name. The existing Active/Completed/Archived tabs and archive behavior stay as they are.
 
 ## Technical notes
 
-- New DB objects: `shift_ratings`, `caregiver_metrics` (materialized/rollup refreshed nightly + on shift completion), `care_types.requires_trade_approval`, `shift_trades` gains `eligibility_snapshot jsonb` and `auto_approved boolean`, agency-level `smart_match_weights jsonb`.
-- Eligibility engine lives in a single shared module (`src/lib/shiftEligibility.ts`) used by the trade board, Assign Shift dialog, and Smart Assign sheet — plus mirrored in a Postgres function so the rules can't be bypassed from the client.
-- All trade state changes go through an edge function so hours caps and double-booking are checked server-side atomically.
+- Generation happens client-side in `orderScheduling.ts` and writes a single batched `shifts` insert, same as today — no edge function needed.
+- 12 months × 5 days/week ≈ 260 shifts per line; batched insert handles this, and the preview warns above ~500 total shifts.
+- `duration_hours` per shift comes from the line's times, so Reports/hours math keeps working unchanged.
+- `useCareServices` remains the single source for the service catalog and category ordering.
+- Schedule, Reports, and the client portal read shifts, so they need no changes beyond the optional new `order_service_id` column.
 
-## Suggested order
+## Build order
 
-Phase 1 (quick) → Phase 2 → Phase 3 → Phase 4 → Phase 5. Phases 4 and 5 depend on the assignment data model settling in 2–3.
+1. Migration: `order_services`, `client_orders.duration_months`, `shifts.order_service_id`, GRANTs/RLS, backfill.
+2. `src/lib/orderScheduling.ts` + tests for weekly/biweekly/monthly/once and overlap detection.
+3. New wizard components (`OrderServiceLineEditor`, `OrderSchedulePreview`) and rebuilt create/edit flow in `OrderManagement.tsx`.
+4. Order list/detail updates for multi-line display.
