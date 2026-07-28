@@ -295,7 +295,7 @@ const Dashboard = () => {
           </button>
           <button type="button" onClick={() => navigate("/order-management")} className="text-left">
             <StatCard
-              title="Active Orders"
+              title="Active Care Plans"
               value={stats.activeOrders}
               description="Not completed or archived"
               icon={ClipboardList}

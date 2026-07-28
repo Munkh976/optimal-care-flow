@@ -234,12 +234,12 @@ export function OrderWizardDialog({ open, onOpenChange, agencyId, clients, order
       }
 
       toast.success(
-        `${isEdit ? "Order updated" : status === "draft" ? "Draft saved" : "Order submitted"} — ${rows.length} shift${rows.length === 1 ? "" : "s"} scheduled`
+        `${isEdit ? "Care plan updated" : status === "draft" ? "Draft saved" : "Care plan submitted"} — ${rows.length} shift${rows.length === 1 ? "" : "s"} scheduled`
       );
       onOpenChange(false);
       onSaved();
     } catch (e: any) {
-      toast.error(e.message || "Failed to save order");
+      toast.error(e.message || "Failed to save care plan");
     } finally {
       setSaving(false);
     }
@@ -251,7 +251,7 @@ export function OrderWizardDialog({ open, onOpenChange, agencyId, clients, order
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? `Edit order ${order?.order_number}` : "Create care order"}</DialogTitle>
+          <DialogTitle>{isEdit ? `Edit care plan ${order?.order_number}` : "Create care plan"}</DialogTitle>
           <DialogDescription>
             Step {step} of 4 — {stepTitles[step - 1]}. Shifts are created unassigned and filled from Schedule.
           </DialogDescription>
@@ -282,7 +282,7 @@ export function OrderWizardDialog({ open, onOpenChange, agencyId, clients, order
               </Select>
             </div>
             <div>
-              <Label>Order notes (optional)</Label>
+              <Label>Care plan notes (optional)</Label>
               <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
             </div>
           </div>
@@ -468,7 +468,7 @@ export function OrderWizardDialog({ open, onOpenChange, agencyId, clients, order
 
             {preview.length > 500 && (
               <div className="rounded-md border p-3 text-sm text-muted-foreground">
-                This order generates {preview.length} shifts. Consider a shorter duration.
+                This care plan generates {preview.length} shifts. Consider a shorter duration.
               </div>
             )}
 
@@ -486,7 +486,7 @@ export function OrderWizardDialog({ open, onOpenChange, agencyId, clients, order
 
             {isEdit && (
               <p className="text-xs text-muted-foreground">
-                Saving replaces future unassigned shifts on this order. Past and already-assigned shifts stay untouched.
+                Saving replaces future unassigned shifts on this care plan. Past and already-assigned shifts stay untouched.
               </p>
             )}
           </div>
@@ -510,7 +510,7 @@ export function OrderWizardDialog({ open, onOpenChange, agencyId, clients, order
               </Button>
               <Button onClick={() => handleSave("submitted")} disabled={saving || !preview.length}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEdit ? "Update order" : "Submit order"}
+                {isEdit ? "Update care plan" : "Submit care plan"}
               </Button>
             </div>
           )}
