@@ -616,24 +616,11 @@ const Caregivers = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Care Services / Skills</Label>
+                    <Label>Care Services</Label>
                     <ReactSelect
                       isMulti
-                      options={Array.from(
-                        careTypes.reduce((map: Map<string, any[]>, ct: any) => {
-                          const list = map.get(ct.category) || [];
-                          list.push({ value: ct.code, label: `${ct.name} · ${ct.code}`, category: ct.category });
-                          map.set(ct.category, list);
-                          return map;
-                        }, new Map<string, any[]>())
-                      ).map(([label, options]) => ({ label, options }))}
-                      value={careTypes
-                        .filter(ct => formData.care_type_codes.includes(ct.code))
-                        .map(ct => ({
-                          value: ct.code,
-                          label: `${ct.name} · ${ct.code}`,
-                          category: ct.category
-                        }))}
+                      options={groupedOptions}
+                      value={formData.care_type_codes.map(optionFor)}
                       onChange={(selected) => setFormData({ ...formData, care_type_codes: selected.map(s => s.value) })}
                       className="react-select-container"
                       classNamePrefix="react-select"
