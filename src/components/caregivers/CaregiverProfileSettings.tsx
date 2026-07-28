@@ -7,7 +7,8 @@ import { MapPin, Clock, Lock, User, Briefcase, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AvailabilityDialog } from "./AvailabilityDialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCareServices } from "@/hooks/useCareServices";
 import { US_STATES } from "@/constants/usStates";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -63,7 +64,8 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
     confirmPassword: "",
   });
   const [skills, setSkills] = useState<CaregiverSkill[]>([]);
-  const [careTypes, setCareTypes] = useState<CareType[]>([]);
+  const { services, categoryNames } = useCareServices();
+  const careTypes = services as unknown as CareType[];
   const [editSkillsMode, setEditSkillsMode] = useState(false);
   const [selectedCareType, setSelectedCareType] = useState("");
   const [newSkillData, setNewSkillData] = useState({
@@ -76,7 +78,7 @@ export const CaregiverProfileSettings = ({ caregiverProfile, onRefresh }: Caregi
 
 useEffect(() => {
   fetchSkills();
-  fetchCareTypes();
+  // Care services come from the shared useCareServices hook.
 }, [caregiverProfile?.id]);
 
 // Keep local form state in sync with incoming profile
@@ -97,20 +99,6 @@ useEffect(() => {
       return;
     }
     setSkills(data || []);
-  };
-
-  const fetchCareTypes = async () => {
-    const { data, error } = await supabase
-      .from("care_types")
-      .select("code, name, category")
-      .eq("is_active", true)
-      .order("name");
-
-    if (error) {
-      console.error("Error fetching care types:", error);
-      return;
-    }
-    setCareTypes(data || []);
   };
 
   const handleSave = async () => {
