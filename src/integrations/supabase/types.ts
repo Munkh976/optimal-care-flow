@@ -24,10 +24,14 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
+          late_trade_hours: number
+          max_weekly_hours: number
           naics_code: string | null
           phone: string | null
+          smart_match_weights: Json
           state: string | null
           tax_id: string | null
+          travel_buffer_minutes: number
           updated_at: string | null
           website: string | null
           zip_code: string | null
@@ -41,10 +45,14 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          late_trade_hours?: number
+          max_weekly_hours?: number
           naics_code?: string | null
           phone?: string | null
+          smart_match_weights?: Json
           state?: string | null
           tax_id?: string | null
+          travel_buffer_minutes?: number
           updated_at?: string | null
           website?: string | null
           zip_code?: string | null
@@ -58,10 +66,14 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          late_trade_hours?: number
+          max_weekly_hours?: number
           naics_code?: string | null
           phone?: string | null
+          smart_match_weights?: Json
           state?: string | null
           tax_id?: string | null
+          travel_buffer_minutes?: number
           updated_at?: string | null
           website?: string | null
           zip_code?: string | null
@@ -113,6 +125,7 @@ export type Database = {
           keywords: string | null
           name: string
           price: number | null
+          requires_trade_approval: boolean
           updated_at: string | null
         }
         Insert: {
@@ -126,6 +139,7 @@ export type Database = {
           keywords?: string | null
           name: string
           price?: number | null
+          requires_trade_approval?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -139,6 +153,7 @@ export type Database = {
           keywords?: string | null
           name?: string
           price?: number | null
+          requires_trade_approval?: boolean
           updated_at?: string | null
         }
         Relationships: []
@@ -175,6 +190,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "caregiver_availability_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
           {
             foreignKeyName: "caregiver_availability_caregiver_id_fkey"
             columns: ["caregiver_id"]
@@ -222,6 +244,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "caregiver_certifications_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
           {
             foreignKeyName: "caregiver_certifications_caregiver_id_fkey"
             columns: ["caregiver_id"]
@@ -343,6 +372,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "care_types"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "caregiver_skills_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
           },
           {
             foreignKeyName: "caregiver_skills_caregiver_id_fkey"
@@ -653,6 +689,13 @@ export type Database = {
             foreignKeyName: "clients_preferred_caregiver_id_fkey"
             columns: ["preferred_caregiver_id"]
             isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "clients_preferred_caregiver_id_fkey"
+            columns: ["preferred_caregiver_id"]
+            isOneToOne: false
             referencedRelation: "caregivers"
             referencedColumns: ["id"]
           },
@@ -820,6 +863,9 @@ export type Database = {
           is_locked: boolean | null
           mileage: number | null
           notes: string | null
+          override_at: string | null
+          override_by: string | null
+          override_reason: string | null
           shift_id: string
           status: Database["public"]["Enums"]["assignment_status"]
           updated_at: string | null
@@ -838,6 +884,9 @@ export type Database = {
           is_locked?: boolean | null
           mileage?: number | null
           notes?: string | null
+          override_at?: string | null
+          override_by?: string | null
+          override_reason?: string | null
           shift_id: string
           status?: Database["public"]["Enums"]["assignment_status"]
           updated_at?: string | null
@@ -856,11 +905,21 @@ export type Database = {
           is_locked?: boolean | null
           mileage?: number | null
           notes?: string | null
+          override_at?: string | null
+          override_by?: string | null
+          override_reason?: string | null
           shift_id?: string
           status?: Database["public"]["Enums"]["assignment_status"]
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "shift_assignments_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
           {
             foreignKeyName: "shift_assignments_caregiver_id_fkey"
             columns: ["caregiver_id"]
@@ -877,50 +936,156 @@ export type Database = {
           },
         ]
       }
+      shift_ratings: {
+        Row: {
+          agency_id: string
+          caregiver_id: string
+          client_id: string
+          comment: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          rating: number
+          shift_id: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          caregiver_id: string
+          client_id: string
+          comment?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          rating: number
+          shift_id: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          caregiver_id?: string
+          client_id?: string
+          comment?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          rating?: number
+          shift_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_ratings_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "shift_ratings_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_ratings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_ratings_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: true
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift_trades: {
         Row: {
+          approval_reasons: string[]
+          auto_approved: boolean
           created_at: string | null
+          decided_by: string | null
+          decision_notes: string | null
+          eligibility_snapshot: Json | null
           id: string
           new_caregiver_id: string | null
           original_caregiver_id: string
           reason: string | null
+          requires_manager_approval: boolean
           resolved_at: string | null
           shift_assignment_id: string
+          shift_id: string | null
           status: Database["public"]["Enums"]["trade_status"]
           surge_pay_amount: number | null
           trade_type: Database["public"]["Enums"]["trade_type"]
+          updated_at: string
         }
         Insert: {
+          approval_reasons?: string[]
+          auto_approved?: boolean
           created_at?: string | null
+          decided_by?: string | null
+          decision_notes?: string | null
+          eligibility_snapshot?: Json | null
           id?: string
           new_caregiver_id?: string | null
           original_caregiver_id: string
           reason?: string | null
+          requires_manager_approval?: boolean
           resolved_at?: string | null
           shift_assignment_id: string
+          shift_id?: string | null
           status?: Database["public"]["Enums"]["trade_status"]
           surge_pay_amount?: number | null
           trade_type?: Database["public"]["Enums"]["trade_type"]
+          updated_at?: string
         }
         Update: {
+          approval_reasons?: string[]
+          auto_approved?: boolean
           created_at?: string | null
+          decided_by?: string | null
+          decision_notes?: string | null
+          eligibility_snapshot?: Json | null
           id?: string
           new_caregiver_id?: string | null
           original_caregiver_id?: string
           reason?: string | null
+          requires_manager_approval?: boolean
           resolved_at?: string | null
           shift_assignment_id?: string
+          shift_id?: string | null
           status?: Database["public"]["Enums"]["trade_status"]
           surge_pay_amount?: number | null
           trade_type?: Database["public"]["Enums"]["trade_type"]
+          updated_at?: string
         }
         Relationships: [
           {
             foreignKeyName: "shift_trades_new_caregiver_id_fkey"
             columns: ["new_caregiver_id"]
             isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "shift_trades_new_caregiver_id_fkey"
+            columns: ["new_caregiver_id"]
+            isOneToOne: false
             referencedRelation: "caregivers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_trades_original_caregiver_id_fkey"
+            columns: ["original_caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
           },
           {
             foreignKeyName: "shift_trades_original_caregiver_id_fkey"
@@ -1022,6 +1187,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "care_types"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "shifts_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
           },
           {
             foreignKeyName: "shifts_caregiver_id_fkey"
@@ -1157,6 +1329,13 @@ export type Database = {
             foreignKeyName: "time_off_requests_caregiver_id_fkey"
             columns: ["caregiver_id"]
             isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "time_off_requests_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
             referencedRelation: "caregivers"
             referencedColumns: ["id"]
           },
@@ -1199,7 +1378,30 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      caregiver_performance: {
+        Row: {
+          agency_id: string | null
+          avg_rating: number | null
+          caregiver_id: string | null
+          completion_rate: number | null
+          hours_last_30d: number | null
+          lifetime_completed: number | null
+          lifetime_hours: number | null
+          lifetime_no_shows: number | null
+          on_time_rate: number | null
+          rating_count: number | null
+          shifts_last_30d: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "caregivers_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       assign_caregiver_role: {
