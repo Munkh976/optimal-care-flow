@@ -616,19 +616,22 @@ const Caregivers = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Care Types / Skills</Label>
+                    <Label>Care Services / Skills</Label>
                     <ReactSelect
                       isMulti
-                      options={careTypes.map(ct => ({
-                        value: ct.code,
-                        label: `${ct.name} (${ct.category})`,
-                        category: ct.category
-                      }))}
+                      options={Array.from(
+                        careTypes.reduce((map: Map<string, any[]>, ct: any) => {
+                          const list = map.get(ct.category) || [];
+                          list.push({ value: ct.code, label: `${ct.name} · ${ct.code}`, category: ct.category });
+                          map.set(ct.category, list);
+                          return map;
+                        }, new Map<string, any[]>())
+                      ).map(([label, options]) => ({ label, options }))}
                       value={careTypes
                         .filter(ct => formData.care_type_codes.includes(ct.code))
                         .map(ct => ({
                           value: ct.code,
-                          label: `${ct.name} (${ct.category})`,
+                          label: `${ct.name} · ${ct.code}`,
                           category: ct.category
                         }))}
                       onChange={(selected) => setFormData({ ...formData, care_type_codes: selected.map(s => s.value) })}
@@ -832,7 +835,7 @@ const Caregivers = () => {
                     <TableHead>Rate</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Account</TableHead>
-                      <TableHead>Care Types</TableHead>
+                      <TableHead>Care Services</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -989,7 +992,7 @@ const Caregivers = () => {
               <div className="border-t pt-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Award className="h-4 w-4 text-accent" />
-                  <span className="text-sm font-medium">Care Types & Skills</span>
+                  <span className="text-sm font-medium">Care Services & Skills</span>
                 </div>
                 {viewCaregiver.caregiver_skills && viewCaregiver.caregiver_skills.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
@@ -1000,7 +1003,7 @@ const Caregivers = () => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No care types assigned</p>
+                  <p className="text-sm text-muted-foreground">No care services assigned</p>
                 )}
               </div>
             </div>
