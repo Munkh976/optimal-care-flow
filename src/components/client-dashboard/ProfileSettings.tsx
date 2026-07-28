@@ -161,7 +161,7 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
       await fetchClientCareTypes();
       onRefresh(); // Refresh parent data
     } catch (error: any) {
-      toast.error(error.message || "Failed to remove care type");
+      toast.error(error.message || "Failed to remove care service");
     }
   };
 

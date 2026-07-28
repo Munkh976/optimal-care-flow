@@ -154,7 +154,7 @@ useEffect(() => {
 
   const handleAddSkill = async () => {
     if (!selectedCareType || !caregiverProfile?.id) {
-      toast.error("Please select a care type");
+      toast.error("Please select a care service");
       return;
     }
 

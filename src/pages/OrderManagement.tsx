@@ -175,7 +175,7 @@ const OrderManagement = () => {
       .order("name");
 
     if (error) {
-      toast.error("Failed to load care types");
+      toast.error("Failed to load care services");
     } else {
       setCareTypes(data || []);
     }
@@ -338,11 +338,11 @@ const OrderManagement = () => {
       setClientCareTypes(types);
       
       if (types.length === 0) {
-        toast.info("This client has no care types configured. Showing all available services.");
+        toast.info("This client has no care services configured. Showing all available services.");
         setClientCareTypes(careTypes);
       }
     } catch (error: any) {
-      toast.error("Failed to load client care types");
+      toast.error("Failed to load client care services");
       setClientCareTypes(careTypes);
     } finally {
       setLoadingClientCareTypes(false);
@@ -858,7 +858,7 @@ const OrderManagement = () => {
                                             <div className="font-medium">{new Date(shift.shift_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
                                           </div>
                                           <div>
-                                            <div className="text-sm text-muted-foreground">Care Type</div>
+                                            <div className="text-sm text-muted-foreground">Care Service</div>
                                             <div className="font-medium">{careTypeName}</div>
                                           </div>
                                           <div>
