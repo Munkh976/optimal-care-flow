@@ -51,14 +51,19 @@ test.describe('Schedule Management', () => {
     }
   });
 
-  test('should display unassigned shifts', async ({ page }) => {
-    await page.goto('/unassigned-shifts');
-    await expect(page.locator('h1')).toContainText('Unassigned Shifts');
+  test('should show unassigned shifts tab inside schedule', async ({ page }) => {
+    await page.goto('/schedule?tab=unassigned');
+    await expect(page.locator('h1')).toContainText('Schedule Management');
   });
 
-  test('should navigate to quick assign', async ({ page }) => {
+  test('should redirect legacy quick assign route into schedule', async ({ page }) => {
     await page.goto('/quick-assign');
-    await expect(page.locator('h1')).toContainText('Quick Assign');
+    await expect(page).toHaveURL(/\/schedule\?tab=unassigned/);
+  });
+
+  test('should redirect legacy live operations route into schedule', async ({ page }) => {
+    await page.goto('/live-operations');
+    await expect(page).toHaveURL(/\/schedule\?tab=today/);
   });
 
   test('should display available shifts for caregivers', async ({ page }) => {
