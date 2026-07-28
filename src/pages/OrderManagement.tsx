@@ -349,25 +349,25 @@ const OrderManagement = () => {
     }
   };
 
-  const handleDeleteOrder = async (orderId: string) => {
-    if (!confirm("Are you sure you want to delete this order? This will also delete all associated shifts.")) {
+  const handleArchiveOrder = async (order: Order) => {
+    const archiving = !order.archived_at;
+    if (archiving && !confirm("Archive this order? It stays in the Archived tab with all of its shifts — nothing is deleted.")) {
       return;
     }
 
-    // Delete shifts for this order (cascade will handle it, but we'll be explicit)
-    await supabase.from("shifts").delete().eq("order_id", orderId);
-
-    // Delete order
     const { error } = await supabase
       .from("client_orders")
-      .delete()
-      .eq("id", orderId);
+      .update({
+        archived_at: archiving ? new Date().toISOString() : null,
+        archived_by: archiving ? user?.id ?? null : null,
+      } as never)
+      .eq("id", order.id);
 
     if (error) {
-      toast.error("Failed to delete order");
+      toast.error(archiving ? "Failed to archive order" : "Failed to restore order");
     } else {
-      toast.success("Order deleted successfully");
-      if (user) fetchOrders(user.id);
+      toast.success(archiving ? "Order archived" : "Order restored");
+      if (profile?.agency_id) fetchOrders(profile.agency_id);
     }
   };
 
@@ -400,6 +400,20 @@ const OrderManagement = () => {
   // Search and filter effect
   useEffect(() => {
     let filtered = [...orders];
+    const today = new Date().toISOString().split("T")[0];
+
+    // Scope: active (default) hides archived + finished orders
+    const isArchived = (o: Order) => !!o.archived_at;
+    const isFinished = (o: Order) =>
+      o.status === "completed" || o.status === "cancelled" || o.end_date < today;
+
+    if (scope === "active") {
+      filtered = filtered.filter(o => !isArchived(o) && !isFinished(o));
+    } else if (scope === "completed") {
+      filtered = filtered.filter(o => !isArchived(o) && isFinished(o));
+    } else if (scope === "archived") {
+      filtered = filtered.filter(isArchived);
+    }
 
     // Search filter
     if (searchQuery) {
@@ -414,7 +428,8 @@ const OrderManagement = () => {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
-    // Period filter based on view and currentDate
+    // Period filter (skipped on the Active scope so open work is never hidden)
+    if (scope !== "active") {
     const startDate = view === "week" 
       ? startOfWeek(currentDate)
       : view === "month"
@@ -432,9 +447,10 @@ const OrderManagement = () => {
       const orderEnd = new Date(order.end_date);
       return orderStart <= endDate && orderEnd >= startDate;
     });
+    }
 
     setFilteredOrders(filtered);
-  }, [searchQuery, statusFilter, view, currentDate, orders]);
+  }, [searchQuery, statusFilter, scope, view, currentDate, orders]);
 
   const loadAvailableCaregivers = async () => {
     if (!bookingData.client_id || bookingData.day === null) return;
