@@ -1,68 +1,109 @@
-## Assessment of what exists today
+# Rule-Based Conversation Flow Engine
 
-The current order flow is internally inconsistent:
+A guided, button-driven AI assistant for CareMuch. No LLM in v1 — every question offers 4-5 tap-able answers, with Back and Skip. Branching is stored as data, so managers can edit flows without a code deploy.
 
-- The wizard lets you pick a **Primary Care Service + one optional additional service**, but the additional service is never scheduled — it is dumped into `special_notes` as text. It creates no shifts, no hours, no billing trace.
-- The schedule step allows **exactly one weekday and one time slot**, yet the recurrence selector offers One Time / Weekly / Bi-Weekly / Monthly. Bi-weekly and monthly are not actually honored: generation loops every day and matches `d.getDay() === day`, so bi-weekly produces *weekly* shifts and monthly produces *weekly* shifts for 12 months.
-- Order length is **implied by the frequency** (weekly → 3 months, biweekly → 6, monthly → 12). The customer never chooses a duration.
-- The order row stores `frequency` and `days_of_week` (text), but `days_of_week` is never written — the real schedule only survives as generated shift rows, so an order cannot be meaningfully edited or re-generated.
+## Goals
 
-So: the data model is a single-slot booking wearing an "order" label, and it cannot express your requirement.
+- Caregiver applicants complete a personality/fit screening by tapping answers, and a scored application lands in Caregiver Applications.
+- Client family members complete a care intake that produces a structured request for the agency.
+- Every answer is logged as labeled training data for a future ML classifier.
 
-## Should orders exist at all?
-
-Keep them. Most competing platforms do have an authorization/care-plan layer above shifts — they just don't call it an "order". Shift-only entry breaks down as soon as you need "this client is authorized for 20h/week of personal care through March", recurring regeneration, per-client service history, and later billing/invoicing. The fix is not to delete orders, it is to make the order a **Care Plan with service lines** and keep shifts as the generated, assignable execution records.
+## User Experience
 
 ```text
-Client
-  └── Order (care plan)         start date, duration, status
-        ├── Service line 1      service, days [Mon,Wed,Fri], 09:00-13:00, weekly
-        ├── Service line 2      service, days [Tue], 14:00-16:00, biweekly
-        └── Service line 3      service, days [Mon], 18:00-20:00, weekly
-              └── generates → Shifts (one row per date) → Assignments
++--------------------------------------------+
+|  CareMuch Assistant          Step 4 of 12  |
+|  [======-------------------]               |
++--------------------------------------------+
+|  How do you handle a client who refuses     |
+|  their medication?                          |
+|                                             |
+|  [ Stay calm and try again later        ]   |
+|  [ Call the family right away           ]   |
+|  [ Document it and notify the office    ]   |
+|  [ Respect their choice, no follow-up   ]   |
+|                                             |
+|  ( Back )                     ( Skip > )    |
++--------------------------------------------+
 ```
 
-This directly satisfies both requirements: same service across all or selected weekdays for 1/2/3/6/12 months, and two or more services on different days *or different times on the same day* (each is its own line).
+- Mobile-first, full-width tap targets.
+- Progress bar with "Step X of Y".
+- Back pops the last answer and restores the previous question exactly.
+- Skip records a skipped answer and follows the question's default next step.
+- Sessions resume: leaving and returning restores position.
+- 2-3 designated questions also allow an optional free-text box (for future hand-labeling). Never blocking.
+- Completion screen summarizes what happens next and, for caregivers, submits the application.
 
-## Target architecture
+## Data Model (new tables)
 
-**Database**
+**conversation_flows** — audience (`caregiver_screening`, `family_intake`, `general`), name, description, version, is_active, entry node.
 
-1. New table `order_services` (the service lines):
-   - `order_id`, `care_type_code`, `days_of_week` (int array 0–6), `start_time`, `end_time`, `duration_hours` (generated), `frequency` (`once` | `weekly` | `biweekly` | `monthly`), `week_of_month` (for monthly), `notes`, `is_active`.
-   - GRANTs + RLS scoped by the parent order's `agency_id`, matching existing order policies.
-2. `client_orders`: add `duration_months` (1, 2, 3, 6, 12, or custom end date) and keep `end_date` as the derived stop point. `frequency`/`days_of_week` on the order become legacy/summary only.
-3. `shifts`: add `order_service_id` so every generated shift traces back to its line — enables safe regeneration ("replace future shifts of this line" without touching completed ones).
-4. Backfill: existing orders get one `order_services` row reconstructed from their shifts; existing shifts get linked.
+**flow_nodes** — belongs to a flow. Fields: key, prompt text, helper text, node type (`single_select`, `multi_select`, `info`, `contact_capture`, `terminal`), allow_skip, allow_free_text, sort order, default_next_node_id.
 
-**Generation logic** (new `src/lib/orderScheduling.ts`, pure and unit-testable)
+**flow_options** — belongs to a node. Fields: label, short value, sort order, `score_weight` (numeric), `trait_tag` (patience / reliability / communication / boundaries / safety), `next_node_id`.
 
-- Input: order start date, duration months, list of service lines. Output: shift rows.
-- `weekly` → every matching weekday. `biweekly` → matching weekdays on alternating weeks anchored to the start date. `monthly` → matching weekday of the Nth week of each month. `once` → first matching date only.
-- Overlap detection across lines for the same client (same date, overlapping times) surfaced as a warning before save.
-- Preview: the wizard shows total shifts, total hours, hours/week, and the first ~10 dates before anything is written.
+**conversation_sessions** — flow_id, agency_id, optional user_id, anonymous visitor token, status (`in_progress`, `completed`, `abandoned`), current_node_id, total score, per-trait score JSON, outcome record link (registration id), started/completed timestamps.
 
-**Order Management UI rebuild**
+**conversation_answers** — session_id, node_id, selected option ids, free_text, skipped flag, sequence index, answered_at. Back navigation soft-deletes by trimming to a sequence index so the trail stays auditable.
 
-- Step 1 — Client.
-- Step 2 — Service lines. Add as many lines as needed; each line = service picker (grouped by managed categories via `useCareServices`), weekday multi-select chips (with "All days" / "Weekdays" / "Weekends" shortcuts), start/end time, frequency. Lines are addable, editable, removable.
-- Step 3 — Duration. Start date + duration (1, 2, 3, 6, 12 months, or explicit end date).
-- Step 4 — Review. Per-line summary, generated-shift preview, conflict warnings, then Save draft / Submit.
-- Caregiver selection stays out of the wizard — shifts are created unassigned and filled from Schedule (this matches what we already agreed).
-- **Edit order**: same wizard, pre-filled. Saving regenerates only future, unassigned/open shifts for changed lines; past and completed shifts are preserved untouched. Removing a line cancels its future shifts.
-- Order list rows show the line summary ("Personal Care · Mon/Wed/Fri 9–1 · weekly" + "+2 services") instead of a single service name. The existing Active/Completed/Archived tabs and archive behavior stay as they are.
+Access rules in plain English:
+- Anyone visiting the public site can start a session and record their own answers, identified by their session token; they cannot read anyone else's.
+- Flow definitions are readable publicly (they are just questions), but only agency admins and system admins can create or edit them.
+- Managers and admins can read all sessions and answers for their agency.
+- Nobody can hard-delete answers; sessions can be archived.
 
-## Technical notes
+## Scoring
 
-- Generation happens client-side in `orderScheduling.ts` and writes a single batched `shifts` insert, same as today — no edge function needed.
-- 12 months × 5 days/week ≈ 260 shifts per line; batched insert handles this, and the preview warns above ~500 total shifts.
-- `duration_hours` per shift comes from the line's times, so Reports/hours math keeps working unchanged.
-- `useCareServices` remains the single source for the service catalog and category ordering.
-- Schedule, Reports, and the client portal read shifts, so they need no changes beyond the optional new `order_service_id` column.
+Each option carries a weight and a trait tag. On completion the engine computes:
+- Total score = sum of weights.
+- Per-trait subtotals.
+- A band: `strong_fit` / `review` / `not_a_fit`, using thresholds stored on the flow.
 
-## Build order
+For caregiver screening, the completed session writes a `caregiver_registrations` row with the score, band, trait breakdown, and a link back to the transcript. The existing manager Approve/Reject workflow is unchanged — it simply now shows the screening result.
 
-1. Migration: `order_services`, `client_orders.duration_months`, `shifts.order_service_id`, GRANTs/RLS, backfill.
-2. `src/lib/orderScheduling.ts` + tests for weekly/biweekly/monthly/once and overlap detection.
-3. New wizard components (`OrderServiceLineEditor`, `OrderSchedulePreview`) and rebuilt create/edit flow in `OrderManagement.tsx`.
-4. Order list/detail updates for multi-line display.
+## Application Structure
+
+- `src/lib/flowEngine.ts` — pure functions: `nextNode(node, option)`, `applyAnswer(state, answer)`, `goBack(state)`, `computeScore(answers)`. Fully unit-testable, no React or network.
+- `src/hooks/useConversationFlow.ts` — loads a flow, manages session state, persists answers, handles resume.
+- `src/components/chat/ChatWidget.tsx` — the shell (header, progress, message list).
+- `src/components/chat/QuestionCard.tsx` — prompt, option buttons, optional free-text.
+- `src/components/chat/NavControls.tsx` — Back / Skip.
+- `src/components/chat/CompletionCard.tsx` — outcome summary.
+- Route `/assistant` for a full-page version; the widget also mounts on the public landing page and the caregiver registration page.
+
+## Manager-Facing Admin
+
+- New page `/flow-builder` (agency admin + system admin only, registered in `system_modules` + `role_permissions` so it appears in the nav).
+- List flows, create/edit nodes, drag to reorder, edit options with weight and next-node dropdown.
+- A visual "orphan/dead-end" check so a flow can't be published with unreachable nodes.
+- Preview mode to walk the flow without saving a session.
+
+## Seed Content
+
+- Caregiver screening flow: ~12 questions covering availability, experience, transport, a scenario on client refusal, a scenario on a family conflict, boundaries, reliability, and a free-text "describe a difficult situation".
+- Family intake flow: ~8 questions covering who needs care, services needed (pulled from Care Services), days/times, urgency, and contact capture.
+
+## Build Order
+
+1. Migration: the five tables, grants, access rules, updated-at triggers.
+2. `flowEngine.ts` + unit tests for branching, back, skip, scoring.
+3. `useConversationFlow` hook with session persistence and resume.
+4. Chat widget UI and the `/assistant` route.
+5. Seed both flows with real content.
+6. Wire caregiver completion into `caregiver_registrations` and surface the score in Caregiver Applications.
+7. Flow Builder admin page + nav registration.
+8. End-to-end verification: complete both flows, test Back/Skip, reload mid-flow, confirm an application appears with the correct score.
+
+## Technical Notes
+
+- No LLM, no edge function needed for v1 — the engine runs client-side against flow data, with answers persisted directly. This keeps latency near zero and cost at zero.
+- Anonymous visitors are supported via a generated session token stored in localStorage, so applicants don't need an account before screening.
+- Free-text answers are stored but not scored in v1; they are the seed corpus for a later classifier.
+- Later LLM layer, when you want it, is additive: a "type your own answer" field whose text is mapped onto one of the existing options. The flow data and scoring do not change.
+
+## Out of Scope for This Phase
+
+- ML intent classification and auto-retraining.
+- Voice input.
+- Multi-language flows (the schema leaves room via a locale column later).
