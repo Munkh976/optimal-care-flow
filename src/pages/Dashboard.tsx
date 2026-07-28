@@ -201,7 +201,7 @@ const Dashboard = () => {
         title: `${timeOffRes.count} time-off request${timeOffRes.count === 1 ? "" : "s"} pending`,
         message: "Approve or deny to keep the schedule accurate.",
         actionLabel: "Review",
-        to: "/time-off-requests",
+        to: "/time-off",
       });
     }
     if ((tradesRes.count || 0) > 0) {
@@ -331,7 +331,7 @@ const Dashboard = () => {
                   <Badge variant="secondary" className="ml-2">{stats.pendingTrades}</Badge>
                 )}
               </Button>
-              <Button variant="outline" onClick={() => navigate("/time-off-requests")}>
+              <Button variant="outline" onClick={() => navigate("/time-off")}>
                 <Shield className="mr-2 h-4 w-4" />
                 Time Off
                 {stats.pendingTimeOff > 0 && (
