@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +8,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { usePendingApprovals } from "@/hooks/usePendingApprovals";
 import {
-  Users, Clock, AlertTriangle, UserCheck, CalendarDays,
+  Clock, AlertTriangle, UserCheck, CalendarDays,
   Sparkles, ArrowRightLeft, Shield, Plus, ClipboardList, BadgeCheck
 } from "lucide-react";
 
@@ -362,13 +361,13 @@ const Dashboard = () => {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <h6 className="font-semibold">{request.client_name}</h6>
-                        <p className="text-sm text-muted-foreground">{request.care_type.replace('_', ' ')}</p>
+                        <p className="text-sm text-muted-foreground">{request.care_type}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           <Clock className="inline h-3 w-3 mr-1" />
                           {new Date(request.shift_date).toLocaleDateString()} at {request.start_time}
                         </p>
                       </div>
-                      <Button size="sm" variant="destructive" onClick={() => navigate(`/quick-assign?shift=${request.id}`)}>
+                      <Button size="sm" variant="destructive" onClick={() => navigate(`/schedule?tab=unassigned`)}>
                         Assign
                       </Button>
                     </div>
