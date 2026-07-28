@@ -14,6 +14,8 @@ import ShiftTrades from "./pages/ShiftTrades";
 import CaregiverDashboard from "./pages/CaregiverDashboard";
 import ClientDashboard from "./pages/ClientDashboard";
 import CaregiverRegistration from "./pages/CaregiverRegistration";
+import Assistant from "./pages/Assistant";
+import FlowBuilder from "./pages/FlowBuilder";
 import CaregiverApprovals from "./pages/CaregiverApprovals";
 import Users from "./pages/Users";
 import AddUser from "./pages/AddUser";
@@ -55,6 +57,8 @@ const App = () => (
           <Route path="/quick-assign" element={<Navigate to="/schedule?tab=unassigned" replace />} />
           <Route path="/shift-trades" element={<ShiftTrades />} />
           <Route path="/caregiver-registration" element={<CaregiverRegistration />} />
+          <Route path="/assistant" element={<Assistant />} />
+          <Route path="/flow-builder" element={<FlowBuilder />} />
           <Route path="/caregiver-approvals" element={<CaregiverApprovals />} />
           <Route path="/notifications-outbox" element={<NotificationsOutbox />} />
           <Route path="/caregiver-dashboard" element={<CaregiverDashboard />} />

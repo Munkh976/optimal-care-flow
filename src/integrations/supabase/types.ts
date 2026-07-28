@@ -704,6 +704,324 @@ export type Database = {
           },
         ]
       }
+      conversation_answers: {
+        Row: {
+          answered_at: string
+          created_at: string
+          free_text: string | null
+          id: string
+          is_active: boolean
+          node_id: string
+          option_ids: string[]
+          option_labels: string[]
+          score_delta: number
+          sequence_index: number
+          session_id: string
+          skipped: boolean
+          updated_at: string
+        }
+        Insert: {
+          answered_at?: string
+          created_at?: string
+          free_text?: string | null
+          id?: string
+          is_active?: boolean
+          node_id: string
+          option_ids?: string[]
+          option_labels?: string[]
+          score_delta?: number
+          sequence_index: number
+          session_id: string
+          skipped?: boolean
+          updated_at?: string
+        }
+        Update: {
+          answered_at?: string
+          created_at?: string
+          free_text?: string | null
+          id?: string
+          is_active?: boolean
+          node_id?: string
+          option_ids?: string[]
+          option_labels?: string[]
+          score_delta?: number
+          sequence_index?: number
+          session_id?: string
+          skipped?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_answers_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_answers_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_flows: {
+        Row: {
+          agency_id: string | null
+          audience: Database["public"]["Enums"]["flow_audience"]
+          created_at: string
+          description: string | null
+          entry_node_id: string | null
+          id: string
+          is_active: boolean
+          name: string
+          review_threshold: number
+          strong_fit_threshold: number
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          agency_id?: string | null
+          audience?: Database["public"]["Enums"]["flow_audience"]
+          created_at?: string
+          description?: string | null
+          entry_node_id?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          review_threshold?: number
+          strong_fit_threshold?: number
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          agency_id?: string | null
+          audience?: Database["public"]["Enums"]["flow_audience"]
+          created_at?: string
+          description?: string | null
+          entry_node_id?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          review_threshold?: number
+          strong_fit_threshold?: number
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_flows_entry_node_fkey"
+            columns: ["entry_node_id"]
+            isOneToOne: false
+            referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_sessions: {
+        Row: {
+          agency_id: string | null
+          band: string | null
+          completed_at: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          current_node_id: string | null
+          flow_id: string
+          id: string
+          registration_id: string | null
+          session_token: string
+          started_at: string
+          status: Database["public"]["Enums"]["conversation_session_status"]
+          total_score: number
+          trait_scores: Json
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          agency_id?: string | null
+          band?: string | null
+          completed_at?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          current_node_id?: string | null
+          flow_id: string
+          id?: string
+          registration_id?: string | null
+          session_token: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["conversation_session_status"]
+          total_score?: number
+          trait_scores?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          agency_id?: string | null
+          band?: string | null
+          completed_at?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          current_node_id?: string | null
+          flow_id?: string
+          id?: string
+          registration_id?: string | null
+          session_token?: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["conversation_session_status"]
+          total_score?: number
+          trait_scores?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_sessions_current_node_id_fkey"
+            columns: ["current_node_id"]
+            isOneToOne: false
+            referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_sessions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_sessions_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_nodes: {
+        Row: {
+          allow_free_text: boolean
+          allow_skip: boolean
+          created_at: string
+          default_next_node_id: string | null
+          flow_id: string
+          free_text_label: string | null
+          helper_text: string | null
+          id: string
+          node_key: string
+          node_type: Database["public"]["Enums"]["flow_node_type"]
+          prompt: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          allow_free_text?: boolean
+          allow_skip?: boolean
+          created_at?: string
+          default_next_node_id?: string | null
+          flow_id: string
+          free_text_label?: string | null
+          helper_text?: string | null
+          id?: string
+          node_key: string
+          node_type?: Database["public"]["Enums"]["flow_node_type"]
+          prompt: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          allow_free_text?: boolean
+          allow_skip?: boolean
+          created_at?: string
+          default_next_node_id?: string | null
+          flow_id?: string
+          free_text_label?: string | null
+          helper_text?: string | null
+          id?: string
+          node_key?: string
+          node_type?: Database["public"]["Enums"]["flow_node_type"]
+          prompt?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_nodes_default_next_fkey"
+            columns: ["default_next_node_id"]
+            isOneToOne: false
+            referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_nodes_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_options: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          next_node_id: string | null
+          node_id: string
+          score_weight: number
+          sort_order: number
+          trait_tag: string | null
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          next_node_id?: string | null
+          node_id: string
+          score_weight?: number
+          sort_order?: number
+          trait_tag?: string | null
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          next_node_id?: string | null
+          node_id?: string
+          score_weight?: number
+          sort_order?: number
+          trait_tag?: string | null
+          updated_at?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_options_next_node_id_fkey"
+            columns: ["next_node_id"]
+            isOneToOne: false
+            referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_options_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_services: {
         Row: {
           care_type_code: string
@@ -1481,6 +1799,32 @@ export type Database = {
         Args: { caregiver_email: string }
         Returns: undefined
       }
+      flow_session_complete: {
+        Args: {
+          p_band: string
+          p_contact_email?: string
+          p_contact_name?: string
+          p_contact_phone?: string
+          p_session_id: string
+          p_token: string
+          p_total_score: number
+          p_trait_scores: Json
+        }
+        Returns: undefined
+      }
+      flow_session_progress: {
+        Args: { p_node_id: string; p_session_id: string; p_token: string }
+        Returns: undefined
+      }
+      flow_session_trim_answers: {
+        Args: {
+          p_from_index: number
+          p_node_id: string
+          p_session_id: string
+          p_token: string
+        }
+        Returns: undefined
+      }
       generate_order_number: { Args: never; Returns: string }
       get_caregiver_with_profile: {
         Args: { caregiver_uuid: string }
@@ -1563,6 +1907,14 @@ export type Database = {
         | "dementia_care"
         | "hospice"
       caregiver_role: "full_time" | "part_time" | "on_call"
+      conversation_session_status: "in_progress" | "completed" | "abandoned"
+      flow_audience: "caregiver_screening" | "family_intake" | "general"
+      flow_node_type:
+        | "single_select"
+        | "multi_select"
+        | "info"
+        | "contact_capture"
+        | "terminal"
       request_status: "pending" | "approved" | "denied" | "cancelled"
       request_type: "vacation" | "medical" | "personal" | "emergency"
       shift_status:
@@ -1740,6 +2092,15 @@ export const Constants = {
         "hospice",
       ],
       caregiver_role: ["full_time", "part_time", "on_call"],
+      conversation_session_status: ["in_progress", "completed", "abandoned"],
+      flow_audience: ["caregiver_screening", "family_intake", "general"],
+      flow_node_type: [
+        "single_select",
+        "multi_select",
+        "info",
+        "contact_capture",
+        "terminal",
+      ],
       request_status: ["pending", "approved", "denied", "cancelled"],
       request_type: ["vacation", "medical", "personal", "emergency"],
       shift_status: [
