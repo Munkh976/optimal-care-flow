@@ -51,6 +51,7 @@ import { PickShiftDialog } from "@/components/schedule/PickShiftDialog";
 import { LiveOpsView } from "@/components/schedule/LiveOpsView";
 import { SmartAssignSheet } from "@/components/schedule/SmartAssignSheet";
 import { AutoFillDialog } from "@/components/schedule/AutoFillDialog";
+import { useCareServices } from "@/hooks/useCareServices";
 
 const CATEGORY_COLORS = [
   "hsl(217, 91%, 60%)",
