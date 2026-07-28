@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Search, Eye, Trash2, Pencil } from "lucide-react";
+import { Plus, Search, Eye, Trash2, Pencil, Tags } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from "@/components/ui/textarea";
 import { AppLayout } from "@/components/AppLayout";
 import { careTypeFormSchema } from "@/lib/validation";
+import { ManageCategoriesDialog } from "@/components/care-types/ManageCategoriesDialog";
 
 const CareTypes = () => {
   const queryClient = useQueryClient();
@@ -24,6 +25,7 @@ const CareTypes = () => {
   const [selectedCareType, setSelectedCareType] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewCareType, setViewCareType] = useState<any>(null);
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [formData, setFormData] = useState({
     code: "",
     category: "",
@@ -44,6 +46,20 @@ const CareTypes = () => {
       
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ["care-service-categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("care_service_categories" as never)
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order")
+        .order("name");
+      if (error) throw error;
+      return (data || []) as any[];
     },
   });
 
@@ -78,12 +94,21 @@ const CareTypes = () => {
         .delete()
         .eq("id", deleteId);
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === "23503" || /foreign key/i.test(error.message)) {
+          toast.error(
+            "This care service is already used by shifts, caregiver skills or client care needs, so it can't be deleted. Edit it instead, or mark it inactive to hide it from new bookings."
+          );
+        } else {
+          toast.error("Could not delete this care service. Please try again.");
+        }
+        return;
+      }
 
       toast.success("Care type deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["care-types"] });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete care type");
+    } catch {
+      toast.error("Could not delete this care service. Please try again.");
     } finally {
       setDeleteId(null);
     }
