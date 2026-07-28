@@ -180,7 +180,7 @@ export const AssignShiftDialog = ({
         <DialogHeader>
           <DialogTitle>Assign Shift</DialogTitle>
           <DialogDescription>
-            Confirm the caregiver, care type and times before saving this assignment.
+            Confirm the caregiver, care service and times before saving this assignment.
           </DialogDescription>
         </DialogHeader>
 
@@ -250,10 +250,10 @@ export const AssignShiftDialog = ({
           </div>
 
           <div className="space-y-2">
-            <Label>Care type</Label>
+            <Label>Care service</Label>
             <Select value={careTypeCode} onValueChange={setCareTypeCode}>
               <SelectTrigger>
-                <SelectValue placeholder="Select care type" />
+                <SelectValue placeholder="Select care service" />
               </SelectTrigger>
               <SelectContent>
                 {careTypes.map((t) => (

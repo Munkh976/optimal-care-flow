@@ -11,14 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, Clock, MapPin, Search, Zap } from "lucide-react";
+import { AlertTriangle, Clock, MapPin, Search } from "lucide-react";
 
 interface Props {
   clients: any[];
   shifts: any[];
   getAssignedCaregiver: (shift: any) => any;
   onSelectShift: (shift: any) => void;
-  onAssign: (shift: any) => void;
+  onAssign?: (shift: any) => void;
 }
 
 export const ClientGridView = ({
@@ -26,7 +26,6 @@ export const ClientGridView = ({
   shifts,
   getAssignedCaregiver,
   onSelectShift,
-  onAssign,
 }: Props) => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "unassigned" | "with">("all");
@@ -144,9 +143,9 @@ export const ClientGridView = ({
                       {items.slice(0, 4).map((s) => {
                         const cg = getAssignedCaregiver(s);
                         return (
-                          <li key={s.id} className="flex items-center gap-2">
+                          <li key={s.id}>
                             <button
-                              className="flex-1 text-left rounded-md border px-2.5 py-1.5 text-sm hover:bg-muted/50 transition-colors"
+                              className="w-full text-left rounded-md border px-2.5 py-1.5 text-sm hover:bg-muted/50 transition-colors"
                               onClick={() => onSelectShift(s)}
                             >
                               <span className="font-medium">
@@ -162,17 +161,6 @@ export const ClientGridView = ({
                                 · {s.care_types?.name || s.order_title || "—"}
                               </span>
                             </button>
-                            {!cg && (
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                className="h-8 w-8 shrink-0"
-                                onClick={() => onAssign(s)}
-                                aria-label="Assign caregiver"
-                              >
-                                <Zap className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
                           </li>
                         );
                       })}
