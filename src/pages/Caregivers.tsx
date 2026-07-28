@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import { AppLayout } from "@/components/AppLayout";
 import { caregiverFormSchema, passwordResetSchema } from "@/lib/validation";
 import { usePendingApprovals } from "@/hooks/usePendingApprovals";
+import { useCareServices } from "@/hooks/useCareServices";
 
 
 const Caregivers = () => {
@@ -36,7 +37,7 @@ const Caregivers = () => {
   const [editCaregiver, setEditCaregiver] = useState<any>(null);
   const [viewCaregiver, setViewCaregiver] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [careTypes, setCareTypes] = useState<any[]>([]);
+  const { services: careTypes, groupedOptions, optionFor } = useCareServices();
   const [availabilityCaregiver, setAvailabilityCaregiver] = useState<any>(null);
   const [formData, setFormData] = useState({
     first_name: "",
@@ -76,7 +77,7 @@ const Caregivers = () => {
       if (profileData) {
         setProfile(profileData);
         fetchCaregivers(session.user.id);
-        fetchCareTypes();
+        // Care services come from the shared useCareServices hook.
       }
     };
 
@@ -137,22 +138,6 @@ const Caregivers = () => {
       setLoading(false);
     }
   };
-
-  const fetchCareTypes = async () => {
-    const { data, error } = await supabase
-      .from("care_types")
-      .select("*")
-      .eq("is_active", true)
-      .order("category", { ascending: true })
-      .order("name", { ascending: true });
-
-    if (error) {
-      toast.error("Failed to load care services");
-    } else {
-      setCareTypes(data || []);
-    }
-  };
-
 
   const handleOpenAddDialog = () => {
     setIsEditMode(false);
@@ -616,24 +601,11 @@ const Caregivers = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Care Services / Skills</Label>
+                    <Label>Care Services</Label>
                     <ReactSelect
                       isMulti
-                      options={Array.from(
-                        careTypes.reduce((map: Map<string, any[]>, ct: any) => {
-                          const list = map.get(ct.category) || [];
-                          list.push({ value: ct.code, label: `${ct.name} · ${ct.code}`, category: ct.category });
-                          map.set(ct.category, list);
-                          return map;
-                        }, new Map<string, any[]>())
-                      ).map(([label, options]) => ({ label, options }))}
-                      value={careTypes
-                        .filter(ct => formData.care_type_codes.includes(ct.code))
-                        .map(ct => ({
-                          value: ct.code,
-                          label: `${ct.name} · ${ct.code}`,
-                          category: ct.category
-                        }))}
+                      options={groupedOptions}
+                      value={formData.care_type_codes.map(optionFor)}
                       onChange={(selected) => setFormData({ ...formData, care_type_codes: selected.map(s => s.value) })}
                       className="react-select-container"
                       classNamePrefix="react-select"

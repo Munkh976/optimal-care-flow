@@ -17,6 +17,7 @@ import ReactSelect from "react-select";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
+import { useCareServices } from "@/hooks/useCareServices";
 import { clientFormSchema, passwordResetSchema } from "@/lib/validation";
 
 const Clients = () => {
@@ -36,7 +37,7 @@ const Clients = () => {
   const [editClient, setEditClient] = useState<any>(null);
   const [viewClient, setViewClient] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [careTypes, setCareTypes] = useState<any[]>([]);
+  const { services: careTypes, groupedOptions, optionFor } = useCareServices();
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -114,7 +115,7 @@ const Clients = () => {
     };
 
     checkAuth();
-    fetchCareTypes();
+    // Care services come from the shared useCareServices hook.
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
@@ -126,21 +127,6 @@ const Clients = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
-
-  const fetchCareTypes = async () => {
-    const { data, error } = await supabase
-      .from("care_types")
-      .select("*")
-      .eq("is_active", true)
-      .order("category", { ascending: true })
-      .order("name", { ascending: true });
-
-    if (error) {
-      toast.error("Failed to load care types");
-    } else {
-      setCareTypes(data || []);
-    }
-  };
 
   const fetchClients = async (agencyId: string) => {
     try {
@@ -957,22 +943,15 @@ const Clients = () => {
               <Label>Care Services</Label>
               <ReactSelect
                 isMulti
-                options={Array.from(new Set(careTypes.map(cn => cn.category))).map(category => ({
-                  label: category,
-                  options: careTypes
-                    .filter(cn => cn.category === category)
-                    .map(cn => ({ value: cn.code, label: cn.name }))
-                }))}
-                value={careTypes
-                  .filter(cn => formData.care_type_codes.includes(cn.code))
-                  .map(cn => ({ value: cn.code, label: cn.name }))}
+                options={groupedOptions}
+                value={formData.care_type_codes.map(optionFor)}
                 onChange={(selected) => setFormData({ 
                   ...formData, 
                   care_type_codes: selected.map(s => s.value) 
                 })}
                 className="react-select-container"
                 classNamePrefix="react-select"
-                placeholder="Select care needs by category..."
+                placeholder="Select care services by category..."
               />
             </div>
             <div className="space-y-2">

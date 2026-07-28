@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCareServices } from "@/hooks/useCareServices";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -68,13 +69,13 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
   });
   const [showPasswordSection, setShowPasswordSection] = useState(false);
   const [clientCareTypes, setClientCareTypes] = useState<ClientCareType[]>([]);
-  const [availableCareTypes, setAvailableCareTypes] = useState<CareType[]>([]);
+  const { groupedOptions, optionFor } = useCareServices();
   const [selectedCareTypes, setSelectedCareTypes] = useState<string[]>([]);
 
   useEffect(() => {
     if (clientProfile?.id) {
       fetchClientCareTypes();
-      fetchAvailableCareTypes();
+      // Care services come from the shared useCareServices hook.
     }
   }, [clientProfile?.id]);
 
@@ -113,30 +114,15 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
     }
   };
 
-  const fetchAvailableCareTypes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("care_types")
-        .select("*")
-        .eq("is_active", true)
-        .order("category", { ascending: true });
-
-      if (error) throw error;
-      setAvailableCareTypes(data || []);
-    } catch (error: any) {
-      console.error("Error fetching care types:", error);
-    }
-  };
-
   const handleAddCareTypes = async () => {
     if (!selectedCareTypes.length || !clientProfile?.id) return;
 
-    // Filter out already existing care types
+    // Filter out care services that are already on the client
     const existingCodes = clientCareTypes.map(cn => cn.care_type_code);
     const newCareTypes = selectedCareTypes.filter(code => !existingCodes.includes(code));
 
     if (!newCareTypes.length) {
-      toast.error("All selected care types are already added");
+      toast.error("All selected care services are already added");
       return;
     }
 
@@ -153,12 +139,12 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
 
       if (error) throw error;
 
-      toast.success(`${newCareTypes.length} care type(s) added successfully`);
+      toast.success(`${newCareTypes.length} care service(s) added successfully`);
       setSelectedCareTypes([]);
       await fetchClientCareTypes();
       onRefresh(); // Refresh parent data
     } catch (error: any) {
-      toast.error(error.message || "Failed to add care types");
+      toast.error(error.message || "Failed to add care services");
     }
   };
 
@@ -175,7 +161,7 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
       await fetchClientCareTypes();
       onRefresh(); // Refresh parent data
     } catch (error: any) {
-      toast.error(error.message || "Failed to remove care type");
+      toast.error(error.message || "Failed to remove care service");
     }
   };
 
@@ -416,19 +402,18 @@ export const ProfileSettings = ({ clientProfile, userEmail, onRefresh }: Profile
         <CardContent className="space-y-4">
           {editMode && (
             <div className="space-y-3">
-              <Label>Add Care Needs</Label>
+              <Label>Add Care Services</Label>
               <ReactSelect
                 isMulti
-                options={availableCareTypes
-                  .filter(type => !clientCareTypes.some(cn => cn.care_type_code === type.code))
-                  .map(type => ({
-                    value: type.code,
-                    label: `${type.name} (${type.category})`
-                  }))}
-                value={selectedCareTypes.map(code => {
-                  const type = availableCareTypes.find(n => n.code === code);
-                  return type ? { value: code, label: `${type.name} (${type.category})` } : null;
-                }).filter(Boolean)}
+                options={groupedOptions
+                  .map(group => ({
+                    label: group.label,
+                    options: group.options.filter(
+                      o => !clientCareTypes.some(cn => cn.care_type_code === o.value)
+                    ),
+                  }))
+                  .filter(group => group.options.length > 0)}
+                value={selectedCareTypes.map(optionFor)}
                 onChange={(selected) => {
                   setSelectedCareTypes(selected ? selected.map(s => s.value) : []);
                 }}

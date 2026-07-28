@@ -280,7 +280,7 @@ const SystemAdminDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Configuration</CardTitle>
-            <p className="text-sm text-muted-foreground">Configure care types and needs</p>
+            <p className="text-sm text-muted-foreground">Configure care services and categories</p>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
