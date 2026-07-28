@@ -64,37 +64,47 @@ const Reports = () => {
         return;
       }
 
-      // Fetch shifts data
-      const { data: shifts, error: shiftsError } = await supabase
-        .from("shifts")
-        .select("*, shift_assignments(*)")
-        .gte("shift_date", format(dateRange.from, "yyyy-MM-dd"))
-        .lte("shift_date", format(dateRange.to, "yyyy-MM-dd"))
-        .eq("agency_id", user.id);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("agency_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      const agencyId = profile?.agency_id;
+      if (!agencyId) {
+        toast.error("No agency is linked to your account");
+        return;
+      }
+
+      const from = format(dateRange.from, "yyyy-MM-dd");
+      const to = format(dateRange.to, "yyyy-MM-dd");
+
+      const [{ data: shifts, error: shiftsError }, { data: caregivers, error: caregiversError }, { data: clients, error: clientsError }, { data: careTypes }] =
+        await Promise.all([
+          supabase
+            .from("shifts")
+            .select("*, shift_assignments(*)")
+            .gte("shift_date", from)
+            .lte("shift_date", to)
+            .eq("agency_id", agencyId),
+          supabase.from("caregivers").select("*").eq("agency_id", agencyId).eq("is_active", true),
+          supabase.from("clients").select("*").eq("agency_id", agencyId).eq("is_active", true),
+          supabase.from("care_types").select("code, name"),
+        ]);
 
       if (shiftsError) throw shiftsError;
-
-      // Fetch caregivers
-      const { data: caregivers, error: caregiversError } = await supabase
-        .from("caregivers")
-        .select("*")
-        .eq("agency_id", user.id)
-        .eq("is_active", true);
-
       if (caregiversError) throw caregiversError;
-
-      // Fetch clients
-      const { data: clients, error: clientsError } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("agency_id", user.id)
-        .eq("is_active", true);
-
       if (clientsError) throw clientsError;
+
+      const shiftIds = (shifts || []).map((s) => s.id);
+      const { data: ratings } = shiftIds.length
+        ? await supabase.from("shift_ratings").select("caregiver_id, rating").in("shift_id", shiftIds)
+        : { data: [] as any[] };
 
       // Calculate stats
       const completedShifts = shifts?.filter(s => s.status === "completed").length || 0;
       const totalHours = shifts?.reduce((sum, s) => sum + (Number(s.duration_hours) || 0), 0) || 0;
+      const unassignedShifts = shifts?.filter((s) => !s.caregiver_id).length || 0;
+      const coverageRate = shifts?.length ? ((shifts.length - unassignedShifts) / shifts.length) * 100 : 0;
 
       // Calculate growth rate (compare with previous period)
       const periodDays = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
@@ -104,7 +114,7 @@ const Reports = () => {
         .select("id")
         .gte("shift_date", format(prevFrom, "yyyy-MM-dd"))
         .lt("shift_date", format(dateRange.from, "yyyy-MM-dd"))
-        .eq("agency_id", user.id);
+        .eq("agency_id", agencyId);
 
       const growthRate = prevShifts && prevShifts.length > 0
         ? ((shifts?.length || 0) - prevShifts.length) / prevShifts.length * 100
@@ -117,6 +127,8 @@ const Reports = () => {
         activeClients: clients?.length || 0,
         totalHours,
         growthRate,
+        unassignedShifts,
+        coverageRate,
       });
 
       // Process shift data for charts
@@ -133,6 +145,79 @@ const Reports = () => {
       setShiftData(Object.values(shiftsByDate || {}).sort((a: any, b: any) => 
         new Date(a.date).getTime() - new Date(b.date).getTime()
       ));
+
+      // --- Workforce metrics (DoorDash-style) ---
+      const nameById = new Map((caregivers || []).map((c: any) => [c.id, `${c.first_name} ${c.last_name}`]));
+      const ratingsBy = new Map<string, number[]>();
+      (ratings || []).forEach((r: any) => {
+        if (!r.caregiver_id) return;
+        ratingsBy.set(r.caregiver_id, [...(ratingsBy.get(r.caregiver_id) || []), Number(r.rating)]);
+      });
+
+      const byCaregiver = new Map<string, CaregiverMetric & { onTimeCount: number; clocked: number; completed: number }>();
+      (shifts || []).forEach((s: any) => {
+        const cid = s.caregiver_id;
+        if (!cid) return;
+        const entry =
+          byCaregiver.get(cid) ||
+          {
+            caregiver: nameById.get(cid) || "Unknown",
+            shifts: 0,
+            hours: 0,
+            completionRate: 0,
+            onTimeRate: 0,
+            avgRating: null,
+            overtimeHours: 0,
+            onTimeCount: 0,
+            clocked: 0,
+            completed: 0,
+          };
+        entry.shifts += 1;
+        entry.hours += Number(s.duration_hours) || 0;
+        if (s.status === "completed") entry.completed += 1;
+        const assignment = (s.shift_assignments || [])[0];
+        if (assignment?.clock_in_time) {
+          entry.clocked += 1;
+          const scheduled = new Date(`${s.shift_date}T${String(s.start_time).slice(0, 8)}`);
+          const actual = new Date(assignment.clock_in_time);
+          if (actual.getTime() - scheduled.getTime() <= 5 * 60 * 1000) entry.onTimeCount += 1;
+        }
+        byCaregiver.set(cid, entry);
+      });
+
+      const weeksInRange = Math.max(1, periodDays / 7);
+      setWorkforce(
+        Array.from(byCaregiver.entries())
+          .map(([cid, e]) => {
+            const rs = ratingsBy.get(cid) || [];
+            return {
+              caregiver: e.caregiver,
+              shifts: e.shifts,
+              hours: Number(e.hours.toFixed(1)),
+              completionRate: e.shifts ? (e.completed / e.shifts) * 100 : 0,
+              onTimeRate: e.clocked ? (e.onTimeCount / e.clocked) * 100 : 0,
+              avgRating: rs.length ? Number((rs.reduce((a, b) => a + b, 0) / rs.length).toFixed(2)) : null,
+              overtimeHours: Number(Math.max(0, e.hours - 40 * weeksInRange).toFixed(1)),
+            };
+          })
+          .sort((a, b) => b.hours - a.hours)
+      );
+
+      // --- Client service mix ---
+      const nameByCode = new Map((careTypes || []).map((c: any) => [c.code, c.name]));
+      const mix = new Map<string, { service: string; shifts: number; hours: number }>();
+      (shifts || []).forEach((s: any) => {
+        const key = s.care_type_code || "—";
+        const entry = mix.get(key) || { service: nameByCode.get(key) || key, shifts: 0, hours: 0 };
+        entry.shifts += 1;
+        entry.hours += Number(s.duration_hours) || 0;
+        mix.set(key, entry);
+      });
+      setServiceMix(
+        Array.from(mix.values())
+          .map((m) => ({ ...m, hours: Number(m.hours.toFixed(1)) }))
+          .sort((a, b) => b.shifts - a.shifts)
+      );
 
     } catch (error: any) {
       toast.error(error.message || "Failed to load report data");
