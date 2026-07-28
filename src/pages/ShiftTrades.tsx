@@ -1,211 +1,255 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Calendar, Clock, DollarSign, MapPin, CheckCircle, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import { AppLayout } from "@/components/AppLayout";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar, Clock, Loader2, MapPin, RefreshCw, Search, User } from "lucide-react";
+import { toast } from "sonner";
+import { assignShift } from "@/lib/shiftAssignment";
+import { evaluateEligibility, loadEligibilityRules, type EligibilityResult } from "@/lib/shiftEligibility";
+import { EligibilityReport } from "@/components/schedule/EligibilityReport";
+import { queueNotification } from "@/lib/notifications";
 
-interface ShiftTrade {
-  id: string;
-  reason: string;
-  status: 'pending' | 'accepted' | 'declined' | 'cancelled' | 'expired';
-  trade_type: 'trade_board' | 'direct_trade' | 'agency_coverage';
-  surge_pay_amount: number;
-  created_at: string;
-  shift_assignments: {
-    shift_id: string;
-    shifts: {
-      shift_date: string;
-      start_time: string;
-      end_time: string;
-      clients: {
-        first_name: string;
-        last_name: string;
-        city: string;
-      };
-    };
-  };
-  original_caregivers: {
-    first_name: string;
-    last_name: string;
-  };
-  new_caregivers: {
-    first_name: string;
-    last_name: string;
-  } | null;
-}
+const STAFF_ROLES = ["manager", "agency_admin", "system_admin", "scheduler"];
+
+type TabKey = "board" | "approval" | "history";
+
+const hhmm = (t?: string | null) => (t || "").slice(0, 5);
 
 const ShiftTrades = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [trades, setTrades] = useState<ShiftTrade[]>([]);
+  const [tab, setTab] = useState<TabKey>("board");
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [trades, setTrades] = useState<any[]>([]);
+  const [caregivers, setCaregivers] = useState<any[]>([]);
+  const [agencyId, setAgencyId] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [active, setActive] = useState<any | null>(null);
+  const [takerId, setTakerId] = useState<string>("");
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<EligibilityResult | null>(null);
+  const [managerNote, setManagerNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const isStaff = role !== null && STAFF_ROLES.includes(role);
+
+  const fetchTrades = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("shift_trades")
+      .select(
+        `*,
+         shifts:shift_id (
+           id, shift_date, start_time, end_time, duration_hours, care_type_code,
+           required_skills, client_id, status, order_title, pay_rate, agency_id,
+           clients ( first_name, last_name, city, zip_code )
+         ),
+         original_caregiver:original_caregiver_id ( id, first_name, last_name, email ),
+         new_caregiver:new_caregiver_id ( id, first_name, last_name, email )`
+      )
+      .order("created_at", { ascending: false });
+    if (error) {
+      toast.error("Could not load the trade board");
+      setTrades([]);
+    } else {
+      setTrades(data || []);
+    }
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    checkAuthAndFetch();
-    
-    // Set up real-time updates
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+      const [{ data: roleData }, { data: profile }] = await Promise.all([
+        supabase.rpc("get_user_role", { _user_id: user.id }),
+        supabase.from("profiles").select("agency_id").eq("id", user.id).maybeSingle(),
+      ]);
+      setRole((roleData as string) ?? null);
+      setAgencyId(profile?.agency_id ?? null);
+      if (profile?.agency_id) {
+        const { data: cgs } = await supabase
+          .from("caregivers")
+          .select("id, first_name, last_name, email, hourly_rate")
+          .eq("agency_id", profile.agency_id)
+          .eq("is_active", true)
+          .order("first_name");
+        setCaregivers(cgs || []);
+      }
+      fetchTrades();
+    })();
     const channel = supabase
-      .channel('shift-trades')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'shift_trades'
-        },
-        () => {
-          fetchTrades();
-        }
-      )
+      .channel("shift-trades")
+      .on("postgres_changes", { event: "*", schema: "public", table: "shift_trades" }, () => fetchTrades())
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [navigate, fetchTrades]);
 
-  const checkAuthAndFetch = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate("/auth");
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return trades.filter((t) => {
+      const inTab =
+        tab === "board"
+          ? t.status === "pending" && !t.requires_manager_approval
+          : tab === "approval"
+          ? t.status === "pending" && t.requires_manager_approval
+          : t.status !== "pending";
+      if (!inTab) return false;
+      if (!q) return true;
+      const client = t.shifts?.clients;
+      const hay = [
+        t.shifts?.order_title,
+        t.shifts?.care_type_code,
+        client ? `${client.first_name} ${client.last_name}` : "",
+        client?.city,
+        t.original_caregiver ? `${t.original_caregiver.first_name} ${t.original_caregiver.last_name}` : "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [trades, tab, search]);
+
+  const counts = useMemo(
+    () => ({
+      board: trades.filter((t) => t.status === "pending" && !t.requires_manager_approval).length,
+      approval: trades.filter((t) => t.status === "pending" && t.requires_manager_approval).length,
+    }),
+    [trades]
+  );
+
+  const openPickup = (trade: any) => {
+    setActive(trade);
+    setTakerId("");
+    setResult(null);
+    setManagerNote("");
+  };
+
+  useEffect(() => {
+    if (!active?.shifts || !takerId) {
+      setResult(null);
       return;
     }
-    fetchTrades();
-  };
+    let cancelled = false;
+    (async () => {
+      setChecking(true);
+      const rules = await loadEligibilityRules(active.shifts.agency_id ?? agencyId);
+      const r = await evaluateEligibility({ caregiverId: takerId, shift: active.shifts, rules });
+      if (!cancelled) setResult(r);
+      setChecking(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active, takerId, agencyId]);
 
-  const fetchTrades = async () => {
+  const completeTrade = async (opts: { managerOverride?: boolean }) => {
+    if (!active?.shifts || !takerId || !result) return;
+    if (!result.eligible && !opts.managerOverride) return;
+    setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
+      const needsApproval = !result.autoApprovable;
+      if (needsApproval && !isStaff) {
+        const { error } = await supabase
+          .from("shift_trades")
+          .update({
+            new_caregiver_id: takerId,
+            requires_manager_approval: true,
+            approval_reasons: [...result.blockers, ...result.flags].map((i) => i.label),
+            eligibility_snapshot: result as never,
+          } as never)
+          .eq("id", active.id);
+        if (error) throw error;
+        toast.success("Sent to your manager for approval");
+        setActive(null);
+        fetchTrades();
+        return;
+      }
+      await assignShift({
+        shiftId: active.shifts.id,
+        caregiverId: takerId,
+        careTypeCode: active.shifts.care_type_code,
+        startTime: hhmm(active.shifts.start_time),
+        endTime: hhmm(active.shifts.end_time),
+        method: "traded",
+        notes: managerNote || null,
+      } as never);
+      const { error } = await supabase
         .from("shift_trades")
-        .select(`
-          *,
-          shift_assignments!inner (
-            shift_id,
-            shifts!inner (
-              shift_date,
-              start_time,
-              end_time,
-              agency_id,
-              clients (
-                first_name,
-                last_name,
-                city
-              )
-            )
-          ),
-          original_caregivers:caregivers!shift_trades_original_caregiver_id_fkey (
-            first_name,
-            last_name
-          ),
-          new_caregivers:caregivers!shift_trades_new_caregiver_id_fkey (
-            first_name,
-            last_name
-          )
-        `)
-        .order("created_at", { ascending: false });
-
+        .update({
+          new_caregiver_id: takerId,
+          status: "accepted",
+          auto_approved: result.autoApprovable,
+          requires_manager_approval: false,
+          approval_reasons: [...result.blockers, ...result.flags].map((i) => i.label),
+          eligibility_snapshot: result as never,
+          decided_by: user?.id ?? null,
+          decision_notes: managerNote || null,
+          resolved_at: new Date().toISOString(),
+        } as never)
+        .eq("id", active.id);
       if (error) throw error;
-      
-      // Filter by agency_id through the shift relationship
-      const filteredData = (data || []).filter((trade: any) => 
-        trade.shift_assignments?.shifts?.agency_id === user.id
-      );
-      
-      setTrades(filteredData);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      const taker = caregivers.find((c) => c.id === takerId);
+      if (taker?.email) {
+        await queueNotification({
+          agencyId,
+          recipientEmail: taker.email,
+          recipientName: `${taker.first_name} ${taker.last_name}`,
+          kind: "shift_trade_accepted",
+          subject: "You picked up a shift",
+          body: `You are now assigned to ${active.shifts.order_title} on ${active.shifts.shift_date} from ${hhmm(
+            active.shifts.start_time
+          )} to ${hhmm(active.shifts.end_time)}.`,
+          payload: { shift_id: active.shifts.id, trade_id: active.id },
+        });
+      }
+      toast.success(result.autoApprovable ? "Trade completed automatically" : "Trade approved and assigned");
+      setActive(null);
+      fetchTrades();
+    } catch (e: any) {
+      toast.error(e.message || "Could not complete the trade");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleAccept = async (tradeId: string) => {
+  const declineTrade = async (trade: any) => {
+    const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase
       .from("shift_trades")
-      .update({ 
-        status: "accepted",
-        resolved_at: new Date().toISOString()
-      })
-      .eq("id", tradeId);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Trade accepted successfully",
-      });
-      fetchTrades();
-    }
-  };
-
-  const handleDecline = async (tradeId: string) => {
-    const { error } = await supabase
-      .from("shift_trades")
-      .update({ 
+      .update({
         status: "declined",
-        resolved_at: new Date().toISOString()
-      })
-      .eq("id", tradeId);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Trade declined",
-      });
+        decided_by: user?.id ?? null,
+        resolved_at: new Date().toISOString(),
+      } as never)
+      .eq("id", trade.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Trade declined");
       fetchTrades();
     }
   };
-
-  const getStatusBadge = (status: string) => {
-    const variants: any = {
-      pending: "bg-warning/10 text-warning border-warning/20",
-      accepted: "bg-success/10 text-success border-success/20",
-      declined: "bg-destructive/10 text-destructive border-destructive/20",
-      cancelled: "bg-muted text-muted-foreground",
-      expired: "bg-muted text-muted-foreground"
-    };
-    return <Badge variant="outline" className={variants[status]}>{status}</Badge>;
-  };
-
-  const getTradeTypeBadge = (type: string) => {
-    const labels: any = {
-      trade_board: "Trade Board",
-      direct_trade: "Direct Trade",
-      agency_coverage: "Agency Coverage"
-    };
-    return <Badge variant="secondary">{labels[type]}</Badge>;
-  };
-
-  const filteredTrades = trades.filter(trade => {
-    if (filter === 'all') return true;
-    if (filter === 'pending') return trade.status === 'pending';
-    if (filter === 'completed') return ['accepted', 'declined', 'cancelled'].includes(trade.status);
-    return true;
-  });
 
   if (loading) {
     return (
@@ -220,166 +264,197 @@ const ShiftTrades = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Shift Trade Board</h1>
-          <p className="text-muted-foreground mt-1">Browse and claim available shift trades</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Trade Board</h1>
+            <p className="text-muted-foreground mt-1">
+              Caregivers who pass every rule pick up shifts instantly. Anything else lands in the approval queue.
+            </p>
+          </div>
+          <Button variant="outline" onClick={fetchTrades}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-primary">{trades.filter(t => t.status === 'pending').length}</p>
-                <p className="text-sm text-muted-foreground mt-1">Available Shifts</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-warning">{trades.filter(t => t.surge_pay_amount > 0 && t.status === 'pending').length}</p>
-                <p className="text-sm text-muted-foreground mt-1">With Surge Pay</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-success">{trades.filter(t => t.status === 'accepted').length}</p>
-                <p className="text-sm text-muted-foreground mt-1">Accepted</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-muted-foreground">{trades.filter(t => t.status === 'declined').length}</p>
-                <p className="text-sm text-muted-foreground mt-1">Declined</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
+            <TabsList>
+              <TabsTrigger value="board">Open board{counts.board ? ` (${counts.board})` : ""}</TabsTrigger>
+              <TabsTrigger value="approval">
+                Needs approval{counts.approval ? ` (${counts.approval})` : ""}
+              </TabsTrigger>
+              <TabsTrigger value="history">History</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Search client, caregiver, service…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
 
-        {/* Filter Section */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={filter === 'all' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('all')}
-              >
-                All Shifts
-              </Button>
-              <Button
-                variant={filter === 'pending' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('pending')}
-              >
-                Available
-              </Button>
-              <Button
-                variant={filter === 'completed' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('completed')}
-              >
-                Completed
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-4">
-          {filteredTrades.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <RefreshCw className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No shift trades found</p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredTrades.map((trade) => (
-              <Card 
-                key={trade.id} 
-                className={`transition-all hover:shadow-lg ${
-                  trade.surge_pay_amount > 0 && trade.status === 'pending'
-                    ? 'border-l-4 border-l-warning bg-gradient-to-r from-warning/5 to-transparent'
-                    : trade.status === 'pending'
-                    ? 'hover:border-primary/20'
-                    : ''
-                }`}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2 flex-1">
-                      {trade.surge_pay_amount > 0 && trade.status === 'pending' && (
-                        <Badge className="bg-gradient-to-r from-warning to-warning/80 text-warning-foreground mb-2">
-                          <DollarSign className="h-3 w-3 mr-1" />
-                          +${trade.surge_pay_amount}/hr Surge Pay
-                        </Badge>
-                      )}
-                      <CardTitle className="text-xl">
-                        {format(new Date(trade.shift_assignments.shifts.shift_date), "EEEE, MMMM d")}
-                      </CardTitle>
-                      <CardDescription className="space-y-2">
-                        <div className="flex items-center gap-4 flex-wrap">
+        {filtered.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <RefreshCw className="h-10 w-10 text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">Nothing here right now</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {filtered.map((trade) => {
+              const s = trade.shifts;
+              const client = s?.clients;
+              return (
+                <Card key={trade.id}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <CardTitle className="text-lg">{s?.order_title || "Shift"}</CardTitle>
+                        <CardDescription className="flex flex-wrap items-center gap-3 mt-1">
                           <span className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {trade.shift_assignments.shifts.start_time} - {trade.shift_assignments.shifts.end_time}
+                            <Calendar className="h-3.5 w-3.5" />
+                            {s?.shift_date}
                           </span>
                           <span className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            {trade.shift_assignments.shifts.clients.city}
+                            <Clock className="h-3.5 w-3.5" />
+                            {hhmm(s?.start_time)}–{hhmm(s?.end_time)} ({s?.duration_hours}h)
                           </span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="font-medium">Client:</span> {trade.shift_assignments.shifts.clients.first_name} {trade.shift_assignments.shifts.clients.last_name}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Posted by: {trade.original_caregivers.first_name} {trade.original_caregivers.last_name}
-                        </div>
-                      </CardDescription>
+                          {client?.city && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5" />
+                              {client.city}
+                            </span>
+                          )}
+                        </CardDescription>
+                      </div>
+                      <Badge variant={trade.status === "pending" ? "outline" : "secondary"}>{trade.status}</Badge>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      {getStatusBadge(trade.status)}
-                      {getTradeTypeBadge(trade.trade_type)}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {trade.reason && (
-                    <div className="bg-muted/50 p-3 rounded-lg">
-                      <p className="font-medium text-sm mb-1">Reason for Trade</p>
-                      <p className="text-sm text-muted-foreground">{trade.reason}</p>
-                    </div>
-                  )}
-
-                  {trade.new_caregivers && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Badge variant="secondary">
-                        Claimed by: {trade.new_caregivers.first_name} {trade.new_caregivers.last_name}
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="text-sm flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      {client ? `${client.first_name} ${client.last_name}` : "Client"}
+                      <Badge variant="outline" className="text-xs">
+                        {s?.care_type_code}
                       </Badge>
                     </div>
-                  )}
-
-                  {trade.status === "pending" && (
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90"
-                        onClick={() => handleAccept(trade.id)}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Claim This Shift
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+                    <p className="text-xs text-muted-foreground">
+                      Given up by {trade.original_caregiver?.first_name} {trade.original_caregiver?.last_name}
+                      {trade.reason ? ` — ${trade.reason}` : ""}
+                    </p>
+                    {trade.approval_reasons?.length > 0 && trade.status === "pending" && (
+                      <div className="flex flex-wrap gap-1">
+                        {trade.approval_reasons.map((r: string) => (
+                          <Badge key={r} variant="outline" className="text-[10px] border-warning/40 text-warning">
+                            {r}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {trade.new_caregiver && (
+                      <p className="text-xs">
+                        Requested by{" "}
+                        <span className="font-medium">
+                          {trade.new_caregiver.first_name} {trade.new_caregiver.last_name}
+                        </span>
+                      </p>
+                    )}
+                    {trade.status === "pending" && (
+                      <div className="flex gap-2 pt-1">
+                        <Button size="sm" onClick={() => openPickup(trade)} disabled={!s}>
+                          {tab === "approval" ? "Review" : "Pick up"}
+                        </Button>
+                        {isStaff && (
+                          <Button size="sm" variant="outline" onClick={() => declineTrade(trade)}>
+                            Decline
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Pick up shift</DialogTitle>
+            <DialogDescription>
+              {active?.shifts?.shift_date} · {hhmm(active?.shifts?.start_time)}–{hhmm(active?.shifts?.end_time)} ·{" "}
+              {active?.shifts?.order_title}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Caregiver taking this shift</Label>
+              <Select value={takerId} onValueChange={setTakerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select caregiver" />
+                </SelectTrigger>
+                <SelectContent>
+                  {caregivers
+                    .filter((c) => c.id !== active?.original_caregiver_id)
+                    .map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.first_name} {c.last_name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {checking && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Running eligibility checks…
+              </div>
+            )}
+            {result && !checking && <EligibilityReport result={result} />}
+
+            {result && !result.autoApprovable && isStaff && (
+              <div className="space-y-2">
+                <Label htmlFor="mnote">Manager override reason</Label>
+                <Textarea
+                  id="mnote"
+                  rows={2}
+                  value={managerNote}
+                  onChange={(e) => setManagerNote(e.target.value)}
+                  placeholder="Why are you approving this despite the warnings?"
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActive(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => completeTrade({ managerOverride: isStaff })}
+              disabled={
+                saving ||
+                !result ||
+                checking ||
+                (!result.eligible && !isStaff) ||
+                (isStaff && !result.autoApprovable && managerNote.trim().length === 0)
+              }
+            >
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {result?.autoApprovable ? "Confirm pickup" : isStaff ? "Approve & assign" : "Send for manager approval"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };

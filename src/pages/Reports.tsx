@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   ChartContainer,
   ChartTooltip,
@@ -26,6 +27,18 @@ interface ReportStats {
   activeClients: number;
   totalHours: number;
   growthRate: number;
+  unassignedShifts: number;
+  coverageRate: number;
+}
+
+interface CaregiverMetric {
+  caregiver: string;
+  shifts: number;
+  hours: number;
+  completionRate: number;
+  onTimeRate: number;
+  avgRating: number | null;
+  overtimeHours: number;
 }
 
 const Reports = () => {
@@ -36,6 +49,8 @@ const Reports = () => {
   const [stats, setStats] = useState<ReportStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [shiftData, setShiftData] = useState<any[]>([]);
+  const [workforce, setWorkforce] = useState<CaregiverMetric[]>([]);
+  const [serviceMix, setServiceMix] = useState<{ service: string; shifts: number; hours: number }[]>([]);
 
   useEffect(() => {
     fetchReportData();
@@ -50,37 +65,47 @@ const Reports = () => {
         return;
       }
 
-      // Fetch shifts data
-      const { data: shifts, error: shiftsError } = await supabase
-        .from("shifts")
-        .select("*, shift_assignments(*)")
-        .gte("shift_date", format(dateRange.from, "yyyy-MM-dd"))
-        .lte("shift_date", format(dateRange.to, "yyyy-MM-dd"))
-        .eq("agency_id", user.id);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("agency_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      const agencyId = profile?.agency_id;
+      if (!agencyId) {
+        toast.error("No agency is linked to your account");
+        return;
+      }
+
+      const from = format(dateRange.from, "yyyy-MM-dd");
+      const to = format(dateRange.to, "yyyy-MM-dd");
+
+      const [{ data: shifts, error: shiftsError }, { data: caregivers, error: caregiversError }, { data: clients, error: clientsError }, { data: careTypes }] =
+        await Promise.all([
+          supabase
+            .from("shifts")
+            .select("*, shift_assignments(*)")
+            .gte("shift_date", from)
+            .lte("shift_date", to)
+            .eq("agency_id", agencyId),
+          supabase.from("caregivers").select("*").eq("agency_id", agencyId).eq("is_active", true),
+          supabase.from("clients").select("*").eq("agency_id", agencyId).eq("is_active", true),
+          supabase.from("care_types").select("code, name"),
+        ]);
 
       if (shiftsError) throw shiftsError;
-
-      // Fetch caregivers
-      const { data: caregivers, error: caregiversError } = await supabase
-        .from("caregivers")
-        .select("*")
-        .eq("agency_id", user.id)
-        .eq("is_active", true);
-
       if (caregiversError) throw caregiversError;
-
-      // Fetch clients
-      const { data: clients, error: clientsError } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("agency_id", user.id)
-        .eq("is_active", true);
-
       if (clientsError) throw clientsError;
+
+      const shiftIds = (shifts || []).map((s) => s.id);
+      const { data: ratings } = shiftIds.length
+        ? await supabase.from("shift_ratings").select("caregiver_id, rating").in("shift_id", shiftIds)
+        : { data: [] as any[] };
 
       // Calculate stats
       const completedShifts = shifts?.filter(s => s.status === "completed").length || 0;
       const totalHours = shifts?.reduce((sum, s) => sum + (Number(s.duration_hours) || 0), 0) || 0;
+      const unassignedShifts = shifts?.filter((s) => !s.caregiver_id).length || 0;
+      const coverageRate = shifts?.length ? ((shifts.length - unassignedShifts) / shifts.length) * 100 : 0;
 
       // Calculate growth rate (compare with previous period)
       const periodDays = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
@@ -90,7 +115,7 @@ const Reports = () => {
         .select("id")
         .gte("shift_date", format(prevFrom, "yyyy-MM-dd"))
         .lt("shift_date", format(dateRange.from, "yyyy-MM-dd"))
-        .eq("agency_id", user.id);
+        .eq("agency_id", agencyId);
 
       const growthRate = prevShifts && prevShifts.length > 0
         ? ((shifts?.length || 0) - prevShifts.length) / prevShifts.length * 100
@@ -103,6 +128,8 @@ const Reports = () => {
         activeClients: clients?.length || 0,
         totalHours,
         growthRate,
+        unassignedShifts,
+        coverageRate,
       });
 
       // Process shift data for charts
@@ -119,6 +146,79 @@ const Reports = () => {
       setShiftData(Object.values(shiftsByDate || {}).sort((a: any, b: any) => 
         new Date(a.date).getTime() - new Date(b.date).getTime()
       ));
+
+      // --- Workforce metrics (DoorDash-style) ---
+      const nameById = new Map((caregivers || []).map((c: any) => [c.id, `${c.first_name} ${c.last_name}`]));
+      const ratingsBy = new Map<string, number[]>();
+      (ratings || []).forEach((r: any) => {
+        if (!r.caregiver_id) return;
+        ratingsBy.set(r.caregiver_id, [...(ratingsBy.get(r.caregiver_id) || []), Number(r.rating)]);
+      });
+
+      const byCaregiver = new Map<string, CaregiverMetric & { onTimeCount: number; clocked: number; completed: number }>();
+      (shifts || []).forEach((s: any) => {
+        const cid = s.caregiver_id;
+        if (!cid) return;
+        const entry =
+          byCaregiver.get(cid) ||
+          {
+            caregiver: nameById.get(cid) || "Unknown",
+            shifts: 0,
+            hours: 0,
+            completionRate: 0,
+            onTimeRate: 0,
+            avgRating: null,
+            overtimeHours: 0,
+            onTimeCount: 0,
+            clocked: 0,
+            completed: 0,
+          };
+        entry.shifts += 1;
+        entry.hours += Number(s.duration_hours) || 0;
+        if (s.status === "completed") entry.completed += 1;
+        const assignment = (s.shift_assignments || [])[0];
+        if (assignment?.clock_in_time) {
+          entry.clocked += 1;
+          const scheduled = new Date(`${s.shift_date}T${String(s.start_time).slice(0, 8)}`);
+          const actual = new Date(assignment.clock_in_time);
+          if (actual.getTime() - scheduled.getTime() <= 5 * 60 * 1000) entry.onTimeCount += 1;
+        }
+        byCaregiver.set(cid, entry);
+      });
+
+      const weeksInRange = Math.max(1, periodDays / 7);
+      setWorkforce(
+        Array.from(byCaregiver.entries())
+          .map(([cid, e]) => {
+            const rs = ratingsBy.get(cid) || [];
+            return {
+              caregiver: e.caregiver,
+              shifts: e.shifts,
+              hours: Number(e.hours.toFixed(1)),
+              completionRate: e.shifts ? (e.completed / e.shifts) * 100 : 0,
+              onTimeRate: e.clocked ? (e.onTimeCount / e.clocked) * 100 : 0,
+              avgRating: rs.length ? Number((rs.reduce((a, b) => a + b, 0) / rs.length).toFixed(2)) : null,
+              overtimeHours: Number(Math.max(0, e.hours - 40 * weeksInRange).toFixed(1)),
+            };
+          })
+          .sort((a, b) => b.hours - a.hours)
+      );
+
+      // --- Client service mix ---
+      const nameByCode = new Map((careTypes || []).map((c: any) => [c.code, c.name]));
+      const mix = new Map<string, { service: string; shifts: number; hours: number }>();
+      (shifts || []).forEach((s: any) => {
+        const key = s.care_type_code || "—";
+        const entry = mix.get(key) || { service: nameByCode.get(key) || key, shifts: 0, hours: 0 };
+        entry.shifts += 1;
+        entry.hours += Number(s.duration_hours) || 0;
+        mix.set(key, entry);
+      });
+      setServiceMix(
+        Array.from(mix.values())
+          .map((m) => ({ ...m, hours: Number(m.hours.toFixed(1)) }))
+          .sort((a, b) => b.shifts - a.shifts)
+      );
 
     } catch (error: any) {
       toast.error(error.message || "Failed to load report data");
@@ -270,6 +370,8 @@ const Reports = () => {
               <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="shifts">Shifts</TabsTrigger>
+                <TabsTrigger value="workforce">Workforce</TabsTrigger>
+                <TabsTrigger value="clients">Clients</TabsTrigger>
                 <TabsTrigger value="performance">Performance</TabsTrigger>
               </TabsList>
 
@@ -341,6 +443,102 @@ const Reports = () => {
                 </Card>
               </TabsContent>
 
+              <TabsContent value="workforce" className="space-y-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Caregiver scorecard</CardTitle>
+                    <Button variant="outline" size="sm" onClick={() => exportToCSV(workforce, "workforce_report")}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {workforce.length === 0 ? (
+                      <p className="text-muted-foreground py-8 text-center">No assigned shifts in this period</p>
+                    ) : (
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Caregiver</TableHead>
+                              <TableHead className="text-right">Shifts</TableHead>
+                              <TableHead className="text-right">Hours</TableHead>
+                              <TableHead className="text-right">Overtime</TableHead>
+                              <TableHead className="text-right">Completion</TableHead>
+                              <TableHead className="text-right">On-time</TableHead>
+                              <TableHead className="text-right">Rating</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {workforce.map((w) => (
+                              <TableRow key={w.caregiver}>
+                                <TableCell className="font-medium">{w.caregiver}</TableCell>
+                                <TableCell className="text-right">{w.shifts}</TableCell>
+                                <TableCell className="text-right">{w.hours}</TableCell>
+                                <TableCell className="text-right">
+                                  {w.overtimeHours > 0 ? (
+                                    <span className="text-destructive font-medium">{w.overtimeHours}</span>
+                                  ) : (
+                                    "—"
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">{w.completionRate.toFixed(0)}%</TableCell>
+                                <TableCell className="text-right">
+                                  {w.onTimeRate ? `${w.onTimeRate.toFixed(0)}%` : "—"}
+                                </TableCell>
+                                <TableCell className="text-right">{w.avgRating ?? "—"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="clients" className="space-y-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Service mix</CardTitle>
+                    <Button variant="outline" size="sm" onClick={() => exportToCSV(serviceMix, "service_mix")}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {serviceMix.length === 0 ? (
+                      <p className="text-muted-foreground py-8 text-center">No services delivered in this period</p>
+                    ) : (
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Care service</TableHead>
+                              <TableHead className="text-right">Shifts</TableHead>
+                              <TableHead className="text-right">Hours</TableHead>
+                              <TableHead className="text-right">Share</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {serviceMix.map((m) => (
+                              <TableRow key={m.service}>
+                                <TableCell className="font-medium">{m.service}</TableCell>
+                                <TableCell className="text-right">{m.shifts}</TableCell>
+                                <TableCell className="text-right">{m.hours}</TableCell>
+                                <TableCell className="text-right">
+                                  {stats.totalShifts ? ((m.shifts / stats.totalShifts) * 100).toFixed(0) : 0}%
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
               <TabsContent value="performance" className="space-y-6">
                 <Card>
                   <CardHeader>
@@ -355,6 +553,14 @@ const Reports = () => {
                             ? `${((stats.completedShifts / stats.totalShifts) * 100).toFixed(1)}%`
                             : "N/A"}
                         </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Coverage Rate</span>
+                        <span className="text-lg font-bold">{stats.coverageRate.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Unfilled Shifts</span>
+                        <span className="text-lg font-bold">{stats.unassignedShifts}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Avg Hours per Shift</span>

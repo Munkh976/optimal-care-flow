@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { AppLayout } from "@/components/AppLayout";
 import { timeOffRequestSchema, firstError } from "@/lib/validation";
+import { TimeOffDecisionDialog } from "@/components/timeoff/TimeOffDecisionDialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const APPROVER_ROLES = ["manager", "agency_admin", "system_admin"];
 
@@ -29,6 +31,7 @@ interface TimeOffRequest {
   caregivers: {
     first_name: string;
     last_name: string;
+    email?: string | null;
   };
 }
 
@@ -41,6 +44,10 @@ const TimeOffRequests = () => {
   const [caregivers, setCaregivers] = useState<any[]>([]);
   const [userRole, setUserRole] = useState<string | null>(null);
   const canApprove = userRole !== null && APPROVER_ROLES.includes(userRole);
+  const [statusFilter, setStatusFilter] = useState<string>("pending");
+  const [decisionTarget, setDecisionTarget] = useState<TimeOffRequest | null>(null);
+  const [decisionType, setDecisionType] = useState<"approved" | "denied">("approved");
+  const [decisionOpen, setDecisionOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     caregiver_id: "",
@@ -74,7 +81,8 @@ const TimeOffRequests = () => {
           *,
           caregivers (
             first_name,
-            last_name
+            last_name,
+            email
           )
         `)
         .order("created_at", { ascending: false });
@@ -165,65 +173,23 @@ const TimeOffRequests = () => {
     }
   };
 
-  const handleApprove = async (id: string) => {
+  const openDecision = (request: TimeOffRequest, type: "approved" | "denied") => {
     if (!canApprove) {
       toast({
         title: "Not allowed",
-        description: "Only managers and admins can approve requests",
+        description: "Only managers and admins can decide on requests",
         variant: "destructive",
       });
       return;
     }
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    const { error } = await supabase
-      .from("time_off_requests")
-      .update({ status: "approved", approved_by_user_id: user?.id })
-      .eq("id", id);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Request approved",
-      });
-      fetchRequests();
-    }
+    setDecisionTarget(request);
+    setDecisionType(type);
+    setDecisionOpen(true);
   };
 
-  const handleDeny = async (id: string) => {
-    if (!canApprove) {
-      toast({
-        title: "Not allowed",
-        description: "Only managers and admins can deny requests",
-        variant: "destructive",
-      });
-      return;
-    }
-    const { error } = await supabase
-      .from("time_off_requests")
-      .update({ status: "denied" })
-      .eq("id", id);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Request denied",
-      });
-      fetchRequests();
-    }
-  };
+  const visibleRequests =
+    statusFilter === "all" ? requests : requests.filter((r) => r.status === statusFilter);
+  const pendingCount = requests.filter((r) => r.status === "pending").length;
 
   const getStatusBadge = (status: string) => {
     const variants: any = {
@@ -350,8 +316,17 @@ const TimeOffRequests = () => {
           </Dialog>
         </div>
 
+        <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+          <TabsList>
+            <TabsTrigger value="pending">Pending{pendingCount > 0 ? ` (${pendingCount})` : ""}</TabsTrigger>
+            <TabsTrigger value="approved">Approved</TabsTrigger>
+            <TabsTrigger value="denied">Denied</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         <div className="grid gap-4">
-          {requests.length === 0 ? (
+          {visibleRequests.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
@@ -359,7 +334,7 @@ const TimeOffRequests = () => {
               </CardContent>
             </Card>
           ) : (
-            requests.map((request) => (
+            visibleRequests.map((request) => (
               <Card key={request.id}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -391,7 +366,7 @@ const TimeOffRequests = () => {
                         size="sm"
                         variant="outline"
                         className="text-success border-success/20 hover:bg-success/10"
-                        onClick={() => handleApprove(request.id)}
+                        onClick={() => openDecision(request, "approved")}
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
                         Approve
@@ -400,7 +375,7 @@ const TimeOffRequests = () => {
                         size="sm"
                         variant="outline"
                         className="text-destructive border-destructive/20 hover:bg-destructive/10"
-                        onClick={() => handleDeny(request.id)}
+                        onClick={() => openDecision(request, "denied")}
                       >
                         <XCircle className="h-4 w-4 mr-2" />
                         Deny
@@ -412,6 +387,14 @@ const TimeOffRequests = () => {
             ))
           )}
         </div>
+
+        <TimeOffDecisionDialog
+          request={decisionTarget}
+          decision={decisionType}
+          open={decisionOpen}
+          onOpenChange={setDecisionOpen}
+          onDone={fetchRequests}
+        />
       </div>
     </AppLayout>
   );
