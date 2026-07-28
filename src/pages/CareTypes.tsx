@@ -202,17 +202,23 @@ const CareTypes = () => {
           <h2 className="text-3xl font-bold mb-2">Care Services</h2>
           <p className="text-muted-foreground">Manage standardized care service catalog</p>
         </div>
-        <Button
-          className="gap-2"
-          onClick={() => {
-            setSelectedCareType(null);
-            setFormData({ code: "", category: "", name: "", description: "", keywords: "", price: "35.00", duration: "4" });
-            setIsDialogOpen(true);
-          }}
-        >
-          <Plus className="h-4 w-4" />
-          Add Care Service
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setIsCategoriesOpen(true)}>
+            <Tags className="h-4 w-4" />
+            Manage Categories
+          </Button>
+          <Button
+            className="gap-2"
+            onClick={() => {
+              setSelectedCareType(null);
+              setFormData({ code: "", category: "", name: "", description: "", keywords: "", price: "35.00", duration: "4" });
+              setIsDialogOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Add Care Service
+          </Button>
+        </div>
       </div>
 
       <Card className="p-6">
@@ -336,12 +342,11 @@ const CareTypes = () => {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Activities of Daily Living (ADL)">Activities of Daily Living (ADL)</SelectItem>
-                    <SelectItem value="Instrumental Activities of Daily Living (IADL)">Instrumental Activities of Daily Living (IADL)</SelectItem>
-                  <SelectItem value="Health Monitoring & Care">Health Monitoring & Care</SelectItem>
-                  <SelectItem value="Cognitive & Emotional Support">Cognitive & Emotional Support</SelectItem>
-                  <SelectItem value="Safety & Transportation">Safety & Transportation</SelectItem>
-                  <SelectItem value="Specialized Care">Specialized Care</SelectItem>
+                    {(categories || []).map((cat: any) => (
+                      <SelectItem key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -474,6 +479,8 @@ const CareTypes = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ManageCategoriesDialog open={isCategoriesOpen} onOpenChange={setIsCategoriesOpen} />
       </div>
     </AppLayout>
   );
