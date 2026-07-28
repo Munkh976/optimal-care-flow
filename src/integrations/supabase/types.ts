@@ -475,6 +475,8 @@ export type Database = {
       client_orders: {
         Row: {
           agency_id: string
+          archived_at: string | null
+          archived_by: string | null
           client_id: string
           created_at: string | null
           days_of_week: string | null
@@ -489,6 +491,8 @@ export type Database = {
         }
         Insert: {
           agency_id: string
+          archived_at?: string | null
+          archived_by?: string | null
           client_id: string
           created_at?: string | null
           days_of_week?: string | null
@@ -503,6 +507,8 @@ export type Database = {
         }
         Update: {
           agency_id?: string
+          archived_at?: string | null
+          archived_by?: string | null
           client_id?: string
           created_at?: string | null
           days_of_week?: string | null

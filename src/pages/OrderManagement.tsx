@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Trash2, Eye, ChevronDown, ChevronUp, Package, Zap, Star, CheckCircle2, Loader2 } from "lucide-react";
+import { Plus, Edit, Send, Calendar as CalendarIcon, Clock, User, Search, Filter, Archive, ArchiveRestore, Eye, ChevronDown, ChevronUp, Package, Zap, Star, CheckCircle2, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,6 +29,7 @@ type Order = {
   days_of_week: string;
   status: string;
   notes?: string;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
   clients?: {
@@ -55,6 +56,7 @@ const OrderManagement = () => {
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [scope, setScope] = useState<"active" | "completed" | "archived" | "all">("active");
   const [view, setView] = useState<"week" | "month" | "year">("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   
@@ -347,25 +349,25 @@ const OrderManagement = () => {
     }
   };
 
-  const handleDeleteOrder = async (orderId: string) => {
-    if (!confirm("Are you sure you want to delete this order? This will also delete all associated shifts.")) {
+  const handleArchiveOrder = async (order: Order) => {
+    const archiving = !order.archived_at;
+    if (archiving && !confirm("Archive this order? It stays in the Archived tab with all of its shifts — nothing is deleted.")) {
       return;
     }
 
-    // Delete shifts for this order (cascade will handle it, but we'll be explicit)
-    await supabase.from("shifts").delete().eq("order_id", orderId);
-
-    // Delete order
     const { error } = await supabase
       .from("client_orders")
-      .delete()
-      .eq("id", orderId);
+      .update({
+        archived_at: archiving ? new Date().toISOString() : null,
+        archived_by: archiving ? user?.id ?? null : null,
+      } as never)
+      .eq("id", order.id);
 
     if (error) {
-      toast.error("Failed to delete order");
+      toast.error(archiving ? "Failed to archive order" : "Failed to restore order");
     } else {
-      toast.success("Order deleted successfully");
-      if (user) fetchOrders(user.id);
+      toast.success(archiving ? "Order archived" : "Order restored");
+      if (profile?.agency_id) fetchOrders(profile.agency_id);
     }
   };
 
@@ -398,6 +400,20 @@ const OrderManagement = () => {
   // Search and filter effect
   useEffect(() => {
     let filtered = [...orders];
+    const today = new Date().toISOString().split("T")[0];
+
+    // Scope: active (default) hides archived + finished orders
+    const isArchived = (o: Order) => !!o.archived_at;
+    const isFinished = (o: Order) =>
+      o.status === "completed" || o.status === "cancelled" || o.end_date < today;
+
+    if (scope === "active") {
+      filtered = filtered.filter(o => !isArchived(o) && !isFinished(o));
+    } else if (scope === "completed") {
+      filtered = filtered.filter(o => !isArchived(o) && isFinished(o));
+    } else if (scope === "archived") {
+      filtered = filtered.filter(isArchived);
+    }
 
     // Search filter
     if (searchQuery) {
@@ -412,7 +428,8 @@ const OrderManagement = () => {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
-    // Period filter based on view and currentDate
+    // Period filter (skipped on the Active scope so open work is never hidden)
+    if (scope !== "active") {
     const startDate = view === "week" 
       ? startOfWeek(currentDate)
       : view === "month"
@@ -430,9 +447,10 @@ const OrderManagement = () => {
       const orderEnd = new Date(order.end_date);
       return orderStart <= endDate && orderEnd >= startDate;
     });
+    }
 
     setFilteredOrders(filtered);
-  }, [searchQuery, statusFilter, view, currentDate, orders]);
+  }, [searchQuery, statusFilter, scope, view, currentDate, orders]);
 
   const loadAvailableCaregivers = async () => {
     if (!bookingData.client_id || bookingData.day === null) return;
@@ -569,6 +587,23 @@ const OrderManagement = () => {
         {/* Search and Filters */}
         <Card className="mb-6">
           <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-2 mb-4">
+              {([
+                { key: "active", label: "Active" },
+                { key: "completed", label: "Completed" },
+                { key: "archived", label: "Archived" },
+                { key: "all", label: "All" },
+              ] as const).map(tab => (
+                <Button
+                  key={tab.key}
+                  size="sm"
+                  variant={scope === tab.key ? "default" : "outline"}
+                  onClick={() => setScope(tab.key)}
+                >
+                  {tab.label}
+                </Button>
+              ))}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <div className="relative">
@@ -790,10 +825,15 @@ const OrderManagement = () => {
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteOrder(order.id);
+                                handleArchiveOrder(order);
                               }}
+                              title={order.archived_at ? "Restore order" : "Archive order"}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              {order.archived_at ? (
+                                <ArchiveRestore className="h-4 w-4" />
+                              ) : (
+                                <Archive className="h-4 w-4" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>
