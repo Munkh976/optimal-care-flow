@@ -15,33 +15,22 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange, onAssign }: Shif
   const isUnassigned =
     (!shift.shift_assignments || shift.shift_assignments.length === 0) && !shift.caregiver_id;
 
-  const formatCareType = (careType: string) => {
-    const types: any = {
-      personal_care: "Personal Care",
-      companion: "Companion Care",
-      medical: "Medical Care",
-      respite: "Respite Care",
-    };
-    return types[careType] || careType;
-  };
-
-  const getCareTypeColor = (careType: string) => {
-    const colors: any = {
-      personal_care: "bg-primary/10 text-primary border-primary/20",
-      companion: "bg-accent/10 text-accent border-accent/20",
-      medical: "bg-destructive/10 text-destructive border-destructive/20",
-      respite: "bg-secondary/10 text-secondary border-secondary/20",
-    };
-    return colors[careType] || "bg-muted";
-  };
+  // Different views pass either `clients`/`care_types` (Supabase relations) or
+  // pre-mapped `client`/`care_type` objects — support both.
+  const client = shift.clients || shift.client;
+  const careType = shift.care_types || shift.care_type;
+  const serviceName = careType?.name || shift.order_title || "Care service";
+  const clientName = [client?.first_name, client?.last_name].filter(Boolean).join(" ");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl">
-            {shift.care_type_code} - {shift.care_type?.name || formatCareType(shift.care_type_code)}
-          </DialogTitle>
+          <DialogTitle className="text-2xl">{serviceName}</DialogTitle>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {shift.care_type_code && <Badge variant="outline">{shift.care_type_code}</Badge>}
+            {careType?.category && <Badge variant="secondary">{careType.category}</Badge>}
+          </div>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
@@ -52,14 +41,15 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange, onAssign }: Shif
               Client
             </div>
             <div className="ml-6">
-              <p className="font-medium text-lg">
-                {shift.client?.first_name} {shift.client?.last_name}
-              </p>
+              <p className="font-medium text-lg">{clientName || "Unknown client"}</p>
+              {client?.phone && (
+                <p className="text-sm text-muted-foreground">{client.phone}</p>
+              )}
             </div>
           </div>
 
           {/* Location */}
-          {shift.client?.address && (
+          {client?.address && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold">
                 <MapPin className="h-4 w-4" />
@@ -67,10 +57,10 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange, onAssign }: Shif
               </div>
               <div className="ml-6">
                 <p className="text-sm">
-                  {shift.client.address}
-                  {shift.client.city && `, ${shift.client.city}`}
-                  {shift.client.state && `, ${shift.client.state}`}
-                  {shift.client.zip_code && ` ${shift.client.zip_code}`}
+                  {client.address}
+                  {client.city && `, ${client.city}`}
+                  {client.state && `, ${client.state}`}
+                  {client.zip_code && ` ${client.zip_code}`}
                 </p>
               </div>
             </div>
@@ -110,7 +100,7 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange, onAssign }: Shif
           </div>
 
           {/* Care Requirements / Needs */}
-          {shift.client?.care_requirements && shift.client.care_requirements.length > 0 && (
+          {client?.care_requirements && client.care_requirements.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold">
                 <FileText className="h-4 w-4" />
@@ -118,7 +108,7 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange, onAssign }: Shif
               </div>
               <div className="ml-6">
                 <div className="flex flex-wrap gap-2">
-                  {shift.client.care_requirements.map((req: string, idx: number) => (
+                  {client.care_requirements.map((req: string, idx: number) => (
                     <Badge key={idx} variant="secondary">
                       {req}
                     </Badge>
