@@ -24,6 +24,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
   const [flow, setFlow] = useState<ConversationFlow | null>(null);
   const [state, setState] = useState<FlowState | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -91,15 +92,17 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
         // starts a new session with a client-generated id.
         const fresh = initState(loaded);
         const id = crypto.randomUUID();
+        const token = crypto.randomUUID();
         const { error: createError } = await supabase.from("conversation_sessions").insert({
           id,
           flow_id: loaded.id,
-          session_token: crypto.randomUUID(),
+          session_token: token,
           current_node_id: fresh.currentNodeId,
         });
         if (createError) throw createError;
         if (cancelled) return;
         setSessionId(id);
+        setSessionToken(token);
         setState(fresh);
       } catch (e: any) {
         if (!cancelled) setError(e.message ?? "Could not load the conversation.");
