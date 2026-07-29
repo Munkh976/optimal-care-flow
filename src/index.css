@@ -52,6 +52,16 @@ All colors MUST be HSL.
 
     --radius: 0.75rem;
 
+    /* Guided conversation surface (public assistant) */
+    --convo-surface: 0 0% 100%;
+    --convo-ink: 0 0% 7%;
+    --convo-muted: 220 9% 46%;
+    --convo-line: 220 13% 91%;
+    --convo-pill: 220 14% 96%;
+    --convo-pill-foreground: 215 20% 25%;
+    --convo-accent: 174 70% 40%;
+    --convo-accent-foreground: 0 0% 100%;
+
     /* Gradients for premium features */
     --gradient-primary: linear-gradient(135deg, hsl(215, 85%, 28%) 0%, hsl(195, 85%, 35%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(185, 85%, 45%) 0%, hsl(170, 75%, 50%) 100%);
