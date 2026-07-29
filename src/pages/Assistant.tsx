@@ -16,10 +16,7 @@ export default function Assistant() {
     return (
       <ConversationSurface
         audience="caregiver_screening"
-        completionTitle="Thanks for sharing"
-        completionMessage="Finish your application and a manager will review it with your answers attached."
-        actionLabel="Continue to application"
-        onAction={() => (window.location.href = "/caregiver-registration")}
+        agencyName="Kind Care Services"
         onExit={() => setAudience(null)}
       />
     );
