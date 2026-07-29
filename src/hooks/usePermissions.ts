@@ -69,6 +69,7 @@ export const usePermissions = () => {
         schedule: "/schedule",
         caregivers: "/caregivers",
         clients: "/clients",
+        client_inquiries: "/client-inquiries",
         shifts: "/schedule",
         orders: "/order-management",
         availability: "/time-off",

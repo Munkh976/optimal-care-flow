@@ -56,6 +56,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     role_permissions: Settings,
     caregivers: Users,
     clients: UserCog,
+    client_inquiries: Inbox,
     shifts: Calendar,
     orders: FileText,
     availability: Clock,
