@@ -18,15 +18,23 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ConversationFlow, FlowNode, findOrphanNodes } from "@/lib/flowEngine";
+import {
+  ConversationFlow,
+  FlowNode,
+  TRAIT_KEYS,
+  TRAIT_LABELS,
+  optionPoints,
+  validateFlow,
+} from "@/lib/flowEngine";
 import { AlertTriangle, ExternalLink, Loader2, Plus, Trash2 } from "lucide-react";
 
 const NODE_TYPES = [
   { value: "single_select", label: "Single choice" },
   { value: "multi_select", label: "Multiple choice" },
   { value: "info", label: "Information only" },
-  { value: "terminal", label: "Ending" },
 ];
+
+const AUTO_NEXT = "__auto";
 
 export default function FlowBuilder() {
   const [flows, setFlows] = useState<ConversationFlow[]>([]);
@@ -65,7 +73,9 @@ export default function FlowBuilder() {
     const ids = (nodeRows || []).map((n: any) => n.id);
     const { data: optionRows } = await supabase
       .from("flow_options")
-      .select("id, node_id, label, value, sort_order, score_weight, trait_tag, next_node_id")
+      .select(
+        "id, node_id, label, value, sort_order, score_weight, trait_tag, trait_weights, next_node_id"
+      )
       .in("node_id", ids)
       .order("sort_order");
 
@@ -98,10 +108,30 @@ export default function FlowBuilder() {
     [nodes, selectedNodeId]
   );
 
-  const orphans = useMemo(() => {
-    if (!activeFlow) return [];
-    return findOrphanNodes({ ...activeFlow, nodes });
-  }, [activeFlow, nodes]);
+  const validation = useMemo(
+    () =>
+      activeFlow
+        ? validateFlow({ ...activeFlow, nodes })
+        : { orphans: [], backwardBranches: [], multiParent: [] },
+    [activeFlow, nodes]
+  );
+
+  /**
+   * Branching is owned by the earlier question: a question can only be pointed
+   * at by one parent, and only from a question that comes before it.
+   */
+  const availableTargets = useMemo(() => {
+    if (!selectedNode) return [] as FlowNode[];
+    const claimedByOthers = new Set<string>();
+    for (const node of nodes) {
+      if (node.id === selectedNode.id) continue;
+      if (node.default_next_node_id) claimedByOthers.add(node.default_next_node_id);
+      node.options.forEach((o) => o.next_node_id && claimedByOthers.add(o.next_node_id));
+    }
+    return nodes.filter(
+      (n) => n.sort_order > selectedNode.sort_order && !claimedByOthers.has(n.id)
+    );
+  }, [nodes, selectedNode]);
 
   const patchNode = (nodeId: string, patch: Partial<FlowNode>) =>
     setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, ...patch } : n)));
@@ -130,7 +160,8 @@ export default function FlowBuilder() {
         .update({
           label: option.label,
           value: option.value,
-          score_weight: option.score_weight,
+          score_weight: optionPoints(option),
+          trait_weights: (option.trait_weights ?? {}) as never,
           trait_tag: option.trait_tag,
           next_node_id: option.next_node_id,
           sort_order: option.sort_order,
@@ -149,49 +180,66 @@ export default function FlowBuilder() {
       return;
     }
     toast({ title: "Question saved" });
-    if (activeFlowId) void loadNodes(activeFlowId);
   };
 
   const addOption = async () => {
     if (!selectedNode) return;
-    const { error } = await supabase.from("flow_options").insert({
-      node_id: selectedNode.id,
-      label: "New answer",
-      value: `option_${selectedNode.options.length + 1}`,
-      sort_order: selectedNode.options.length + 1,
-      score_weight: 0,
-    });
+    const { data, error } = await supabase
+      .from("flow_options")
+      .insert({
+        node_id: selectedNode.id,
+        label: "New answer",
+        value: `option_${selectedNode.options.length + 1}`,
+        sort_order: selectedNode.options.length + 1,
+        score_weight: 0,
+      })
+      .select(
+        "id, node_id, label, value, sort_order, score_weight, trait_tag, trait_weights, next_node_id"
+      )
+      .single();
     if (error) {
       toast({ title: "Could not add answer", description: error.message, variant: "destructive" });
       return;
     }
-    if (activeFlowId) void loadNodes(activeFlowId);
+    // Merge only the new row so any unsaved edits on screen survive.
+    patchNode(selectedNode.id, { options: [...selectedNode.options, data as never] });
   };
 
   const removeOption = async (optionId: string) => {
+    if (!selectedNode) return;
     const { error } = await supabase.from("flow_options").delete().eq("id", optionId);
     if (error) {
       toast({ title: "Could not remove answer", description: error.message, variant: "destructive" });
       return;
     }
-    if (activeFlowId) void loadNodes(activeFlowId);
+    patchNode(selectedNode.id, {
+      options: selectedNode.options.filter((o) => o.id !== optionId),
+    });
   };
 
   const addQuestion = async () => {
     if (!activeFlowId) return;
     const sort = (nodes[nodes.length - 1]?.sort_order ?? 0) + 10;
-    const { error } = await supabase.from("flow_nodes").insert({
-      flow_id: activeFlowId,
-      node_key: `question_${Date.now()}`,
-      prompt: "New question",
-      node_type: "single_select" as never,
-      sort_order: sort,
-    });
+    const { data, error } = await supabase
+      .from("flow_nodes")
+      .insert({
+        flow_id: activeFlowId,
+        node_key: `question_${Date.now()}`,
+        prompt: "New question",
+        node_type: "single_select" as never,
+        sort_order: sort,
+      })
+      .select(
+        "id, flow_id, node_key, prompt, helper_text, node_type, allow_skip, allow_free_text, free_text_label, sort_order, default_next_node_id"
+      )
+      .single();
     if (error) {
       toast({ title: "Could not add question", description: error.message, variant: "destructive" });
       return;
     }
-    void loadNodes(activeFlowId);
+    const created = { ...(data as any), options: [] } as FlowNode;
+    setNodes((prev) => [...prev, created]);
+    setSelectedNodeId(created.id);
   };
 
   const deleteQuestion = async (nodeId: string) => {
@@ -205,7 +253,7 @@ export default function FlowBuilder() {
       return;
     }
     setSelectedNodeId(null);
-    if (activeFlowId) void loadNodes(activeFlowId);
+    setNodes((prev) => prev.filter((n) => n.id !== nodeId));
   };
 
   return (
