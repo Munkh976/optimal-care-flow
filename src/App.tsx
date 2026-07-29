@@ -72,6 +72,7 @@ const App = () => (
           <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
           <Route path="/system-admin" element={<SystemAdminDashboard />} />
           <Route path="/care-types" element={<CareTypes />} />
+          <Route path="/care-service-categories" element={<CareTypes openCategoriesOnLoad />} />
           <Route path="/order-management" element={<OrderManagement />} />
           <Route path="/available-shifts" element={<AvailableShifts />} />
           <Route path="/caregiver-time-off" element={<CaregiverTimeOff />} />

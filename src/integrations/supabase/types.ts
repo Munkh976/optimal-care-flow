@@ -116,6 +116,7 @@ export type Database = {
       care_types: {
         Row: {
           category: string
+          category_id: string | null
           code: string
           created_at: string | null
           description: string | null
@@ -130,6 +131,7 @@ export type Database = {
         }
         Insert: {
           category: string
+          category_id?: string | null
           code: string
           created_at?: string | null
           description?: string | null
@@ -144,6 +146,7 @@ export type Database = {
         }
         Update: {
           category?: string
+          category_id?: string | null
           code?: string
           created_at?: string | null
           description?: string | null
@@ -156,7 +159,15 @@ export type Database = {
           requires_trade_approval?: boolean
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "care_types_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "care_service_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       caregiver_availability: {
         Row: {
@@ -265,6 +276,7 @@ export type Database = {
           address: string | null
           agency_id: string | null
           availability: Json | null
+          care_type_codes: string[]
           city: string | null
           created_at: string | null
           email: string
@@ -286,6 +298,7 @@ export type Database = {
           address?: string | null
           agency_id?: string | null
           availability?: Json | null
+          care_type_codes?: string[]
           city?: string | null
           created_at?: string | null
           email: string
@@ -307,6 +320,7 @@ export type Database = {
           address?: string | null
           agency_id?: string | null
           availability?: Json | null
+          care_type_codes?: string[]
           city?: string | null
           created_at?: string | null
           email?: string

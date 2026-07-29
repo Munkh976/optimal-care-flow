@@ -173,6 +173,10 @@ export const caregiverRegistrationSchema = z.object({
     .refine((v) => v === "" || (!Number.isNaN(Number(v)) && Number(v) >= 0 && Number(v) <= 1000), {
       message: "Hourly rate must be between 0 and 1000",
     }),
+  careTypeCodes: z
+    .array(z.string().trim().min(1).max(30))
+    .min(1, { message: "Select at least one Care Service" })
+    .max(50, { message: "Select fewer Care Services" }),
 });
 
 export const clientFormSchema = z.object({

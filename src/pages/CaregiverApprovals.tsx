@@ -14,6 +14,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { ScreeningResultDialog, ScreeningSession } from "@/components/caregivers/ScreeningResultDialog";
 import { BAND_LABELS, ScoreBand } from "@/lib/flowEngine";
 import { ClipboardList } from "lucide-react";
+import { useCareServices } from "@/hooks/useCareServices";
 
 interface CaregiverRegistration {
   id: string;
@@ -34,6 +35,7 @@ interface CaregiverRegistration {
   reviewed_by?: string | null;
   reviewed_at?: string | null;
   availability?: any;
+  care_type_codes?: string[];
   updated_at?: string;
 }
 
@@ -41,6 +43,7 @@ const CaregiverApprovals = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userRole, hasPermission } = usePermissions();
+  const { optionFor } = useCareServices();
   const [registrations, setRegistrations] = useState<CaregiverRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -271,6 +274,21 @@ const CaregiverApprovals = () => {
                       <p className="font-medium mb-1">Desired Rate</p>
                       <p className="text-muted-foreground">${registration.hourly_rate}/hr</p>
                     </div>
+                  </div>
+
+                  <div>
+                    <p className="font-medium mb-2 text-sm">Care Services</p>
+                    {registration.care_type_codes && registration.care_type_codes.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {registration.care_type_codes.map((code) => (
+                          <Badge key={code} variant="secondary">
+                            {optionFor(code).label}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No Care Services selected.</p>
+                    )}
                   </div>
 
                   {registration.rejection_reason && (

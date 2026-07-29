@@ -75,6 +75,7 @@ export const usePermissions = () => {
         time_off: "/time-off",
         shift_trades: "/shift-trades",
         care_types: "/care-types",
+        care_service_categories: "/care-service-categories",
         conversation_builder: "/flow-builder",
         care_needs: "/care-needs",
         agency: "/agency-settings",
