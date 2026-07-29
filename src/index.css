@@ -53,6 +53,13 @@ All colors MUST be HSL.
     --radius: 0.75rem;
 
     /* Guided conversation surface (public assistant) */
+    /* Marketing surfaces */
+    --surface-1: 0 0% 100%;
+    --surface-2: 210 20% 97%;
+    --brand: 175 84% 32%;
+    --brand-foreground: 0 0% 100%;
+    --brand-soft: 172 60% 95%;
+
     --convo-surface: 0 0% 100%;
     --convo-ink: 0 0% 7%;
     --convo-muted: 220 9% 46%;
