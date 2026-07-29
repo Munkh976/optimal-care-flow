@@ -62,6 +62,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     time_off: Clock,
     shift_trades: Repeat,
     care_types: Tag,
+    care_service_categories: Tag,
     care_needs: List,
     agency: Settings,
     agency_settings: Building2,
