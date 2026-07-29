@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   AnswerInput,
@@ -19,8 +19,14 @@ export interface ContactDetails {
   phone?: string;
 }
 
-export function useConversationFlow(audience: string, options?: { persist?: boolean }) {
+export function useConversationFlow(
+  audience: string,
+  options?: { persist?: boolean; deferSession?: boolean }
+) {
   const persist = options?.persist !== false;
+  // When deferred, the session row is only created on the first answer so we
+  // never store empty rows for visitors who never engage.
+  const deferSession = Boolean(options?.deferSession);
   const [flow, setFlow] = useState<ConversationFlow | null>(null);
   const [state, setState] = useState<FlowState | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -28,6 +34,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const sessionRef = useRef<{ id: string; token: string } | null>(null);
 
   const loadFlow = useCallback(async (): Promise<ConversationFlow | null> => {
     const { data: flowRow, error: flowError } = await supabase
@@ -84,7 +91,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
         }
         setFlow(loaded);
 
-        if (!persist) {
+        if (!persist || deferSession) {
           setState(initState(loaded));
           setLoading(false);
           return;
@@ -103,6 +110,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
         });
         if (createError) throw createError;
         if (cancelled) return;
+        sessionRef.current = { id, token };
         setSessionId(id);
         setSessionToken(token);
         setState(fresh);
@@ -115,7 +123,29 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
     return () => {
       cancelled = true;
     };
-  }, [audience, persist, loadFlow]);
+  }, [audience, persist, deferSession, loadFlow]);
+
+  /** Create (once) the session row this conversation writes to. */
+  const ensureSession = useCallback(
+    async (flowId: string) => {
+      if (sessionRef.current) return sessionRef.current;
+      const created = { id: crypto.randomUUID(), token: crypto.randomUUID() };
+      const { error: createError } = await supabase.from("conversation_sessions").insert({
+        id: created.id,
+        flow_id: flowId,
+        session_token: created.token,
+      });
+      if (createError) {
+        console.error("Could not start session", createError);
+        return null;
+      }
+      sessionRef.current = created;
+      setSessionId(created.id);
+      setSessionToken(created.token);
+      return created;
+    },
+    []
+  );
 
   const currentNode = useMemo(
     () => (flow && state ? getNode(flow, state.currentNodeId) : null),
@@ -133,11 +163,13 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
       const result = applyAnswer(flow, state, input);
       setState(result.state);
 
-      if (!persist || !sessionId) return;
+      if (!persist) return;
+      const session = sessionRef.current ?? (await ensureSession(flow.id));
+      if (!session) return;
       setSaving(true);
       try {
         const { error: insertError } = await supabase.from("conversation_answers").insert({
-          session_id: sessionId,
+          session_id: session.id,
           node_id: result.answer.nodeId,
           option_ids: result.answer.optionIds,
           option_labels: result.answer.optionLabels,
@@ -150,8 +182,8 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
         if (insertError) console.error("Could not save answer", insertError);
 
         const { error: updateError } = await supabase.rpc("flow_session_progress", {
-          p_session_id: sessionId,
-          p_token: sessionToken ?? "",
+          p_session_id: session.id,
+          p_token: session.token,
           p_node_id: result.state.currentNodeId,
         });
         if (updateError) console.error("Could not update session", updateError);
@@ -159,7 +191,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
         setSaving(false);
       }
     },
-    [flow, state, sessionId, sessionToken, persist]
+    [flow, state, persist, ensureSession]
   );
 
   const back = useCallback(async () => {
@@ -228,6 +260,34 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
     if (typeof window !== "undefined") window.location.reload();
   }, []);
 
+  /** Family intake: store contact details and mark the session as submitted. */
+  const submitIntake = useCallback(
+    async (contact: {
+      name: string;
+      phone: string;
+      email?: string | null;
+      preference: string;
+    }) => {
+      if (!flow) return false;
+      const session = sessionRef.current ?? (await ensureSession(flow.id));
+      if (!session) return false;
+      const { error: submitError } = await supabase.rpc("flow_session_submit_intake", {
+        p_session_id: session.id,
+        p_token: session.token,
+        p_name: contact.name,
+        p_phone: contact.phone,
+        p_email: contact.email ?? null,
+        p_preference: contact.preference,
+      });
+      if (submitError) {
+        console.error("Could not submit intake", submitError);
+        return false;
+      }
+      return true;
+    },
+    [flow, ensureSession]
+  );
+
   const linkRegistration = useCallback(
     async (registrationId: string) => {
       if (!sessionId) return;
@@ -257,5 +317,6 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
     complete,
     restart,
     linkRegistration,
+    submitIntake,
   };
 }

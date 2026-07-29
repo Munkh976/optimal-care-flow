@@ -896,18 +896,24 @@ export type Database = {
         Row: {
           agency_id: string | null
           band: string | null
+          client_email: string | null
+          client_name: string | null
+          client_phone: string | null
           completed_at: string | null
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
+          contact_preference: string | null
           created_at: string
           current_node_id: string | null
           flow_id: string
+          follow_up_status: string
           id: string
           registration_id: string | null
           session_token: string
           started_at: string
           status: Database["public"]["Enums"]["conversation_session_status"]
+          submitted_at: string | null
           total_score: number
           trait_profile: Json
           trait_scores: Json
@@ -917,18 +923,24 @@ export type Database = {
         Insert: {
           agency_id?: string | null
           band?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
           completed_at?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          contact_preference?: string | null
           created_at?: string
           current_node_id?: string | null
           flow_id: string
+          follow_up_status?: string
           id?: string
           registration_id?: string | null
           session_token: string
           started_at?: string
           status?: Database["public"]["Enums"]["conversation_session_status"]
+          submitted_at?: string | null
           total_score?: number
           trait_profile?: Json
           trait_scores?: Json
@@ -938,18 +950,24 @@ export type Database = {
         Update: {
           agency_id?: string | null
           band?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
           completed_at?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          contact_preference?: string | null
           created_at?: string
           current_node_id?: string | null
           flow_id?: string
+          follow_up_status?: string
           id?: string
           registration_id?: string | null
           session_token?: string
           started_at?: string
           status?: Database["public"]["Enums"]["conversation_session_status"]
+          submitted_at?: string | null
           total_score?: number
           trait_profile?: Json
           trait_scores?: Json
@@ -1913,6 +1931,19 @@ export type Database = {
         Args: { p_node_id: string; p_session_id: string; p_token: string }
         Returns: undefined
       }
+      flow_session_submit_intake: {
+        Args: {
+          p_email: string
+          p_name: string
+          p_phone: string
+          p_preference: string
+          p_session_id: string
+          p_token: string
+          p_total_score?: number
+          p_trait_scores?: Json
+        }
+        Returns: undefined
+      }
       flow_session_trim_answers: {
         Args: {
           p_from_index: number
@@ -2005,7 +2036,11 @@ export type Database = {
         | "dementia_care"
         | "hospice"
       caregiver_role: "full_time" | "part_time" | "on_call"
-      conversation_session_status: "in_progress" | "completed" | "abandoned"
+      conversation_session_status:
+        | "in_progress"
+        | "completed"
+        | "abandoned"
+        | "submitted"
       flow_audience: "caregiver_screening" | "family_intake" | "general"
       flow_node_type:
         | "single_select"
@@ -2190,7 +2225,12 @@ export const Constants = {
         "hospice",
       ],
       caregiver_role: ["full_time", "part_time", "on_call"],
-      conversation_session_status: ["in_progress", "completed", "abandoned"],
+      conversation_session_status: [
+        "in_progress",
+        "completed",
+        "abandoned",
+        "submitted",
+      ],
       flow_audience: ["caregiver_screening", "family_intake", "general"],
       flow_node_type: [
         "single_select",

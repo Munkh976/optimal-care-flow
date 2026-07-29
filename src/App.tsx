@@ -36,6 +36,7 @@ import Reports from "./pages/Reports";
 import AdminUserManagement from "./pages/AdminUserManagement";
 import OAuthConsent from "./pages/OAuthConsent";
 import NotificationsOutbox from "./pages/NotificationsOutbox";
+import ClientInquiries from "./pages/ClientInquiries";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ const App = () => (
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/caregivers" element={<Caregivers />} />
           <Route path="/clients" element={<Clients />} />
+          <Route path="/client-inquiries" element={<ClientInquiries />} />
           <Route path="/time-off" element={<TimeOffRequests />} />
           <Route path="/live-operations" element={<Navigate to="/schedule?tab=today" replace />} />
           <Route path="/quick-assign" element={<Navigate to="/schedule?tab=unassigned" replace />} />

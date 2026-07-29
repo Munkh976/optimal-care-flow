@@ -22,6 +22,7 @@ import {
   Settings,
   Shield,
   Building2,
+  Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -56,6 +57,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     role_permissions: Settings,
     caregivers: Users,
     clients: UserCog,
+    client_inquiries: Inbox,
     shifts: Calendar,
     orders: FileText,
     availability: Clock,
