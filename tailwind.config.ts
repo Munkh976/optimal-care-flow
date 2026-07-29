@@ -67,6 +67,18 @@ export default {
         },
         convo: {
           surface: "hsl(var(--convo-surface))",
+        },
+        surface: {
+          1: "hsl(var(--surface-1))",
+          2: "hsl(var(--surface-2))",
+        },
+        brand: {
+          DEFAULT: "hsl(var(--brand))",
+          foreground: "hsl(var(--brand-foreground))",
+          soft: "hsl(var(--brand-soft))",
+        },
+        convo2: {
+          surface: "hsl(var(--convo-surface))",
           ink: "hsl(var(--convo-ink))",
           muted: "hsl(var(--convo-muted))",
           line: "hsl(var(--convo-line))",
