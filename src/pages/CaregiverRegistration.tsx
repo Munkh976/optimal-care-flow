@@ -25,7 +25,6 @@ const CaregiverRegistration = () => {
     score: ScoreResult | null;
     link: (registrationId: string) => Promise<void>;
   } | null>(null);
-  const [skippedScreening, setSkippedScreening] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     phone: "",
