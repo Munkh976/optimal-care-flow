@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { AppLayout } from "@/components/AppLayout";
 import { usePermissions } from "@/hooks/usePermissions";
+import { ScreeningResultDialog, ScreeningSession } from "@/components/caregivers/ScreeningResultDialog";
+import { BAND_LABELS, ScoreBand } from "@/lib/flowEngine";
+import { ClipboardList } from "lucide-react";
 
 interface CaregiverRegistration {
   id: string;
@@ -43,6 +46,8 @@ const CaregiverApprovals = () => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<{ email: string; password: string | null } | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [screenings, setScreenings] = useState<Record<string, ScreeningSession>>({});
+  const [openScreening, setOpenScreening] = useState<CaregiverRegistration | null>(null);
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; registrationId: string | null; reason: string }>({
     open: false,
     registrationId: null,
@@ -71,6 +76,20 @@ const CaregiverApprovals = () => {
 
       if (error) throw error;
       setRegistrations(data as CaregiverRegistration[] || []);
+
+      const ids = (data || []).map((r: any) => r.id);
+      if (ids.length) {
+        const { data: sessions } = await supabase
+          .from("conversation_sessions")
+          .select("id, registration_id, status, total_score, band, trait_scores, completed_at, started_at")
+          .in("registration_id", ids)
+          .order("completed_at", { ascending: false });
+        const map: Record<string, ScreeningSession> = {};
+        (sessions || []).forEach((s: any) => {
+          if (s.registration_id && !map[s.registration_id]) map[s.registration_id] = s as ScreeningSession;
+        });
+        setScreenings(map);
+      }
     } catch (error: any) {
       toast({
         title: "Error",
