@@ -257,6 +257,8 @@ const CaregiverRegistration = () => {
                 {loading ? "Submitting..." : "Submit Registration"}
               </Button>
             </form>
+            </>
+            )}
           </CardContent>
         </Card>
       </div>
