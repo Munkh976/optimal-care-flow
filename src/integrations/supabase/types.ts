@@ -851,6 +851,7 @@ export type Database = {
           started_at: string
           status: Database["public"]["Enums"]["conversation_session_status"]
           total_score: number
+          trait_profile: Json
           trait_scores: Json
           updated_at: string
           user_id: string | null
@@ -871,6 +872,7 @@ export type Database = {
           started_at?: string
           status?: Database["public"]["Enums"]["conversation_session_status"]
           total_score?: number
+          trait_profile?: Json
           trait_scores?: Json
           updated_at?: string
           user_id?: string | null
@@ -891,6 +893,7 @@ export type Database = {
           started_at?: string
           status?: Database["public"]["Enums"]["conversation_session_status"]
           total_score?: number
+          trait_profile?: Json
           trait_scores?: Json
           updated_at?: string
           user_id?: string | null
@@ -992,6 +995,7 @@ export type Database = {
           score_weight: number
           sort_order: number
           trait_tag: string | null
+          trait_weights: Json
           updated_at: string
           value: string
         }
@@ -1004,6 +1008,7 @@ export type Database = {
           score_weight?: number
           sort_order?: number
           trait_tag?: string | null
+          trait_weights?: Json
           updated_at?: string
           value: string
         }
@@ -1016,6 +1021,7 @@ export type Database = {
           score_weight?: number
           sort_order?: number
           trait_tag?: string | null
+          trait_weights?: Json
           updated_at?: string
           value?: string
         }
