@@ -109,6 +109,37 @@ const CaregiverRegistration = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {!screening && !skippedScreening ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Step 1 of 2 — answer a few quick questions so our team can get to know you. Your
+                  answers are attached to your application.
+                </p>
+                <ChatWidget
+                  audience="caregiver_screening"
+                  title="Caregiver screening"
+                  completionTitle="Screening complete"
+                  completionMessage="Now finish your application details below."
+                  onComplete={(payload) =>
+                    setScreening({
+                      sessionId: payload.sessionId,
+                      score: payload.score,
+                      link: payload.linkRegistration,
+                    })
+                  }
+                />
+                <Button variant="ghost" className="w-full" onClick={() => setSkippedScreening(true)}>
+                  Skip screening and just fill the form
+                </Button>
+              </div>
+            ) : (
+            <>
+            {screening && (
+              <div className="mb-6 flex items-center gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                Screening answers saved — they will be attached to this application.
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
