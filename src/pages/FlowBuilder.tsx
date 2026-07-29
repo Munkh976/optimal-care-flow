@@ -590,6 +590,13 @@ export default function FlowBuilder() {
                       </Select>
                     </div>
 
+                    {isDynamicSource(selectedNode.dynamic_source_table) ? (
+                      <DynamicNodeEditor
+                        node={selectedNode}
+                        readOnly={readOnly}
+                        onChange={(patch) => patchNode(selectedNode.id, patch)}
+                      />
+                    ) : (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label>Answers</Label>
@@ -678,6 +685,7 @@ export default function FlowBuilder() {
                         <p className="text-sm text-muted-foreground">No answers yet.</p>
                       )}
                     </div>
+                    )}
                   </CardContent>
                 </Card>
               ) : (
