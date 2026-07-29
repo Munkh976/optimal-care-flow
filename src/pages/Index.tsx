@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import assistantMark from "@/assets/assistant-mark.png";
+import { ConversationSurface } from "@/components/chat/ConversationSurface";
+import { FamilyIntakeSurface } from "@/components/chat/FamilyIntakeSurface";
 import {
   HeartHandshake,
   Brain,
@@ -92,44 +94,9 @@ const audiences = [
   },
 ];
 
-const chatDemos = {
-  caregiver: {
-    tab: "Caregiver applying",
-    answered: {
-      question: "Hi! What should we call you?",
-      answer: "Maria",
-    },
-    question:
-      "Maria, when you were growing up, who did you most often take care of?",
-    hint: "Choose the answer that fits best",
-    options: [
-      "A parent or grandparent",
-      "A younger sibling",
-      "A neighbor or family friend",
-      "I started caregiving as an adult",
-    ],
-  },
-  family: {
-    tab: "Family seeking care",
-    answered: {
-      question: "Who are you looking for care for?",
-      answer: "My mother",
-    },
-    question: "What kind of help does she need most right now?",
-    hint: "Select all that apply",
-    options: [
-      "Personal care and bathing",
-      "Meal preparation",
-      "Medication reminders",
-      "Companionship and errands",
-    ],
-  },
-} as const;
-
 const Index = () => {
   const navigate = useNavigate();
-  const [demoTab, setDemoTab] = useState<keyof typeof chatDemos>("caregiver");
-  const demo = chatDemos[demoTab];
+  const [agentMode, setAgentMode] = useState<"caregiver" | "family" | null>(null);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -224,17 +191,20 @@ const Index = () => {
 
           <div className="mx-auto mt-10 max-w-xl">
             <div className="mb-4 flex justify-center gap-2">
-              {(Object.keys(chatDemos) as (keyof typeof chatDemos)[]).map((key) => (
+              {([
+                { key: "caregiver", label: "I want to work as a caregiver" },
+                { key: "family", label: "I need care for a loved one" },
+              ] as const).map((tab) => (
                 <button
-                  key={key}
-                  onClick={() => setDemoTab(key)}
+                  key={tab.key}
+                  onClick={() => setAgentMode(tab.key)}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                    demoTab === key
+                    agentMode === tab.key
                       ? "bg-brand text-brand-foreground"
                       : "bg-surface-1 text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {chatDemos[key].tab}
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -257,31 +227,47 @@ const Index = () => {
                 </div>
               </div>
 
-              <div className="space-y-5 px-5 py-6">
-                <p className="text-sm text-muted-foreground">
-                  {demo.answered.question}
-                </p>
-                <div className="flex justify-end">
-                  <span className="rounded-2xl bg-brand-soft px-4 py-2 text-sm font-medium text-brand">
-                    {demo.answered.answer}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-lg font-semibold leading-snug">
-                    {demo.question}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">{demo.hint}</p>
-                </div>
-                <div className="grid gap-2">
-                  {demo.options.map((option) => (
-                    <div
-                      key={option}
-                      className="rounded-xl border border-border px-4 py-3 text-sm"
-                    >
-                      {option}
+              <div className="max-h-[640px] overflow-y-auto">
+                {agentMode === "caregiver" && (
+                  <ConversationSurface
+                    key="caregiver"
+                    embedded
+                    audience="caregiver_screening"
+                    agencyName="Kind Care Services"
+                    onExit={() => setAgentMode(null)}
+                  />
+                )}
+                {agentMode === "family" && (
+                  <FamilyIntakeSurface
+                    key="family"
+                    embedded
+                    onExit={() => setAgentMode(null)}
+                  />
+                )}
+                {!agentMode && (
+                  <div className="flex min-h-[380px] flex-col items-center justify-center gap-5 px-6 py-12 text-center">
+                    <p className="max-w-sm text-lg font-semibold leading-snug">
+                      Hi, I'm the CareMuch assistant. What brings you here today?
+                    </p>
+                    <div className="grid w-full max-w-sm gap-2.5">
+                      <button
+                        onClick={() => setAgentMode("family")}
+                        className="rounded-xl border border-border px-4 py-3 text-left text-sm font-medium transition-colors hover:border-brand hover:bg-brand-soft"
+                      >
+                        I need care for a loved one
+                      </button>
+                      <button
+                        onClick={() => setAgentMode("caregiver")}
+                        className="rounded-xl border border-border px-4 py-3 text-left text-sm font-medium transition-colors hover:border-brand hover:bg-brand-soft"
+                      >
+                        I want to work as a caregiver
+                      </button>
                     </div>
-                  ))}
-                </div>
+                    <p className="text-xs text-muted-foreground">
+                      This is the live assistant — your answers are saved to the agency dashboard.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -9,6 +9,8 @@ import { FlowNode } from "@/lib/flowEngine";
 export interface FamilyIntakeSurfaceProps {
   /** Returns the visitor to the welcome screen (used by Back on step 1). */
   onExit?: () => void;
+  /** Render inside a page section (card) instead of taking the full viewport. */
+  embedded?: boolean;
 }
 
 const CONTACT_PREFERENCES = [
@@ -39,7 +41,8 @@ const contactSchema = z.object({
   preference: z.string().min(1, { message: "Choose how we should reach you" }),
 });
 
-export function FamilyIntakeSurface({ onExit }: FamilyIntakeSurfaceProps) {
+export function FamilyIntakeSurface({ onExit, embedded = false }: FamilyIntakeSurfaceProps) {
+  const shell = embedded ? "h-full min-h-[540px]" : "min-h-screen";
   const flowState = useConversationFlow("family_intake", { deferSession: true });
   const { flow, state, currentNode, loading, error, saving } = flowState;
 
@@ -102,11 +105,11 @@ export function FamilyIntakeSurface({ onExit }: FamilyIntakeSurfaceProps) {
   };
 
   if (submitted) {
-    return <IntakeComplete name={submitted.name} preference={submitted.preference} onExit={onExit} />;
+    return <IntakeComplete name={submitted.name} preference={submitted.preference} onExit={onExit} shell={shell} />;
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-convo-surface">
+    <div className={`flex ${shell} flex-col bg-convo-surface`}>
       <header className="border-b border-convo-line px-4 pb-3 pt-4">
         <div className="mx-auto flex w-full max-w-lg items-center gap-3">
           <button
@@ -401,16 +404,18 @@ function IntakeComplete({
   name,
   preference,
   onExit,
+  shell = "min-h-screen",
 }: {
   name: string;
   preference: string;
   onExit?: () => void;
+  shell?: string;
 }) {
   const firstName = name.trim().split(/\s+/)[0] || "Thank you";
   const verb =
     CONTACT_PREFERENCES.find((p) => p.value === preference)?.verb ?? "contact";
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-convo-surface px-6 py-12">
+    <div className={`flex ${shell} flex-col items-center justify-center bg-convo-surface px-6 py-12`}>
       <div className="w-full max-w-lg text-center">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-convo-accent">
           <Check className="h-10 w-10 text-convo-accent-foreground" strokeWidth={3} />
