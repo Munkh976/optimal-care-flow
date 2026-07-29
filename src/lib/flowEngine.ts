@@ -40,7 +40,7 @@ export interface FlowOption {
   sort_order: number;
   score_weight: number;
   trait_tag: string | null;
-  trait_weights: Record<string, number>;
+  trait_weights?: Record<string, number> | null;
   next_node_id: string | null;
 }
 
@@ -203,9 +203,47 @@ export function canGoBack(state: FlowState): boolean {
 }
 
 /** Best-case score for the flow, used to turn raw points into a percentage. */
+/** Weights for an option, falling back to the legacy single trait tag. */
+export function optionTraitWeights(option: FlowOption): Record<string, number> {
+  const weights = option.trait_weights;
+  if (weights && Object.keys(weights).length > 0) {
+    return Object.fromEntries(
+      Object.entries(weights).map(([k, v]) => [k, Number(v) || 0])
+    );
+  }
+  if (option.trait_tag) return { [option.trait_tag]: Number(option.score_weight || 0) };
+  return {};
+}
+
+/** Total points an option is worth (sum of its trait weights). */
+export function optionPoints(option: FlowOption): number {
+  const weights = option.trait_weights;
+  if (weights && Object.keys(weights).length > 0) {
+    return Object.values(weights).reduce((sum, v) => sum + (Number(v) || 0), 0);
+  }
+  return Number(option.score_weight || 0);
+}
+
+/** Best obtainable points per trait across the whole flow. */
+export function maxTraitScores(flow: ConversationFlow): Record<string, number> {
+  const max: Record<string, number> = {};
+  for (const node of flow.nodes) {
+    const best: Record<string, number> = {};
+    for (const option of node.options) {
+      for (const [trait, value] of Object.entries(optionTraitWeights(option))) {
+        best[trait] = Math.max(best[trait] ?? 0, value);
+      }
+    }
+    for (const [trait, value] of Object.entries(best)) {
+      max[trait] = (max[trait] ?? 0) + value;
+    }
+  }
+  return max;
+}
+
 export function maxPossibleScore(flow: ConversationFlow): number {
   return flow.nodes.reduce((sum, node) => {
-    const weights = node.options.map((o) => Number(o.score_weight || 0));
+    const weights = node.options.map((o) => optionPoints(o));
     const best = weights.length ? Math.max(...weights, 0) : 0;
     return sum + best;
   }, 0);
@@ -222,16 +260,22 @@ export function computeScore(flow: ConversationFlow, answers: FlowAnswer[]): Sco
     for (const id of answer.optionIds) {
       const option = node.options.find((o) => o.id === id);
       if (!option) continue;
-      const weight = Number(option.score_weight || 0);
-      total += weight;
-      if (option.trait_tag) {
-        traits[option.trait_tag] = (traits[option.trait_tag] ?? 0) + weight;
+      total += optionPoints(option);
+      for (const [trait, value] of Object.entries(optionTraitWeights(option))) {
+        traits[trait] = (traits[trait] ?? 0) + value;
       }
     }
   }
 
   const maxPossible = maxPossibleScore(flow);
   const percent = maxPossible > 0 ? Math.round((total / maxPossible) * 100) : 0;
+  const maxTraits = maxTraitScores(flow);
+  const profile: Record<string, number> = {};
+  for (const trait of Object.keys(maxTraits)) {
+    const best = maxTraits[trait];
+    const earned = traits[trait] ?? 0;
+    profile[trait] = best > 0 ? Math.round((earned / best) * 100) / 10 : 0;
+  }
   const band: ScoreBand =
     percent >= Number(flow.strong_fit_threshold)
       ? "strong_fit"
@@ -239,7 +283,7 @@ export function computeScore(flow: ConversationFlow, answers: FlowAnswer[]): Sco
         ? "review"
         : "not_a_fit";
 
-  return { total, maxPossible, percent, traits, band };
+  return { total, maxPossible, percent, traits, profile, band };
 }
 
 export const BAND_LABELS: Record<ScoreBand, string> = {
