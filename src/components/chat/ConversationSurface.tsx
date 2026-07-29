@@ -238,7 +238,7 @@ export function ConversationSurface({
                 <p className="px-6 pt-6 text-[19px] font-bold leading-snug text-convo-ink">
                   {currentNode.prompt}
                 </p>
-                {currentNode.helper_text && (
+                {currentNode.helper_text && !helperRepeatsMultiHint && (
                   <p className="px-6 pt-2 text-sm text-convo-muted">{currentNode.helper_text}</p>
                 )}
                 {multi && (
