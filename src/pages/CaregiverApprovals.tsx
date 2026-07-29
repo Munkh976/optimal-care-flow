@@ -280,6 +280,37 @@ const CaregiverApprovals = () => {
                     </div>
                   )}
 
+                  <div className="rounded-lg border border-border bg-muted/30 p-3">
+                    {screenings[registration.id] ? (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="font-medium">Assistant screening</span>
+                          <Badge
+                            variant={
+                              screenings[registration.id].band === "strong_fit" ? "default" : "secondary"
+                            }
+                          >
+                            {screenings[registration.id].band
+                              ? BAND_LABELS[screenings[registration.id].band as ScoreBand] ??
+                                screenings[registration.id].band
+                              : "Not scored"}
+                          </Badge>
+                          <span className="text-muted-foreground">
+                            Score {screenings[registration.id].total_score}
+                          </span>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => setOpenScreening(registration)}>
+                          <ClipboardList className="mr-2 h-4 w-4" />
+                          View transcript
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No assistant screening was completed with this application.
+                      </p>
+                    )}
+                  </div>
+
                   {registration.status === "pending" && canReviewApplications && (
                     <div className="flex gap-2 pt-2">
                       <Button
