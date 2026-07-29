@@ -65,6 +65,16 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        convo: {
+          surface: "hsl(var(--convo-surface))",
+          ink: "hsl(var(--convo-ink))",
+          muted: "hsl(var(--convo-muted))",
+          line: "hsl(var(--convo-line))",
+          pill: "hsl(var(--convo-pill))",
+          "pill-foreground": "hsl(var(--convo-pill-foreground))",
+          accent: "hsl(var(--convo-accent))",
+          "accent-foreground": "hsl(var(--convo-accent-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
