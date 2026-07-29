@@ -7,15 +7,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Activity, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { caregiverRegistrationSchema, firstError } from "@/lib/validation";
 import { US_STATES } from "@/constants/usStates";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { ScoreResult } from "@/lib/flowEngine";
+import { useCareServices } from "@/hooks/useCareServices";
 
 const CaregiverRegistration = () => {
   const navigate = useNavigate();
+  const { groupedOptions, isLoading: servicesLoading } = useCareServices();
   const [loading, setLoading] = useState(false);
   const [screening, setScreening] = useState<{
     sessionId: string | null;
@@ -34,7 +37,17 @@ const CaregiverRegistration = () => {
     zipCode: "",
     employmentType: "full_time",
     hourlyRate: "",
+    careTypeCodes: [] as string[],
   });
+
+  const handleCareServiceToggle = (code: string, checked: boolean | "indeterminate") => {
+    setFormData((current) => ({
+      ...current,
+      careTypeCodes: checked === true
+        ? Array.from(new Set([...current.careTypeCodes, code]))
+        : current.careTypeCodes.filter((existing) => existing !== code),
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,29 +61,30 @@ const CaregiverRegistration = () => {
       }
 
       const values = parsed.data;
+      const registrationId = crypto.randomUUID();
 
-      const { data: inserted, error: regError } = await supabase
+      const { error: regError } = await supabase
         .from("caregiver_registrations")
         .insert({
-        email: values.email,
-        phone: values.phone,
-        first_name: values.firstName,
-        last_name: values.lastName,
-        address: values.address || null,
-        city: values.city || null,
-        state: values.state || null,
-        zip_code: values.zipCode || null,
-        employment_type: values.employmentType,
-        hourly_rate: values.hourlyRate ? parseFloat(values.hourlyRate) : null,
-        status: "pending",
-        })
-        .select("id")
-        .single();
+          id: registrationId,
+          email: values.email,
+          phone: values.phone,
+          first_name: values.firstName,
+          last_name: values.lastName,
+          address: values.address || null,
+          city: values.city || null,
+          state: values.state || null,
+          zip_code: values.zipCode || null,
+          employment_type: values.employmentType,
+          hourly_rate: values.hourlyRate ? parseFloat(values.hourlyRate) : null,
+          care_type_codes: values.careTypeCodes,
+          status: "pending",
+        });
 
       if (regError) throw regError;
 
-      if (inserted?.id && screening?.sessionId) {
-        await screening.link(inserted.id);
+      if (screening?.sessionId) {
+        await screening.link(registrationId);
       }
 
       toast.success("Application submitted successfully. You can sign in after a manager approves your application.");
@@ -263,9 +277,48 @@ const CaregiverRegistration = () => {
                 </div>
               </div>
 
-              <p className="text-sm text-muted-foreground">
-                Skills and certifications can be added after your registration is approved.
-              </p>
+              <div className="space-y-3">
+                <div>
+                  <Label>Care Services *</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Select the services you can provide. These become your caregiver service profile after approval.
+                  </p>
+                </div>
+                {servicesLoading ? (
+                  <div className="rounded-lg border border-border p-4 text-sm text-muted-foreground">
+                    Loading Care Services...
+                  </div>
+                ) : groupedOptions.length === 0 ? (
+                  <div className="rounded-lg border border-border p-4 text-sm text-muted-foreground">
+                    No active Care Services are available right now.
+                  </div>
+                ) : (
+                  <div className="space-y-4 rounded-lg border border-border p-4">
+                    {groupedOptions.map((group) => (
+                      <div key={group.label} className="space-y-2">
+                        <p className="text-sm font-medium">{group.label}</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {group.options.map((option) => (
+                            <label
+                              key={option.value}
+                              htmlFor={`care-service-${option.value}`}
+                              className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm transition-colors hover:bg-muted/50"
+                            >
+                              <Checkbox
+                                id={`care-service-${option.value}`}
+                                checked={formData.careTypeCodes.includes(option.value)}
+                                onCheckedChange={(checked) => handleCareServiceToggle(option.value, checked)}
+                                className="mt-0.5"
+                              />
+                              <span>{option.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Submitting..." : "Submit Registration"}
