@@ -18,15 +18,23 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ConversationFlow, FlowNode, findOrphanNodes } from "@/lib/flowEngine";
+import {
+  ConversationFlow,
+  FlowNode,
+  TRAIT_KEYS,
+  TRAIT_LABELS,
+  optionPoints,
+  validateFlow,
+} from "@/lib/flowEngine";
 import { AlertTriangle, ExternalLink, Loader2, Plus, Trash2 } from "lucide-react";
 
 const NODE_TYPES = [
   { value: "single_select", label: "Single choice" },
   { value: "multi_select", label: "Multiple choice" },
   { value: "info", label: "Information only" },
-  { value: "terminal", label: "Ending" },
 ];
+
+const AUTO_NEXT = "__auto";
 
 export default function FlowBuilder() {
   const [flows, setFlows] = useState<ConversationFlow[]>([]);
@@ -65,7 +73,9 @@ export default function FlowBuilder() {
     const ids = (nodeRows || []).map((n: any) => n.id);
     const { data: optionRows } = await supabase
       .from("flow_options")
-      .select("id, node_id, label, value, sort_order, score_weight, trait_tag, next_node_id")
+      .select(
+        "id, node_id, label, value, sort_order, score_weight, trait_tag, trait_weights, next_node_id"
+      )
       .in("node_id", ids)
       .order("sort_order");
 
@@ -98,10 +108,30 @@ export default function FlowBuilder() {
     [nodes, selectedNodeId]
   );
 
-  const orphans = useMemo(() => {
-    if (!activeFlow) return [];
-    return findOrphanNodes({ ...activeFlow, nodes });
-  }, [activeFlow, nodes]);
+  const validation = useMemo(
+    () =>
+      activeFlow
+        ? validateFlow({ ...activeFlow, nodes })
+        : { orphans: [], backwardBranches: [], multiParent: [] },
+    [activeFlow, nodes]
+  );
+
+  /**
+   * Branching is owned by the earlier question: a question can only be pointed
+   * at by one parent, and only from a question that comes before it.
+   */
+  const availableTargets = useMemo(() => {
+    if (!selectedNode) return [] as FlowNode[];
+    const claimedByOthers = new Set<string>();
+    for (const node of nodes) {
+      if (node.id === selectedNode.id) continue;
+      if (node.default_next_node_id) claimedByOthers.add(node.default_next_node_id);
+      node.options.forEach((o) => o.next_node_id && claimedByOthers.add(o.next_node_id));
+    }
+    return nodes.filter(
+      (n) => n.sort_order > selectedNode.sort_order && !claimedByOthers.has(n.id)
+    );
+  }, [nodes, selectedNode]);
 
   const patchNode = (nodeId: string, patch: Partial<FlowNode>) =>
     setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, ...patch } : n)));
@@ -130,7 +160,8 @@ export default function FlowBuilder() {
         .update({
           label: option.label,
           value: option.value,
-          score_weight: option.score_weight,
+          score_weight: optionPoints(option),
+          trait_weights: (option.trait_weights ?? {}) as never,
           trait_tag: option.trait_tag,
           next_node_id: option.next_node_id,
           sort_order: option.sort_order,
@@ -149,49 +180,66 @@ export default function FlowBuilder() {
       return;
     }
     toast({ title: "Question saved" });
-    if (activeFlowId) void loadNodes(activeFlowId);
   };
 
   const addOption = async () => {
     if (!selectedNode) return;
-    const { error } = await supabase.from("flow_options").insert({
-      node_id: selectedNode.id,
-      label: "New answer",
-      value: `option_${selectedNode.options.length + 1}`,
-      sort_order: selectedNode.options.length + 1,
-      score_weight: 0,
-    });
+    const { data, error } = await supabase
+      .from("flow_options")
+      .insert({
+        node_id: selectedNode.id,
+        label: "New answer",
+        value: `option_${selectedNode.options.length + 1}`,
+        sort_order: selectedNode.options.length + 1,
+        score_weight: 0,
+      })
+      .select(
+        "id, node_id, label, value, sort_order, score_weight, trait_tag, trait_weights, next_node_id"
+      )
+      .single();
     if (error) {
       toast({ title: "Could not add answer", description: error.message, variant: "destructive" });
       return;
     }
-    if (activeFlowId) void loadNodes(activeFlowId);
+    // Merge only the new row so any unsaved edits on screen survive.
+    patchNode(selectedNode.id, { options: [...selectedNode.options, data as never] });
   };
 
   const removeOption = async (optionId: string) => {
+    if (!selectedNode) return;
     const { error } = await supabase.from("flow_options").delete().eq("id", optionId);
     if (error) {
       toast({ title: "Could not remove answer", description: error.message, variant: "destructive" });
       return;
     }
-    if (activeFlowId) void loadNodes(activeFlowId);
+    patchNode(selectedNode.id, {
+      options: selectedNode.options.filter((o) => o.id !== optionId),
+    });
   };
 
   const addQuestion = async () => {
     if (!activeFlowId) return;
     const sort = (nodes[nodes.length - 1]?.sort_order ?? 0) + 10;
-    const { error } = await supabase.from("flow_nodes").insert({
-      flow_id: activeFlowId,
-      node_key: `question_${Date.now()}`,
-      prompt: "New question",
-      node_type: "single_select" as never,
-      sort_order: sort,
-    });
+    const { data, error } = await supabase
+      .from("flow_nodes")
+      .insert({
+        flow_id: activeFlowId,
+        node_key: `question_${Date.now()}`,
+        prompt: "New question",
+        node_type: "single_select" as never,
+        sort_order: sort,
+      })
+      .select(
+        "id, flow_id, node_key, prompt, helper_text, node_type, allow_skip, allow_free_text, free_text_label, sort_order, default_next_node_id"
+      )
+      .single();
     if (error) {
       toast({ title: "Could not add question", description: error.message, variant: "destructive" });
       return;
     }
-    void loadNodes(activeFlowId);
+    const created = { ...(data as any), options: [] } as FlowNode;
+    setNodes((prev) => [...prev, created]);
+    setSelectedNodeId(created.id);
   };
 
   const deleteQuestion = async (nodeId: string) => {
@@ -205,7 +253,7 @@ export default function FlowBuilder() {
       return;
     }
     setSelectedNodeId(null);
-    if (activeFlowId) void loadNodes(activeFlowId);
+    setNodes((prev) => prev.filter((n) => n.id !== nodeId));
   };
 
   return (
@@ -244,13 +292,37 @@ export default function FlowBuilder() {
               </TabsList>
             </Tabs>
 
-            {orphans.length > 0 && (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                <span>
-                  {orphans.length} question(s) cannot be reached from the start:{" "}
-                  {orphans.map((o) => o.node_key).join(", ")}
-                </span>
+            {(validation.orphans.length > 0 ||
+              validation.backwardBranches.length > 0 ||
+              validation.multiParent.length > 0) && (
+              <div className="space-y-1.5 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+                {validation.orphans.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                    <span>
+                      {validation.orphans.length} question(s) cannot be reached from the start:{" "}
+                      {validation.orphans.map((o) => o.node_key).join(", ")}
+                    </span>
+                  </div>
+                )}
+                {validation.multiParent.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                    <span>
+                      More than one question leads to:{" "}
+                      {validation.multiParent.map((o) => o.node_key).join(", ")}
+                    </span>
+                  </div>
+                )}
+                {validation.backwardBranches.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                    <span>
+                      {validation.backwardBranches.length} answer(s) branch backwards, which can loop
+                      the conversation.
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -367,11 +439,15 @@ export default function FlowBuilder() {
 
                     <div className="space-y-2">
                       <Label>Next question by default</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Used for Skip and for answers with no branch of their own. Only later
+                        questions that no other question already leads to can be chosen.
+                      </p>
                       <Select
-                        value={selectedNode.default_next_node_id ?? "__end"}
+                        value={selectedNode.default_next_node_id ?? AUTO_NEXT}
                         onValueChange={(v) =>
                           patchNode(selectedNode.id, {
-                            default_next_node_id: v === "__end" ? null : v,
+                            default_next_node_id: v === AUTO_NEXT ? null : v,
                           })
                         }
                       >
@@ -379,14 +455,14 @@ export default function FlowBuilder() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__end">Finish the conversation</SelectItem>
-                          {nodes
-                            .filter((n) => n.id !== selectedNode.id)
-                            .map((n) => (
-                              <SelectItem key={n.id} value={n.id}>
-                                {n.prompt}
-                              </SelectItem>
-                            ))}
+                          <SelectItem value={AUTO_NEXT}>
+                            Continue in order (finish if this is the last question)
+                          </SelectItem>
+                          {availableTargets.map((n) => (
+                            <SelectItem key={n.id} value={n.id}>
+                              {n.prompt}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -399,50 +475,80 @@ export default function FlowBuilder() {
                         </Button>
                       </div>
 
-                      {selectedNode.options.map((option, index) => (
-                        <div
-                          key={option.id}
-                          className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-[1fr_110px_140px_auto]"
-                        >
-                          <Input
-                            value={option.label}
-                            placeholder="Answer text"
-                            onChange={(e) =>
-                              patchNode(selectedNode.id, {
-                                options: selectedNode.options.map((o, i) =>
-                                  i === index ? { ...o, label: e.target.value } : o
-                                ),
-                              })
-                            }
-                          />
-                          <Input
-                            type="number"
-                            value={option.score_weight}
-                            placeholder="Points"
-                            onChange={(e) =>
-                              patchNode(selectedNode.id, {
-                                options: selectedNode.options.map((o, i) =>
-                                  i === index ? { ...o, score_weight: Number(e.target.value) } : o
-                                ),
-                              })
-                            }
-                          />
-                          <Input
-                            value={option.trait_tag ?? ""}
-                            placeholder="Trait"
-                            onChange={(e) =>
-                              patchNode(selectedNode.id, {
-                                options: selectedNode.options.map((o, i) =>
-                                  i === index ? { ...o, trait_tag: e.target.value || null } : o
-                                ),
-                              })
-                            }
-                          />
-                          <Button variant="ghost" size="icon" onClick={() => removeOption(option.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
+                      {selectedNode.options.map((option, index) => {
+                        const patchOption = (patch: Record<string, unknown>) =>
+                          patchNode(selectedNode.id, {
+                            options: selectedNode.options.map((o, i) =>
+                              i === index ? { ...o, ...patch } : o
+                            ),
+                          });
+                        const weights = option.trait_weights ?? {};
+                        return (
+                          <div key={option.id} className="space-y-3 rounded-lg border border-border p-3">
+                            <div className="flex gap-2">
+                              <Input
+                                value={option.label}
+                                placeholder="Answer text"
+                                onChange={(e) => patchOption({ label: e.target.value })}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeOption(option.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            <div className="grid gap-2 sm:grid-cols-5">
+                              {TRAIT_KEYS.map((trait) => (
+                                <div key={trait} className="space-y-1">
+                                  <Label className="text-[11px] text-muted-foreground">
+                                    {TRAIT_LABELS[trait]}
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    className="h-8"
+                                    value={Number(weights[trait] ?? 0)}
+                                    onChange={(e) =>
+                                      patchOption({
+                                        trait_weights: {
+                                          ...weights,
+                                          [trait]: Number(e.target.value) || 0,
+                                        },
+                                      })
+                                    }
+                                  />
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-[11px] text-muted-foreground">
+                                If chosen, go to
+                              </Label>
+                              <Select
+                                value={option.next_node_id ?? AUTO_NEXT}
+                                onValueChange={(v) =>
+                                  patchOption({ next_node_id: v === AUTO_NEXT ? null : v })
+                                }
+                              >
+                                <SelectTrigger className="h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value={AUTO_NEXT}>Follow the default</SelectItem>
+                                  {availableTargets.map((n) => (
+                                    <SelectItem key={n.id} value={n.id}>
+                                      {n.prompt}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        );
+                      })}
                       {selectedNode.options.length === 0 && (
                         <p className="text-sm text-muted-foreground">No answers yet.</p>
                       )}

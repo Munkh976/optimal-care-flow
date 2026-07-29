@@ -53,7 +53,9 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
     const nodeIds = (nodeRows || []).map((n: any) => n.id);
     const { data: optionRows, error: optionError } = await supabase
       .from("flow_options")
-      .select("id, node_id, label, value, sort_order, score_weight, trait_tag, next_node_id")
+      .select(
+        "id, node_id, label, value, sort_order, score_weight, trait_tag, trait_weights, next_node_id"
+      )
       .in("node_id", nodeIds)
       .order("sort_order");
     if (optionError) throw optionError;
@@ -184,7 +186,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
         p_session_id: sessionId,
         p_token: sessionToken ?? "",
         p_total_score: finalScore.total,
-        p_trait_scores: finalScore.traits as never,
+        p_trait_scores: finalScore.profile as never,
         p_band: audience === "caregiver_screening" ? finalScore.band : null,
         p_contact_name: contact?.name ?? null,
         p_contact_email: contact?.email ?? null,

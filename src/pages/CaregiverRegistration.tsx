@@ -25,7 +25,6 @@ const CaregiverRegistration = () => {
     score: ScoreResult | null;
     link: (registrationId: string) => Promise<void>;
   } | null>(null);
-  const [skippedScreening, setSkippedScreening] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     phone: "",
@@ -124,7 +123,7 @@ const CaregiverRegistration = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {!screening && !skippedScreening ? (
+            {!screening ? (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
                   Step 1 of 2 — answer a few quick questions so our team can get to know you. Your
@@ -143,9 +142,6 @@ const CaregiverRegistration = () => {
                     })
                   }
                 />
-                <Button variant="ghost" className="w-full" onClick={() => setSkippedScreening(true)}>
-                  Skip screening and just fill the form
-                </Button>
               </div>
             ) : (
             <>
