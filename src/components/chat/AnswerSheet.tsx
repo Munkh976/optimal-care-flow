@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Check } from "lucide-react";
 import { FlowNode } from "@/lib/flowEngine";
@@ -56,8 +56,12 @@ export function AnswerSheet({ node, open, onOpenChange, onSubmit }: AnswerSheetP
           <span className="h-1.5 w-10 rounded-full bg-convo-line" />
         </div>
         <div className="space-y-4 px-6 pb-28 pt-2">
-          <h2 className="text-lg font-bold leading-snug text-convo-ink">{node.prompt}</h2>
-          {node.helper_text && <p className="text-sm text-convo-muted">{node.helper_text}</p>}
+          <SheetTitle className="text-lg font-bold leading-snug text-convo-ink">
+            {node.prompt}
+          </SheetTitle>
+          <SheetDescription className={node.helper_text ? "text-sm text-convo-muted" : "sr-only"}>
+            {node.helper_text || "Choose your answer, then continue."}
+          </SheetDescription>
 
           {node.options.length > 0 && (
             <div className="space-y-2">
