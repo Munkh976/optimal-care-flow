@@ -22,6 +22,7 @@ import {
   Settings,
   Shield,
   Building2,
+  Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
