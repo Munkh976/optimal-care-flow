@@ -11,6 +11,7 @@ import {
   Network,
   ArrowRight,
   Check,
+  UserRoundPlus,
 } from "lucide-react";
 
 const valueProps = [
