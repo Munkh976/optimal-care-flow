@@ -8,12 +8,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Activity, ArrowLeft } from "lucide-react";
+import { Activity, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { caregiverRegistrationSchema, firstError } from "@/lib/validation";
+import { ChatWidget } from "@/components/chat/ChatWidget";
+import { ScoreResult } from "@/lib/flowEngine";
 
 const CaregiverRegistration = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [screening, setScreening] = useState<{
+    sessionId: string | null;
+    score: ScoreResult | null;
+    link: (registrationId: string) => Promise<void>;
+  } | null>(null);
+  const [skippedScreening, setSkippedScreening] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     phone: "",
@@ -40,7 +48,9 @@ const CaregiverRegistration = () => {
 
       const values = parsed.data;
 
-      const { error: regError } = await supabase.from("caregiver_registrations").insert({
+      const { data: inserted, error: regError } = await supabase
+        .from("caregiver_registrations")
+        .insert({
         email: values.email,
         phone: values.phone,
         first_name: values.firstName,
@@ -52,9 +62,15 @@ const CaregiverRegistration = () => {
         employment_type: values.employmentType,
         hourly_rate: values.hourlyRate ? parseFloat(values.hourlyRate) : null,
         status: "pending",
-      });
+        })
+        .select("id")
+        .single();
 
       if (regError) throw regError;
+
+      if (inserted?.id && screening?.sessionId) {
+        await screening.link(inserted.id);
+      }
 
       toast.success("Application submitted successfully. You can sign in after a manager approves your application.");
       navigate("/auth");
