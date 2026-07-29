@@ -110,7 +110,7 @@ export function DynamicQuestion({ node, saving, onSubmit }: DynamicQuestionProps
   return (
     <div className="animate-fade-in pb-8">
       <p className="px-6 pt-6 text-[19px] font-bold leading-snug text-convo-ink">{prompt}</p>
-      {!activeCategory && node.helper_text && (
+      {!activeCategory && node.helper_text && !helperSaysSelectAll && (
         <p className="px-6 pt-2 text-sm text-convo-muted">{node.helper_text}</p>
       )}
       <p className="px-6 pt-2 text-sm text-convo-muted">

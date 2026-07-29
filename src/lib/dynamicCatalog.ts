@@ -124,3 +124,18 @@ export function renderSubQuestion(template: string | null | undefined, category:
   const text = template?.trim() || "Which {category} services have you provided?";
   return text.replace(/\{category\}/g, category);
 }
+
+/**
+ * Care service codes for a set of picked catalog ids. Ids that belong to other
+ * catalogs (categories, certifications) are simply ignored.
+ */
+export async function fetchCareServiceCodes(ids: string[]): Promise<string[]> {
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  if (unique.length === 0) return [];
+  const { data, error } = await supabase
+    .from("care_types")
+    .select("code")
+    .in("id", unique);
+  if (error) throw error;
+  return Array.from(new Set((data || []).map((row: any) => row.code).filter(Boolean)));
+}
