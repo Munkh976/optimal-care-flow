@@ -36,26 +36,38 @@ const NODE_TYPES = [
 
 const AUTO_NEXT = "__auto";
 
+type BuilderFlow = ConversationFlow & {
+  status: string;
+  published_at: string | null;
+  draft_of: string | null;
+  version: number;
+};
+
 export default function FlowBuilder() {
-  const [flows, setFlows] = useState<ConversationFlow[]>([]);
-  const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
+  const [flows, setFlows] = useState<BuilderFlow[]>([]);
+  const [activeAudience, setActiveAudience] = useState<string | null>(null);
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [versioning, setVersioning] = useState(false);
 
   const loadFlows = useCallback(async () => {
     const { data, error } = await supabase
       .from("conversation_flows")
-      .select("id, audience, name, description, entry_node_id, strong_fit_threshold, review_threshold")
+      .select(
+        "id, audience, name, description, entry_node_id, strong_fit_threshold, review_threshold, status, published_at, draft_of, version"
+      )
+      .in("status", ["published", "draft"])
       .order("audience");
     if (error) {
       toast({ title: "Could not load conversations", description: error.message, variant: "destructive" });
       return;
     }
-    const list = (data || []).map((f: any) => ({ ...f, nodes: [] })) as ConversationFlow[];
+    const list = (data || []).map((f: any) => ({ ...f, nodes: [] })) as BuilderFlow[];
     setFlows(list);
-    setActiveFlowId((prev) => prev ?? list[0]?.id ?? null);
+    setActiveAudience((prev) => prev ?? list[0]?.audience ?? null);
+    return list;
   }, []);
 
   const loadNodes = useCallback(async (flowId: string) => {
@@ -95,14 +107,35 @@ export default function FlowBuilder() {
     })();
   }, [loadFlows]);
 
+  const audiences = useMemo(() => {
+    const seen: { audience: string; name: string }[] = [];
+    for (const f of flows) {
+      if (!seen.some((a) => a.audience === f.audience)) {
+        seen.push({ audience: f.audience, name: f.name });
+      }
+    }
+    return seen;
+  }, [flows]);
+
+  /** The published version currently served to visitors. */
+  const publishedFlow = useMemo(
+    () => flows.find((f) => f.audience === activeAudience && f.status === "published") ?? null,
+    [flows, activeAudience]
+  );
+  /** The editable copy, if one has been started. */
+  const draftFlow = useMemo(
+    () => flows.find((f) => f.audience === activeAudience && f.status === "draft") ?? null,
+    [flows, activeAudience]
+  );
+  /** Drafts are edited; the published version is shown read-only. */
+  const activeFlow = draftFlow ?? publishedFlow;
+  const activeFlowId = activeFlow?.id ?? null;
+  const readOnly = !draftFlow;
+
   useEffect(() => {
     if (activeFlowId) void loadNodes(activeFlowId);
   }, [activeFlowId, loadNodes]);
 
-  const activeFlow = useMemo(
-    () => (activeFlowId ? flows.find((f) => f.id === activeFlowId) ?? null : null),
-    [flows, activeFlowId]
-  );
   const selectedNode = useMemo(
     () => nodes.find((n) => n.id === selectedNodeId) ?? null,
     [nodes, selectedNodeId]
@@ -256,6 +289,48 @@ export default function FlowBuilder() {
     setNodes((prev) => prev.filter((n) => n.id !== nodeId));
   };
 
+  /** Start an editable copy of the published version. */
+  const startDraft = async () => {
+    if (!publishedFlow) return;
+    setVersioning(true);
+    const { error } = await supabase.rpc("create_flow_draft", { p_flow_id: publishedFlow.id });
+    setVersioning(false);
+    if (error) {
+      toast({ title: "Could not start a draft", description: error.message, variant: "destructive" });
+      return;
+    }
+    setSelectedNodeId(null);
+    await loadFlows();
+    toast({ title: "Draft created", description: "Visitors keep using the published version until you publish." });
+  };
+
+  const publishDraft = async () => {
+    if (!draftFlow) return;
+    setVersioning(true);
+    const { error } = await supabase.rpc("publish_flow_draft", { p_draft_id: draftFlow.id });
+    setVersioning(false);
+    if (error) {
+      toast({ title: "Could not publish", description: error.message, variant: "destructive" });
+      return;
+    }
+    await loadFlows();
+    toast({ title: "Draft published", description: "New screenings will now use this version." });
+  };
+
+  const discardDraft = async () => {
+    if (!draftFlow) return;
+    setVersioning(true);
+    const { error } = await supabase.rpc("discard_flow_draft", { p_draft_id: draftFlow.id });
+    setVersioning(false);
+    if (error) {
+      toast({ title: "Could not discard draft", description: error.message, variant: "destructive" });
+      return;
+    }
+    setSelectedNodeId(null);
+    await loadFlows();
+    toast({ title: "Draft discarded" });
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6 p-6">
@@ -282,15 +357,58 @@ export default function FlowBuilder() {
           <p className="text-sm text-muted-foreground">No conversations configured yet.</p>
         ) : (
           <>
-            <Tabs value={activeFlowId ?? undefined} onValueChange={setActiveFlowId}>
+            <Tabs
+              value={activeAudience ?? undefined}
+              onValueChange={(v) => {
+                setSelectedNodeId(null);
+                setActiveAudience(v);
+              }}
+            >
               <TabsList>
-                {flows.map((f) => (
-                  <TabsTrigger key={f.id} value={f.id}>
-                    {f.name}
+                {audiences.map((a) => (
+                  <TabsTrigger key={a.audience} value={a.audience}>
+                    {a.name}
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                {draftFlow ? (
+                  <>
+                    <Badge>Draft v{draftFlow.version}</Badge>
+                    <span className="text-muted-foreground">
+                      You are editing a draft. Visitors keep using the published version
+                      {publishedFlow ? ` (v${publishedFlow.version})` : ""} until you publish.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Badge variant="secondary">Published v{publishedFlow?.version ?? 1}</Badge>
+                    <span className="text-muted-foreground">
+                      This is the live version and is read-only. Start a draft to make changes.
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {draftFlow ? (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={discardDraft} disabled={versioning}>
+                      Discard draft
+                    </Button>
+                    <Button size="sm" onClick={publishDraft} disabled={versioning}>
+                      {versioning ? "Working..." : "Publish draft"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" onClick={startDraft} disabled={versioning || !publishedFlow}>
+                    {versioning ? "Working..." : "Edit as draft"}
+                  </Button>
+                )}
+              </div>
+            </div>
 
             {(validation.orphans.length > 0 ||
               validation.backwardBranches.length > 0 ||
@@ -330,7 +448,7 @@ export default function FlowBuilder() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-base">Questions</CardTitle>
-                  <Button size="sm" variant="outline" onClick={addQuestion}>
+                  <Button size="sm" variant="outline" onClick={addQuestion} disabled={readOnly}>
                     <Plus className="mr-1 h-4 w-4" /> Add
                   </Button>
                 </CardHeader>
@@ -371,11 +489,12 @@ export default function FlowBuilder() {
                       <Button
                         size="sm"
                         variant="ghost"
+                        disabled={readOnly}
                         onClick={() => deleteQuestion(selectedNode.id)}
                       >
                         <Trash2 className="mr-1 h-4 w-4" /> Delete
                       </Button>
-                      <Button size="sm" onClick={saveNode} disabled={saving}>
+                      <Button size="sm" onClick={saveNode} disabled={saving || readOnly}>
                         {saving ? "Saving..." : "Save changes"}
                       </Button>
                     </div>
@@ -470,7 +589,7 @@ export default function FlowBuilder() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label>Answers</Label>
-                        <Button size="sm" variant="outline" onClick={addOption}>
+                        <Button size="sm" variant="outline" onClick={addOption} disabled={readOnly}>
                           <Plus className="mr-1 h-4 w-4" /> Add answer
                         </Button>
                       </div>
@@ -489,11 +608,13 @@ export default function FlowBuilder() {
                               <Input
                                 value={option.label}
                                 placeholder="Answer text"
+                                readOnly={readOnly}
                                 onChange={(e) => patchOption({ label: e.target.value })}
                               />
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                disabled={readOnly}
                                 onClick={() => removeOption(option.id)}
                               >
                                 <Trash2 className="h-4 w-4" />

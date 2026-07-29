@@ -787,11 +787,14 @@ export type Database = {
           audience: Database["public"]["Enums"]["flow_audience"]
           created_at: string
           description: string | null
+          draft_of: string | null
           entry_node_id: string | null
           id: string
           is_active: boolean
           name: string
+          published_at: string | null
           review_threshold: number
+          status: string
           strong_fit_threshold: number
           updated_at: string
           version: number
@@ -801,11 +804,14 @@ export type Database = {
           audience?: Database["public"]["Enums"]["flow_audience"]
           created_at?: string
           description?: string | null
+          draft_of?: string | null
           entry_node_id?: string | null
           id?: string
           is_active?: boolean
           name: string
+          published_at?: string | null
           review_threshold?: number
+          status?: string
           strong_fit_threshold?: number
           updated_at?: string
           version?: number
@@ -815,16 +821,26 @@ export type Database = {
           audience?: Database["public"]["Enums"]["flow_audience"]
           created_at?: string
           description?: string | null
+          draft_of?: string | null
           entry_node_id?: string | null
           id?: string
           is_active?: boolean
           name?: string
+          published_at?: string | null
           review_threshold?: number
+          status?: string
           strong_fit_threshold?: number
           updated_at?: string
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "conversation_flows_draft_of_fkey"
+            columns: ["draft_of"]
+            isOneToOne: false
+            referencedRelation: "conversation_flows"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversation_flows_entry_node_fkey"
             columns: ["entry_node_id"]
@@ -1819,6 +1835,8 @@ export type Database = {
         Args: { caregiver_email: string }
         Returns: undefined
       }
+      create_flow_draft: { Args: { p_flow_id: string }; Returns: string }
+      discard_flow_draft: { Args: { p_draft_id: string }; Returns: undefined }
       flow_session_complete: {
         Args: {
           p_band: string
@@ -1904,6 +1922,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      publish_flow_draft: { Args: { p_draft_id: string }; Returns: string }
     }
     Enums: {
       app_role:

@@ -34,7 +34,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
       .from("conversation_flows")
       .select("id, audience, name, description, entry_node_id, strong_fit_threshold, review_threshold")
       .eq("audience", audience as never)
-      .eq("is_active", true)
+      .eq("status", "published")
       .order("version", { ascending: false })
       .limit(1)
       .maybeSingle();
