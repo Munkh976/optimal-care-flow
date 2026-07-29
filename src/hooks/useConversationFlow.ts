@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   AnswerInput,
@@ -110,6 +110,7 @@ export function useConversationFlow(
         });
         if (createError) throw createError;
         if (cancelled) return;
+        sessionRef.current = { id, token };
         setSessionId(id);
         setSessionToken(token);
         setState(fresh);
