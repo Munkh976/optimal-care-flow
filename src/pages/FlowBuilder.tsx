@@ -37,6 +37,7 @@ const NODE_TYPES = [
 ];
 
 const AUTO_NEXT = "__auto";
+const FIXED_ANSWERS = "__fixed";
 
 type BuilderFlow = ConversationFlow & {
   status: string;
@@ -185,6 +186,7 @@ export default function FlowBuilder() {
         allow_free_text: row.allow_free_text,
         free_text_label: row.free_text_label,
         default_next_node_id: row.default_next_node_id,
+                        dynamic_source_table: row.dynamic_source_table ?? null,
         default_weights: (row.default_weights ?? {}) as never,
         sub_question_template: row.sub_question_template ?? null,
       })
@@ -541,6 +543,36 @@ export default function FlowBuilder() {
                           </SelectContent>
                         </Select>
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Where do the answers come from?</Label>
+                      <Select
+                        value={selectedNode.dynamic_source_table ?? FIXED_ANSWERS}
+                        onValueChange={(v) =>
+                          patchNode(selectedNode.id, {
+                            dynamic_source_table: v === FIXED_ANSWERS ? null : v,
+                          })
+                        }
+                      >
+                        <SelectTrigger disabled={readOnly}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={FIXED_ANSWERS}>
+                            Fixed answers I write below
+                          </SelectItem>
+                          <SelectItem value="care_service_categories">
+                            Care service categories (with per-category follow-ups)
+                          </SelectItem>
+                          <SelectItem value="care_types">Care services</SelectItem>
+                          <SelectItem value="certifications">Certifications</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Catalog answers always show the live, active list — no need to retype them
+                        here when the catalog changes.
+                      </p>
                     </div>
 
                     <div className="flex flex-wrap gap-6">

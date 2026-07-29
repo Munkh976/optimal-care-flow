@@ -156,6 +156,14 @@ export function ConversationSurface({
   const multi = currentNode?.node_type === "multi_select";
   const needsText = Boolean(currentNode?.allow_free_text && currentNode.options.length === 0);
   const canContinue = needsText ? freeText.trim().length > 0 : selected.length > 0;
+  // Avoid printing "Select all that apply." twice when a manager also typed it
+  // into the helper text of a multi-select question.
+  const helperRepeatsMultiHint =
+    multi && /select all that apply/i.test(currentNode?.helper_text ?? "");
+
+  // Every catalog item the visitor picked, used to record the care services
+  // they can provide on the application itself.
+  const pickedCatalogIds = transcript.flatMap((a) => a.dynamicItemIds ?? []);
 
   return (
     <div className="flex min-h-screen flex-col bg-convo-surface">
@@ -238,7 +246,7 @@ export function ConversationSurface({
                 <p className="px-6 pt-6 text-[19px] font-bold leading-snug text-convo-ink">
                   {currentNode.prompt}
                 </p>
-                {currentNode.helper_text && (
+                {currentNode.helper_text && !helperRepeatsMultiHint && (
                   <p className="px-6 pt-2 text-sm text-convo-muted">{currentNode.helper_text}</p>
                 )}
                 {multi && (
@@ -333,6 +341,8 @@ export function ConversationSurface({
                   firstName={firstName}
                   agencyName={agencyName}
                   score={score}
+                  careServiceItemIds={pickedCatalogIds}
+                  onExit={onExit}
                   onRegistered={flowState.linkRegistration}
                 />
               </div>

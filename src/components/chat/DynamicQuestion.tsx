@@ -107,10 +107,14 @@ export function DynamicQuestion({ node, saving, onSubmit }: DynamicQuestionProps
 
   const total = useMemo(() => (isCategories ? picked.length + 1 : 1), [isCategories, picked.length]);
 
+  // The "Select all that apply." line is rendered by the surface itself, so a
+  // helper text that repeats it must not be shown twice.
+  const helperSaysSelectAll = /select all that apply/i.test(node.helper_text ?? "");
+
   return (
     <div className="animate-fade-in pb-8">
       <p className="px-6 pt-6 text-[19px] font-bold leading-snug text-convo-ink">{prompt}</p>
-      {!activeCategory && node.helper_text && (
+      {!activeCategory && node.helper_text && !helperSaysSelectAll && (
         <p className="px-6 pt-2 text-sm text-convo-muted">{node.helper_text}</p>
       )}
       <p className="px-6 pt-2 text-sm text-convo-muted">
