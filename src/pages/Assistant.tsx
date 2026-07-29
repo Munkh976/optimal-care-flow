@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, HeartHandshake, UserRoundPlus } from "lucide-react";
 import assistantMark from "@/assets/assistant-mark.png";
-import { ChatWidget } from "@/components/chat/ChatWidget";
 import { ConversationSurface } from "@/components/chat/ConversationSurface";
+import { FamilyIntakeSurface } from "@/components/chat/FamilyIntakeSurface";
 
 type Audience = "caregiver_screening" | "family_intake";
 
@@ -20,6 +20,10 @@ export default function Assistant() {
         onExit={() => setAudience(null)}
       />
     );
+  }
+
+  if (audience === "family_intake") {
+    return <FamilyIntakeSurface onExit={() => setAudience(null)} />;
   }
 
   return (
@@ -39,8 +43,7 @@ export default function Assistant() {
           )}
         </div>
 
-        {!audience ? (
-          <Card className="overflow-hidden shadow-lg">
+        <Card className="overflow-hidden shadow-lg">
             <CardContent className="space-y-6 p-6 text-center">
               <img
                 src={assistantMark}
@@ -93,16 +96,7 @@ export default function Assistant() {
                 </button>
               </div>
             </CardContent>
-          </Card>
-        ) : (
-          <ChatWidget
-            audience="family_intake"
-            title="Care needs intake"
-            subtitle="About 8 quick questions"
-            completionTitle="Thank you!"
-            completionMessage="Our care team has your details and will reach out to arrange a consultation."
-          />
-        )}
+        </Card>
       </div>
     </main>
   );
