@@ -13,6 +13,8 @@ export interface ConversationSurfaceProps {
   audience: "caregiver_screening" | "family_intake" | "general";
   agencyName?: string;
   onExit?: () => void;
+  /** Render inside a page section (card) instead of taking the full viewport. */
+  embedded?: boolean;
 }
 
 function summarise(answer: FlowAnswer): string {
@@ -28,7 +30,9 @@ export function ConversationSurface({
   audience,
   agencyName = "our care team",
   onExit,
+  embedded = false,
 }: ConversationSurfaceProps) {
+  const shell = embedded ? "h-full min-h-[540px]" : "min-h-screen";
   const [stage, setStage] = useState<"welcome" | "name" | "flow">("welcome");
   const [firstName, setFirstName] = useState("");
   const [nameDraft, setNameDraft] = useState("");
@@ -71,7 +75,7 @@ export function ConversationSurface({
   }, [isFinished, loading, flow]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [state?.answers.length, typing, completed, stage]);
 
   const submit = async (input: AnswerInput) => {
@@ -84,7 +88,7 @@ export function ConversationSurface({
 
   if (stage === "welcome") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-convo-surface px-6 text-center">
+      <div className={`flex ${shell} flex-col items-center justify-center bg-convo-surface px-6 py-10 text-center`}>
         <h1 className="max-w-md text-2xl font-bold leading-snug text-convo-ink">
           Hi, I'm CareMuch. Let's see if {agencyName} is a great fit for you.
         </h1>
@@ -111,7 +115,7 @@ export function ConversationSurface({
 
   if (stage === "name") {
     return (
-      <div className="flex min-h-screen flex-col bg-convo-surface px-6 pt-16">
+      <div className={`relative flex ${shell} flex-col bg-convo-surface px-6 pt-16`}>
         <button
           type="button"
           onClick={() => setStage("welcome")}
@@ -166,7 +170,7 @@ export function ConversationSurface({
   const pickedCatalogIds = transcript.flatMap((a) => a.dynamicItemIds ?? []);
 
   return (
-    <div className="flex min-h-screen flex-col bg-convo-surface">
+    <div className={`flex ${shell} flex-col bg-convo-surface`}>
       <header className="relative flex flex-col items-center border-b border-convo-line px-4 pt-3">
         <button
           type="button"
