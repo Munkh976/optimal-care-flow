@@ -131,9 +131,9 @@ export function ScreeningResultDialog({
 
     const traits = session.trait_scores || {};
     if (Object.keys(traits).length) {
-      line("Trait breakdown", 13, true, 4);
+      line("Personality profile (0-10)", 13, true, 4);
       Object.entries(traits).forEach(([trait, value]) => {
-        line(`• ${trait.replace(/_/g, " ")}: ${value}`, 11, false, 0);
+        line(`• ${TRAIT_LABELS[trait] ?? trait.replace(/_/g, " ")}: ${value} / 10`, 11, false, 0);
       });
       y += 8;
     }
@@ -167,8 +167,8 @@ export function ScreeningResultDialog({
             </Badge>
             <span className="text-muted-foreground">Total score: {session.total_score}</span>
             {Object.entries(traits).map(([trait, value]) => (
-              <span key={trait} className="text-muted-foreground capitalize">
-                {trait.replace(/_/g, " ")}: {value}
+              <span key={trait} className="text-muted-foreground">
+                {TRAIT_LABELS[trait] ?? trait.replace(/_/g, " ")}: {value}/10
               </span>
             ))}
           </div>
