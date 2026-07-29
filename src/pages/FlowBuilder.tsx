@@ -544,6 +544,36 @@ export default function FlowBuilder() {
                       </div>
                     </div>
 
+                    <div className="space-y-2">
+                      <Label>Where do the answers come from?</Label>
+                      <Select
+                        value={selectedNode.dynamic_source_table ?? FIXED_ANSWERS}
+                        onValueChange={(v) =>
+                          patchNode(selectedNode.id, {
+                            dynamic_source_table: v === FIXED_ANSWERS ? null : v,
+                          })
+                        }
+                      >
+                        <SelectTrigger disabled={readOnly}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={FIXED_ANSWERS}>
+                            Fixed answers I write below
+                          </SelectItem>
+                          <SelectItem value="care_service_categories">
+                            Care service categories (with per-category follow-ups)
+                          </SelectItem>
+                          <SelectItem value="care_types">Care services</SelectItem>
+                          <SelectItem value="certifications">Certifications</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Catalog answers always show the live, active list — no need to retype them
+                        here when the catalog changes.
+                      </p>
+                    </div>
+
                     <div className="flex flex-wrap gap-6">
                       <label className="flex items-center gap-2 text-sm">
                         <Switch
