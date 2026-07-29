@@ -19,6 +19,7 @@ export interface ChatWidgetProps {
   onComplete?: (payload: {
     sessionId: string | null;
     score: ReturnType<typeof import("@/lib/flowEngine").computeScore> | null;
+    linkRegistration: (registrationId: string) => Promise<void>;
   }) => void;
   actionLabel?: string;
   onAction?: () => void;
@@ -49,7 +50,11 @@ export function ChatWidget({
     (async () => {
       const finalScore = await flowState.complete();
       setCompleted(true);
-      onComplete?.({ sessionId: flowState.sessionId, score: finalScore });
+      onComplete?.({
+        sessionId: flowState.sessionId,
+        score: finalScore,
+        linkRegistration: flowState.linkRegistration,
+      });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFinished, loading, flow]);
