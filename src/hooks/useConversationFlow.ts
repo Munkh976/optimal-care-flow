@@ -176,6 +176,31 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
     if (trimError) console.error("Could not rewind session", trimError);
   }, [state, sessionId, sessionToken, persist]);
 
+  /** Rewind the conversation to a specific question so it can be re-answered. */
+  const rewindTo = useCallback(
+    async (nodeId: string) => {
+      if (!state) return;
+      const index = state.answers.findIndex((a) => a.nodeId === nodeId);
+      if (index < 0) return;
+      const removed = state.answers[index];
+      const previous: FlowState = {
+        currentNodeId: nodeId,
+        answers: state.answers.slice(0, index),
+        finished: false,
+      };
+      setState(previous);
+      if (!persist || !sessionId) return;
+      const { error: trimError } = await supabase.rpc("flow_session_trim_answers", {
+        p_session_id: sessionId,
+        p_token: sessionToken ?? "",
+        p_from_index: removed.sequenceIndex,
+        p_node_id: nodeId,
+      });
+      if (trimError) console.error("Could not rewind session", trimError);
+    },
+    [state, sessionId, sessionToken, persist]
+  );
+
   /** Mark the session complete, store the score, and return it. */
   const complete = useCallback(
     async (contact?: ContactDetails) => {
@@ -227,6 +252,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
     progress: flow && state ? progress(flow, state) : { step: 0, total: 0, percent: 0 },
     answer,
     back,
+    rewindTo,
     complete,
     restart,
     linkRegistration,

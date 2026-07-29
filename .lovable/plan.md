@@ -1,64 +1,35 @@
-# Conversation Builder v2 — fixes, branching model, and trait scoring
+# Lemonade-style conversation UX for /assistant
 
-## Can the current architecture absorb Claude's design?
+Rebuild the caregiver screening surface as a single scrolling, white, mobile-first conversation with section dots, inline answer buttons, and a bottom sheet for multi-select / free-text steps. No database migration is required — everything needed (prompt, helper_text, node_type, allow_skip, allow_free_text, free_text_label, options) already exists in `flow_nodes` / `flow_options`, and answered history already lives in the flow engine state.
 
-Yes — it already *is* that design, minus two layers. What exists today:
+## What gets built
 
-- `flow_nodes` = question nodes, `flow_options` = answers with `next_node_id` (the `SELECT next_question_id FROM answers WHERE id = $answer_id` lookup, already implemented client-side against preloaded flow data).
-- `flow_options.score_weight` + `trait_tag` = a single-trait version of `trait_weight_json`.
-- `conversation_answers` = the labeled training corpus (every selected option, label, free text, sequence index, soft-deleted on Back — nothing lost).
-- Back/Skip already work: Back pops the answer stack, Skip follows `default_next_node_id`.
+**New conversation surface** (replaces `ChatWidget` on `/assistant` for the caregiver flow; the existing widget stays available for the family intake / registration embed until the new one is proven, then both switch over).
 
-So no rewrite. Three additive changes get us to the full vision: multi-trait weights, a normalized 0–10 profile, and a manager review/labeling queue later. No ML, no vector DB, no LLM.
+Structure, top to bottom:
+- Back arrow, top left — rewinds one question (uses existing `back()`); hidden on the first question.
+- Centered section title in gray medium weight ("Your background", etc.).
+- Dot progress row under the title — teal dots for answered questions in the current section, gray for upcoming. Title + dot count animate when the section changes.
+- Scrolling transcript: each answered question renders as bold black question text (left aligned, 24px padding) followed by a gray rounded pill aligned right, with a small circular pencil button to the pill's left that rewinds to that question.
+- Current question: bold black text, optional gray helper text, then either inline buttons (Pattern A) or the "Answer" trigger (Pattern B).
+- Gray "Skip this question →" link when `allow_skip` is true.
+- Typing indicator: three animated dots for 400ms after each answer, then the next question fades in and the view scrolls to it.
 
-## Issue 1 — Fields reset while typing
+**Pattern A — inline buttons.** Single-select nodes with 4 or fewer options: full-width rounded rectangle buttons, white fill, light gray border, bold centered text, optional leading care-context icon. Tapping hides the buttons instantly, shows the pill, runs the typing delay, reveals the next question.
 
-`addQuestion` / `addOption` insert a placeholder row then refetch the whole flow, and every save refetches too, so the edited row is replaced mid-edit and inputs lose their text.
+**Pattern B — bottom sheet.** Multi-select nodes, free-text nodes, and the focused single-select (Q1 experience): the question shows a teal "Answer" button / "Tap to select…" placeholder row. Tapping opens a bottom sheet with a handle bar, the question repeated as heading, teal checkboxes (multi-select) or a large textarea using `free_text_label` as placeholder, and a teal "Continue" button. On Continue the sheet closes, the pill appears, typing indicator runs, next question fades in.
 
-Fix: keep an in-memory draft of the selected question and its answers. New question/answer rows are added to local state only and written on Save. After Save, patch the single changed row in state instead of refetching the whole flow.
+Pattern selection is derived from the node itself — `node_type` multi-select or free-text → Pattern B; single-select with ≤4 options → Pattern A; single-select with more options also falls back to Pattern B. This keeps managers' Flow Builder edits working without a hardcoded question list.
 
-## Issue 2 — Branching should be owned by the previous question (no spider trap)
+**Pill summaries:** single answer → the label; multi-select → first item + "and X more" past two items; free text → the text, truncated; skipped → "Skipped".
 
-Today any answer on any question can point at any other question, so several parents can claim the same child and flows tangle.
+**Sections:** a small client-side config maps each question's position in the published flow order to one of the five sections (Your background 3, Your availability 3, Your qualifications 1, How you care 2, Getting started 3), with a safe fallback that groups any extra questions into the final section so a manager adding a question never breaks the header.
 
-New model, same tables:
+## Technical details
 
-```text
-Question 3  "Why caregiving?"
-  ├─ Answer A  →  next: Question 4
-  ├─ Answer B  →  next: Question 7
-  └─ Answer C  →  next: (default)
-Default next (Skip / no branch)  →  Question 4
-```
-
-- The "next question" dropdown on an answer only lists questions that are **after** the current one in sort order and are **not already claimed** by another question's answer or default. A question therefore has exactly one parent.
-- Removing a branch frees that question for another parent.
-- The tree view shows each question with its children indented underneath, so the manager reads the flow top-down.
-- A validation panel flags: unreachable questions, questions with no way out, and any answer pointing backwards.
-
-## Issue 3 — No "end the conversation" answer
-
-Terminal answers let a candidate exit on question 1 and land on the registration form with nothing scored.
-
-- Remove the "Ending" node type and the "End conversation" choice from answer/default next-question dropdowns in the builder.
-- The flow ends only when the last question in the chain is answered.
-- Skip stays, because skipped answers are still recorded rows (`skipped = true`) — valuable labels — but a skip cannot jump past the end of the tree.
-- The registration form is only reachable from the completion screen.
-
-## Issue 4 — Multi-trait scoring and the candidate profile
-
-- Add `trait_weights` (JSON) to answers: `{"conscientiousness": 2, "agreeableness": 1, "ice": 0}`. The existing `trait_tag` + `score_weight` is migrated into it automatically, and the builder gets a small weight grid across the five dimensions: conscientiousness, agreeableness, emotional stability, ICE (intergenerational care experience), resilience.
-- On completion, sum weights per trait and normalize against the maximum obtainable for that trait in the flow → 0–10 per dimension, stored on the session.
-- The manager's screening dialog gains a radar/bar profile of the five dimensions plus the band, and the existing PDF export includes it.
-
-## Build order
-
-1. Migration: `trait_weights` JSON on `flow_options`, per-trait profile on `conversation_sessions`, backfill from existing weights.
-2. Flow Builder: draft-based editing (fixes the reset), parent-owned next-question dropdowns, tree view, validation panel, trait weight grid, terminal removal.
-3. Flow engine: multi-trait accumulation + normalization; drop terminal handling.
-4. Screening result dialog + PDF: five-dimension profile.
-5. Verify: build a 3-branch flow in the builder, run it at `/assistant`, test Back/Skip, confirm the application shows the profile.
-
-## Deliberately deferred
-
-The intent classifier and retraining flywheel only matter once free-text answers exist at volume. Every click is already stored with its label, so that corpus is accumulating now; the review queue and TF-IDF classifier can be added later without touching this schema.
+- New files: `src/components/chat/ConversationSurface.tsx` (layout, transcript, typing indicator, section header), `src/components/chat/AnswerSheet.tsx` (bottom sheet built on the existing shadcn Sheet with `side="bottom"`), `src/components/chat/AnswerPill.tsx`, `src/components/chat/SectionProgress.tsx`, `src/lib/conversationSections.ts`.
+- `src/pages/Assistant.tsx` renders the new surface for the caregiver flow; the topic chooser and family intake path are kept.
+- Colors, radii, and the teal accent are added as semantic tokens in `index.css` / `tailwind.config.ts` (`--conversation-accent`, pill and border tokens) — no hardcoded hex in components. Light surface is forced for this page only.
+- Reuses `useConversationFlow` unchanged: `answer()`, `back()`, `complete()`, `state.answers` for transcript, `flow.nodes` for section math. `linkRegistration` / completion callbacks keep working so caregiver registration and the manager screening review are unaffected.
+- Existing `QuestionCard` / `NavControls` / `ChatWidget` stay for the embedded registration step in this pass.
+- Verified in the browser with Playwright: full run through all questions, back/pencil rewind, skip, and sheet interactions, at mobile and desktop widths.
