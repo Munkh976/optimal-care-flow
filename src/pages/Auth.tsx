@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Activity, Sparkles } from "lucide-react";
+import { Activity, Sparkles, ArrowLeft, MessageCircle } from "lucide-react";
 import { signInSchema, signUpSchema, firstError } from "@/lib/validation";
 
 const Auth = () => {
@@ -126,6 +126,16 @@ const Auth = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/5 p-4">
       <div className="w-full max-w-md">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate("/")}>
+            <ArrowLeft className="h-4 w-4" />
+            Back to home
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate("/assistant")}>
+            <MessageCircle className="h-4 w-4" />
+            Talk to our assistant
+          </Button>
+        </div>
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
             <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-accent">

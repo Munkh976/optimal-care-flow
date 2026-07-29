@@ -115,10 +115,10 @@ const Index = () => {
             <span className="text-xl font-bold tracking-tight">CareMuch</span>
           </a>
           <div className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-            <button onClick={() => scrollTo("who-its-for")} className="hover:text-foreground">
+            <button onClick={() => scrollTo("for-agencies")} className="hover:text-foreground">
               For agencies
             </button>
-            <button onClick={() => scrollTo("who-its-for")} className="hover:text-foreground">
+            <button onClick={() => scrollTo("for-founders")} className="hover:text-foreground">
               For founders
             </button>
           </div>
@@ -127,7 +127,7 @@ const Index = () => {
               Sign in
             </Button>
             <Button
-              onClick={() => navigate("/auth")}
+              onClick={() => scrollTo("ai-agent")}
               className="bg-brand text-brand-foreground hover:bg-brand/90"
             >
               Get started
@@ -354,9 +354,10 @@ const Index = () => {
             Who it is for
           </h2>
           <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-2">
-            {audiences.map((audience) => (
+            {audiences.map((audience, index) => (
               <div
                 key={audience.title}
+                id={index === 0 ? "for-agencies" : "for-founders"}
                 className={`rounded-2xl bg-surface-1 p-8 transition-shadow hover:shadow-lg ${
                   audience.featured
                     ? "border-[1.5px] border-brand"
