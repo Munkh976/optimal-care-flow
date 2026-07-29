@@ -289,6 +289,48 @@ export default function FlowBuilder() {
     setNodes((prev) => prev.filter((n) => n.id !== nodeId));
   };
 
+  /** Start an editable copy of the published version. */
+  const startDraft = async () => {
+    if (!publishedFlow) return;
+    setVersioning(true);
+    const { error } = await supabase.rpc("create_flow_draft", { p_flow_id: publishedFlow.id });
+    setVersioning(false);
+    if (error) {
+      toast({ title: "Could not start a draft", description: error.message, variant: "destructive" });
+      return;
+    }
+    setSelectedNodeId(null);
+    await loadFlows();
+    toast({ title: "Draft created", description: "Visitors keep using the published version until you publish." });
+  };
+
+  const publishDraft = async () => {
+    if (!draftFlow) return;
+    setVersioning(true);
+    const { error } = await supabase.rpc("publish_flow_draft", { p_draft_id: draftFlow.id });
+    setVersioning(false);
+    if (error) {
+      toast({ title: "Could not publish", description: error.message, variant: "destructive" });
+      return;
+    }
+    await loadFlows();
+    toast({ title: "Draft published", description: "New screenings will now use this version." });
+  };
+
+  const discardDraft = async () => {
+    if (!draftFlow) return;
+    setVersioning(true);
+    const { error } = await supabase.rpc("discard_flow_draft", { p_draft_id: draftFlow.id });
+    setVersioning(false);
+    if (error) {
+      toast({ title: "Could not discard draft", description: error.message, variant: "destructive" });
+      return;
+    }
+    setSelectedNodeId(null);
+    await loadFlows();
+    toast({ title: "Draft discarded" });
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6 p-6">
@@ -315,15 +357,58 @@ export default function FlowBuilder() {
           <p className="text-sm text-muted-foreground">No conversations configured yet.</p>
         ) : (
           <>
-            <Tabs value={activeFlowId ?? undefined} onValueChange={setActiveFlowId}>
+            <Tabs
+              value={activeAudience ?? undefined}
+              onValueChange={(v) => {
+                setSelectedNodeId(null);
+                setActiveAudience(v);
+              }}
+            >
               <TabsList>
-                {flows.map((f) => (
-                  <TabsTrigger key={f.id} value={f.id}>
-                    {f.name}
+                {audiences.map((a) => (
+                  <TabsTrigger key={a.audience} value={a.audience}>
+                    {a.name}
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                {draftFlow ? (
+                  <>
+                    <Badge>Draft v{draftFlow.version}</Badge>
+                    <span className="text-muted-foreground">
+                      You are editing a draft. Visitors keep using the published version
+                      {publishedFlow ? ` (v${publishedFlow.version})` : ""} until you publish.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Badge variant="secondary">Published v{publishedFlow?.version ?? 1}</Badge>
+                    <span className="text-muted-foreground">
+                      This is the live version and is read-only. Start a draft to make changes.
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {draftFlow ? (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={discardDraft} disabled={versioning}>
+                      Discard draft
+                    </Button>
+                    <Button size="sm" onClick={publishDraft} disabled={versioning}>
+                      {versioning ? "Working..." : "Publish draft"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" onClick={startDraft} disabled={versioning || !publishedFlow}>
+                    {versioning ? "Working..." : "Edit as draft"}
+                  </Button>
+                )}
+              </div>
+            </div>
 
             {(validation.orphans.length > 0 ||
               validation.backwardBranches.length > 0 ||
