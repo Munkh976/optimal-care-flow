@@ -107,14 +107,35 @@ export default function FlowBuilder() {
     })();
   }, [loadFlows]);
 
+  const audiences = useMemo(() => {
+    const seen: { audience: string; name: string }[] = [];
+    for (const f of flows) {
+      if (!seen.some((a) => a.audience === f.audience)) {
+        seen.push({ audience: f.audience, name: f.name });
+      }
+    }
+    return seen;
+  }, [flows]);
+
+  /** The published version currently served to visitors. */
+  const publishedFlow = useMemo(
+    () => flows.find((f) => f.audience === activeAudience && f.status === "published") ?? null,
+    [flows, activeAudience]
+  );
+  /** The editable copy, if one has been started. */
+  const draftFlow = useMemo(
+    () => flows.find((f) => f.audience === activeAudience && f.status === "draft") ?? null,
+    [flows, activeAudience]
+  );
+  /** Drafts are edited; the published version is shown read-only. */
+  const activeFlow = draftFlow ?? publishedFlow;
+  const activeFlowId = activeFlow?.id ?? null;
+  const readOnly = !draftFlow;
+
   useEffect(() => {
     if (activeFlowId) void loadNodes(activeFlowId);
   }, [activeFlowId, loadNodes]);
 
-  const activeFlow = useMemo(
-    () => (activeFlowId ? flows.find((f) => f.id === activeFlowId) ?? null : null),
-    [flows, activeFlowId]
-  );
   const selectedNode = useMemo(
     () => nodes.find((n) => n.id === selectedNodeId) ?? null,
     [nodes, selectedNodeId]
