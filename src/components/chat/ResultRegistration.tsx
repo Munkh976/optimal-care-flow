@@ -1,13 +1,18 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchCareServiceCodes } from "@/lib/dynamicCatalog";
 import { ScoreResult } from "@/lib/flowEngine";
 
 interface ResultRegistrationProps {
   firstName: string;
   agencyName: string;
   score: ScoreResult | null;
+  /** Catalog ids the visitor picked during the conversation. */
+  careServiceItemIds?: string[];
+  onExit?: () => void;
   onRegistered: (registrationId: string) => Promise<void> | void;
 }
 
@@ -16,6 +21,8 @@ export function ResultRegistration({
   firstName,
   agencyName,
   score,
+  careServiceItemIds = [],
+  onExit,
   onRegistered,
 }: ResultRegistrationProps) {
   const strong = score ? score.band === "strong_fit" : true;
@@ -23,24 +30,30 @@ export function ResultRegistration({
 
   const [stage, setStage] = useState<"form" | "done" | "skipped">("form");
   const [saving, setSaving] = useState(false);
-  const [values, setValues] = useState({ firstName, phone: "", email: "" });
+  const [values, setValues] = useState({ firstName, phone: "", email: "", hourlyRate: "" });
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!values.firstName.trim()) return toast.error("Please add your first name.");
     if (!values.phone.trim()) return toast.error("Please add a phone number.");
     if (!values.email.trim()) return toast.error("Please add an email address.");
+    const rate = Number(values.hourlyRate);
+    if (!values.hourlyRate.trim() || Number.isNaN(rate) || rate <= 0)
+      return toast.error("Please add your expected hourly rate.");
+    if (rate > 500) return toast.error("Please enter a realistic hourly rate.");
 
     setSaving(true);
     try {
       const registrationId = crypto.randomUUID();
+      const careTypeCodes = await fetchCareServiceCodes(careServiceItemIds);
       const { error } = await supabase.from("caregiver_registrations").insert({
         id: registrationId,
         first_name: values.firstName.trim(),
         last_name: "",
         phone: values.phone.trim(),
         email: values.email.trim().toLowerCase(),
-        care_type_codes: [],
+        care_type_codes: careTypeCodes,
+        hourly_rate: rate,
         status: "pending",
       });
       if (error) throw error;
@@ -65,6 +78,23 @@ export function ResultRegistration({
             ? `${agencyName} has your application and will let you know as soon as a manager reviews it.`
             : `${agencyName} has your answers and will reach out directly.`}
         </p>
+        <div className="space-y-2 pt-2">
+          <Link
+            to="/"
+            className="block w-full rounded-2xl bg-convo-accent px-4 py-3.5 text-sm font-bold text-convo-accent-foreground"
+          >
+            Back to home
+          </Link>
+          {onExit && (
+            <button
+              type="button"
+              onClick={onExit}
+              className="block w-full text-center text-sm text-convo-muted underline-offset-4 hover:underline"
+            >
+              Start over
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -105,6 +135,17 @@ export function ResultRegistration({
           type="email"
           placeholder="Email address"
           aria-label="Email address"
+          className="w-full rounded-2xl border border-convo-line bg-convo-surface px-4 py-3.5 text-sm text-convo-ink outline-none focus:border-convo-accent"
+        />
+        <input
+          value={values.hourlyRate}
+          onChange={(e) =>
+            setValues({ ...values, hourlyRate: e.target.value.replace(/[^0-9.]/g, "") })
+          }
+          type="text"
+          inputMode="decimal"
+          placeholder="Expected hourly rate (USD)"
+          aria-label="Expected hourly rate in US dollars"
           className="w-full rounded-2xl border border-convo-line bg-convo-surface px-4 py-3.5 text-sm text-convo-ink outline-none focus:border-convo-accent"
         />
         <button

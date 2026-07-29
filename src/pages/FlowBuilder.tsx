@@ -185,6 +185,7 @@ export default function FlowBuilder() {
         allow_free_text: row.allow_free_text,
         free_text_label: row.free_text_label,
         default_next_node_id: row.default_next_node_id,
+                        dynamic_source_table: row.dynamic_source_table ?? null,
         default_weights: (row.default_weights ?? {}) as never,
         sub_question_template: row.sub_question_template ?? null,
       })
