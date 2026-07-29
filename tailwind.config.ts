@@ -65,9 +65,6 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        convo: {
-          surface: "hsl(var(--convo-surface))",
-        },
         surface: {
           1: "hsl(var(--surface-1))",
           2: "hsl(var(--surface-2))",
@@ -77,7 +74,7 @@ export default {
           foreground: "hsl(var(--brand-foreground))",
           soft: "hsl(var(--brand-soft))",
         },
-        convo2: {
+        convo: {
           surface: "hsl(var(--convo-surface))",
           ink: "hsl(var(--convo-ink))",
           muted: "hsl(var(--convo-muted))",
