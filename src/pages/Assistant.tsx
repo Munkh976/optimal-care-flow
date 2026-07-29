@@ -36,11 +36,6 @@ export default function Assistant() {
               Home
             </Link>
           </Button>
-          {audience && (
-            <Button variant="ghost" size="sm" onClick={() => setAudience(null)}>
-              Change topic
-            </Button>
-          )}
         </div>
 
         <Card className="overflow-hidden shadow-lg">
