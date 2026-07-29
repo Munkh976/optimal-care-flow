@@ -340,7 +340,6 @@ const CaregiverApprovals = () => {
         </div>
 
         <Dialog open={rejectDialog.open} onOpenChange={(open) => setRejectDialog({ ...rejectDialog, open })}>
-          {null}
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Reject Application</DialogTitle>
