@@ -448,7 +448,7 @@ export default function FlowBuilder() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-base">Questions</CardTitle>
-                  <Button size="sm" variant="outline" onClick={addQuestion}>
+                  <Button size="sm" variant="outline" onClick={addQuestion} disabled={readOnly}>
                     <Plus className="mr-1 h-4 w-4" /> Add
                   </Button>
                 </CardHeader>
@@ -489,11 +489,12 @@ export default function FlowBuilder() {
                       <Button
                         size="sm"
                         variant="ghost"
+                        disabled={readOnly}
                         onClick={() => deleteQuestion(selectedNode.id)}
                       >
                         <Trash2 className="mr-1 h-4 w-4" /> Delete
                       </Button>
-                      <Button size="sm" onClick={saveNode} disabled={saving}>
+                      <Button size="sm" onClick={saveNode} disabled={saving || readOnly}>
                         {saving ? "Saving..." : "Save changes"}
                       </Button>
                     </div>
@@ -588,7 +589,7 @@ export default function FlowBuilder() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label>Answers</Label>
-                        <Button size="sm" variant="outline" onClick={addOption}>
+                        <Button size="sm" variant="outline" onClick={addOption} disabled={readOnly}>
                           <Plus className="mr-1 h-4 w-4" /> Add answer
                         </Button>
                       </div>
@@ -607,11 +608,13 @@ export default function FlowBuilder() {
                               <Input
                                 value={option.label}
                                 placeholder="Answer text"
+                                readOnly={readOnly}
                                 onChange={(e) => patchOption({ label: e.target.value })}
                               />
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                disabled={readOnly}
                                 onClick={() => removeOption(option.id)}
                               >
                                 <Trash2 className="h-4 w-4" />
