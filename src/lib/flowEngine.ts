@@ -13,6 +13,25 @@ export type FlowNodeType =
   | "contact_capture"
   | "terminal";
 
+/** The five caregiver screening dimensions the builder scores against. */
+export const TRAIT_KEYS = [
+  "conscientiousness",
+  "agreeableness",
+  "emotional_stability",
+  "ice",
+  "resilience",
+] as const;
+
+export type TraitKey = (typeof TRAIT_KEYS)[number];
+
+export const TRAIT_LABELS: Record<string, string> = {
+  conscientiousness: "Conscientiousness",
+  agreeableness: "Agreeableness",
+  emotional_stability: "Emotional stability",
+  ice: "Intergenerational care",
+  resilience: "Resilience",
+};
+
 export interface FlowOption {
   id: string;
   node_id: string;
@@ -21,6 +40,7 @@ export interface FlowOption {
   sort_order: number;
   score_weight: number;
   trait_tag: string | null;
+  trait_weights: Record<string, number>;
   next_node_id: string | null;
 }
 
@@ -73,6 +93,8 @@ export interface ScoreResult {
   maxPossible: number;
   percent: number;
   traits: Record<string, number>;
+  /** Each trait normalised to a 0-10 scale against the best obtainable score. */
+  profile: Record<string, number>;
   band: ScoreBand;
 }
 
