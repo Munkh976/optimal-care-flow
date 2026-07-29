@@ -52,7 +52,7 @@ const flow: ConversationFlow = {
         { id: "b1", node_id: "q2", label: "Calm", value: "calm", sort_order: 1, score_weight: 10, trait_tag: "patience", next_node_id: null },
       ],
     }),
-    node({ id: "q3", sort_order: 3, node_type: "terminal", options: [] }),
+    node({ id: "q3", sort_order: 3, options: [] }),
   ],
 };
 
@@ -70,7 +70,7 @@ describe("flowEngine", () => {
     const state = initState(flow);
     const { state: next } = applyAnswer(flow, state, { optionIds: ["a2"] });
     expect(next.currentNodeId).toBe("q3");
-    expect(next.finished).toBe(true);
+    expect(next.finished).toBe(false);
   });
 
   it("skipping records an answer with no score and advances", () => {
@@ -102,9 +102,15 @@ describe("flowEngine", () => {
   it("detects unreachable questions", () => {
     const orphaned: ConversationFlow = {
       ...flow,
-      nodes: [...flow.nodes, node({ id: "q9", sort_order: 99, options: [] })],
+      nodes: [
+        ...flow.nodes.map((n) =>
+          n.id === "q3" ? { ...n, default_next_node_id: "q10" } : n
+        ),
+        node({ id: "q9", sort_order: 99, options: [] }),
+        node({ id: "q10", sort_order: 100, options: [] }),
+      ],
     };
-    // q9 is last in sort order and nothing points at it after the terminal node
+    // q3 jumps straight to q10, so q9 can never be reached.
     expect(findOrphanNodes(orphaned).map((n) => n.id)).toContain("q9");
   });
 });
