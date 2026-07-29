@@ -5,11 +5,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, HeartHandshake, UserRoundPlus } from "lucide-react";
 import assistantMark from "@/assets/assistant-mark.png";
 import { ChatWidget } from "@/components/chat/ChatWidget";
+import { ConversationSurface } from "@/components/chat/ConversationSurface";
 
 type Audience = "caregiver_screening" | "family_intake";
 
 export default function Assistant() {
   const [audience, setAudience] = useState<Audience | null>(null);
+
+  if (audience === "caregiver_screening") {
+    return (
+      <ConversationSurface
+        audience="caregiver_screening"
+        completionTitle="Thanks for sharing"
+        completionMessage="Finish your application and a manager will review it with your answers attached."
+        actionLabel="Continue to application"
+        onAction={() => (window.location.href = "/caregiver-registration")}
+        onExit={() => setAudience(null)}
+      />
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background px-4 py-10">
@@ -83,16 +97,6 @@ export default function Assistant() {
               </div>
             </CardContent>
           </Card>
-        ) : audience === "caregiver_screening" ? (
-          <ChatWidget
-            audience="caregiver_screening"
-            title="Caregiver screening"
-            subtitle="About 10 quick questions"
-            completionTitle="Thanks for sharing"
-            completionMessage="Finish your application and a manager will review it with your answers attached."
-            actionLabel="Continue to application"
-            onAction={() => (window.location.href = "/caregiver-registration")}
-          />
         ) : (
           <ChatWidget
             audience="family_intake"
