@@ -6,6 +6,8 @@ import { buildSections, locateNode } from "@/lib/conversationSections";
 import { AnswerPill } from "./AnswerPill";
 import { SectionProgress } from "./SectionProgress";
 import { ResultRegistration } from "./ResultRegistration";
+import { DynamicQuestion } from "./DynamicQuestion";
+import { isDynamicSource } from "@/lib/dynamicCatalog";
 
 export interface ConversationSurfaceProps {
   audience: "caregiver_screening" | "family_intake" | "general";
@@ -222,7 +224,16 @@ export function ConversationSurface({
               </div>
             )}
 
-            {!completed && !typing && currentNode && (
+            {!completed && !typing && currentNode && isDynamicSource(currentNode.dynamic_source_table) && (
+              <DynamicQuestion
+                key={currentNode.id}
+                node={currentNode}
+                saving={saving}
+                onSubmit={submit}
+              />
+            )}
+
+            {!completed && !typing && currentNode && !isDynamicSource(currentNode.dynamic_source_table) && (
               <div className="animate-fade-in pb-8">
                 <p className="px-6 pt-6 text-[19px] font-bold leading-snug text-convo-ink">
                   {currentNode.prompt}

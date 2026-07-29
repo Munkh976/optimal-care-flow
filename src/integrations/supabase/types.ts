@@ -90,6 +90,7 @@ export type Database = {
           name: string
           sort_order: number
           updated_at: string
+          weight_overrides: Json | null
         }
         Insert: {
           code_prefix?: string | null
@@ -100,6 +101,7 @@ export type Database = {
           name: string
           sort_order?: number
           updated_at?: string
+          weight_overrides?: Json | null
         }
         Update: {
           code_prefix?: string | null
@@ -110,6 +112,7 @@ export type Database = {
           name?: string
           sort_order?: number
           updated_at?: string
+          weight_overrides?: Json | null
         }
         Relationships: []
       }
@@ -128,6 +131,7 @@ export type Database = {
           price: number | null
           requires_trade_approval: boolean
           updated_at: string | null
+          weight_overrides: Json | null
         }
         Insert: {
           category: string
@@ -143,6 +147,7 @@ export type Database = {
           price?: number | null
           requires_trade_approval?: boolean
           updated_at?: string | null
+          weight_overrides?: Json | null
         }
         Update: {
           category?: string
@@ -158,6 +163,7 @@ export type Database = {
           price?: number | null
           requires_trade_approval?: boolean
           updated_at?: string | null
+          weight_overrides?: Json | null
         }
         Relationships: [
           {
@@ -510,6 +516,39 @@ export type Database = {
           },
         ]
       }
+      certifications: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          weight_overrides: Json | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          weight_overrides?: Json | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          weight_overrides?: Json | null
+        }
+        Relationships: []
+      }
       client_care_needs: {
         Row: {
           care_type_code: string
@@ -722,6 +761,7 @@ export type Database = {
         Row: {
           answered_at: string
           created_at: string
+          dynamic_item_ids: Json
           free_text: string | null
           id: string
           is_active: boolean
@@ -737,6 +777,7 @@ export type Database = {
         Insert: {
           answered_at?: string
           created_at?: string
+          dynamic_item_ids?: Json
           free_text?: string | null
           id?: string
           is_active?: boolean
@@ -752,6 +793,7 @@ export type Database = {
         Update: {
           answered_at?: string
           created_at?: string
+          dynamic_item_ids?: Json
           free_text?: string | null
           id?: string
           is_active?: boolean
@@ -944,6 +986,8 @@ export type Database = {
           allow_skip: boolean
           created_at: string
           default_next_node_id: string | null
+          default_weights: Json
+          dynamic_source_table: string | null
           flow_id: string
           free_text_label: string | null
           helper_text: string | null
@@ -952,6 +996,7 @@ export type Database = {
           node_type: Database["public"]["Enums"]["flow_node_type"]
           prompt: string
           sort_order: number
+          sub_question_template: string | null
           updated_at: string
         }
         Insert: {
@@ -959,6 +1004,8 @@ export type Database = {
           allow_skip?: boolean
           created_at?: string
           default_next_node_id?: string | null
+          default_weights?: Json
+          dynamic_source_table?: string | null
           flow_id: string
           free_text_label?: string | null
           helper_text?: string | null
@@ -967,6 +1014,7 @@ export type Database = {
           node_type?: Database["public"]["Enums"]["flow_node_type"]
           prompt: string
           sort_order?: number
+          sub_question_template?: string | null
           updated_at?: string
         }
         Update: {
@@ -974,6 +1022,8 @@ export type Database = {
           allow_skip?: boolean
           created_at?: string
           default_next_node_id?: string | null
+          default_weights?: Json
+          dynamic_source_table?: string | null
           flow_id?: string
           free_text_label?: string | null
           helper_text?: string | null
@@ -982,6 +1032,7 @@ export type Database = {
           node_type?: Database["public"]["Enums"]["flow_node_type"]
           prompt?: string
           sort_order?: number
+          sub_question_template?: string | null
           updated_at?: string
         }
         Relationships: [

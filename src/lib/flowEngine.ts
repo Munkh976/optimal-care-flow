@@ -56,6 +56,12 @@ export interface FlowNode {
   free_text_label: string | null;
   sort_order: number;
   default_next_node_id: string | null;
+  /** When set, the answers come from a catalog table instead of flow_options. */
+  dynamic_source_table?: string | null;
+  /** Trait weights applied to a catalog item that has no overrides of its own. */
+  default_weights?: Record<string, number> | null;
+  /** Follow-up prompt template, `{category}` is replaced with the item name. */
+  sub_question_template?: string | null;
   options: FlowOption[];
 }
 
@@ -78,6 +84,10 @@ export interface FlowAnswer {
   skipped: boolean;
   scoreDelta: number;
   sequenceIndex: number;
+  /** Catalog row ids picked on a dynamic question. */
+  dynamicItemIds?: string[];
+  /** Trait points earned on a dynamic question (options cannot be replayed). */
+  traitDeltas?: Record<string, number>;
 }
 
 export interface FlowState {
@@ -159,6 +169,10 @@ export interface AnswerInput {
   optionIds?: string[];
   freeText?: string | null;
   skipped?: boolean;
+  /** Dynamic questions supply their own labels, item ids and trait points. */
+  labels?: string[];
+  dynamicItemIds?: string[];
+  traitDeltas?: Record<string, number>;
 }
 
 /** Record an answer for the current node and advance. */
@@ -174,15 +188,27 @@ export function applyAnswer(
     .map((id) => node.options.find((o) => o.id === id))
     .filter((o): o is FlowOption => Boolean(o));
 
-  const skipped = Boolean(input.skipped) || (selected.length === 0 && !input.freeText);
+  const dynamicItemIds = input.dynamicItemIds ?? [];
+  const traitDeltas = input.traitDeltas;
+  const labels = input.labels ?? selected.map((o) => o.label);
+
+  const skipped =
+    Boolean(input.skipped) ||
+    (selected.length === 0 && dynamicItemIds.length === 0 && !input.freeText);
 
   const answer: FlowAnswer = {
     nodeId: node.id,
     optionIds: selected.map((o) => o.id),
-    optionLabels: selected.map((o) => o.label),
+    optionLabels: labels,
     freeText: input.freeText ?? null,
     skipped,
-    scoreDelta: skipped ? 0 : selected.reduce((sum, o) => sum + optionPoints(o), 0),
+    dynamicItemIds,
+    traitDeltas,
+    scoreDelta: skipped
+      ? 0
+      : traitDeltas
+        ? Object.values(traitDeltas).reduce((sum, v) => sum + (Number(v) || 0), 0)
+        : selected.reduce((sum, o) => sum + optionPoints(o), 0),
     sequenceIndex: state.answers.length,
   };
 
@@ -240,6 +266,12 @@ export function optionPoints(option: FlowOption): number {
 export function maxTraitScores(flow: ConversationFlow): Record<string, number> {
   const max: Record<string, number> = {};
   for (const node of flow.nodes) {
+    if (node.dynamic_source_table) {
+      for (const [trait, value] of Object.entries(node.default_weights ?? {})) {
+        max[trait] = (max[trait] ?? 0) + (Number(value) || 0);
+      }
+      continue;
+    }
     const best: Record<string, number> = {};
     for (const option of node.options) {
       for (const [trait, value] of Object.entries(optionTraitWeights(option))) {
@@ -255,6 +287,12 @@ export function maxTraitScores(flow: ConversationFlow): Record<string, number> {
 
 export function maxPossibleScore(flow: ConversationFlow): number {
   return flow.nodes.reduce((sum, node) => {
+    if (node.dynamic_source_table) {
+      return (
+        sum +
+        Object.values(node.default_weights ?? {}).reduce((t, v) => t + (Number(v) || 0), 0)
+      );
+    }
     const weights = node.options.map((o) => optionPoints(o));
     const best = weights.length ? Math.max(...weights, 0) : 0;
     return sum + best;
@@ -267,6 +305,14 @@ export function computeScore(flow: ConversationFlow, answers: FlowAnswer[]): Sco
 
   for (const answer of answers) {
     if (answer.skipped) continue;
+    if (answer.traitDeltas) {
+      for (const [trait, value] of Object.entries(answer.traitDeltas)) {
+        const points = Number(value) || 0;
+        total += points;
+        traits[trait] = (traits[trait] ?? 0) + points;
+      }
+      continue;
+    }
     const node = getNode(flow, answer.nodeId);
     if (!node) continue;
     for (const id of answer.optionIds) {

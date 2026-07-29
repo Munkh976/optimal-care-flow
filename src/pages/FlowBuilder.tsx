@@ -27,6 +27,8 @@ import {
   validateFlow,
 } from "@/lib/flowEngine";
 import { AlertTriangle, ExternalLink, Loader2, Plus, Trash2 } from "lucide-react";
+import { DynamicNodeEditor } from "@/components/flow-builder/DynamicNodeEditor";
+import { isDynamicSource } from "@/lib/dynamicCatalog";
 
 const NODE_TYPES = [
   { value: "single_select", label: "Single choice" },
@@ -74,7 +76,7 @@ export default function FlowBuilder() {
     const { data: nodeRows, error } = await supabase
       .from("flow_nodes")
       .select(
-        "id, flow_id, node_key, prompt, helper_text, node_type, allow_skip, allow_free_text, free_text_label, sort_order, default_next_node_id"
+        "id, flow_id, node_key, prompt, helper_text, node_type, allow_skip, allow_free_text, free_text_label, sort_order, default_next_node_id, dynamic_source_table, default_weights, sub_question_template"
       )
       .eq("flow_id", flowId)
       .order("sort_order");
@@ -183,11 +185,13 @@ export default function FlowBuilder() {
         allow_free_text: row.allow_free_text,
         free_text_label: row.free_text_label,
         default_next_node_id: row.default_next_node_id,
+        default_weights: (row.default_weights ?? {}) as never,
+        sub_question_template: row.sub_question_template ?? null,
       })
       .eq("id", row.id);
 
     let optionError: string | null = null;
-    for (const option of options) {
+    for (const option of isDynamicSource(row.dynamic_source_table) ? [] : options) {
       const { error: oErr } = await supabase
         .from("flow_options")
         .update({
@@ -586,6 +590,13 @@ export default function FlowBuilder() {
                       </Select>
                     </div>
 
+                    {isDynamicSource(selectedNode.dynamic_source_table) ? (
+                      <DynamicNodeEditor
+                        node={selectedNode}
+                        readOnly={readOnly}
+                        onChange={(patch) => patchNode(selectedNode.id, patch)}
+                      />
+                    ) : (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label>Answers</Label>
@@ -674,6 +685,7 @@ export default function FlowBuilder() {
                         <p className="text-sm text-muted-foreground">No answers yet.</p>
                       )}
                     </div>
+                    )}
                   </CardContent>
                 </Card>
               ) : (
