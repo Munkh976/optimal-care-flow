@@ -408,6 +408,16 @@ const CaregiverApprovals = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ScreeningResultDialog
+          open={!!openScreening}
+          onOpenChange={(open) => !open && setOpenScreening(null)}
+          session={openScreening ? screenings[openScreening.id] ?? null : null}
+          applicantName={
+            openScreening ? `${openScreening.first_name} ${openScreening.last_name}` : ""
+          }
+          applicantEmail={openScreening?.email ?? ""}
+        />
       </div>
     </AppLayout>
   );
