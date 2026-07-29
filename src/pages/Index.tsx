@@ -163,6 +163,9 @@ const Index = () => {
               <Button size="lg" variant="outline" onClick={() => scrollTo("how-it-works")}>
                 See how it works
               </Button>
+              <Button size="lg" variant="outline" onClick={() => scrollTo("ai-agent")}>
+                Talk to our assistant
+              </Button>
             </div>
             <p className="mt-5 text-xs text-muted-foreground">
               No migration required · Run parallel to your existing operation ·
@@ -173,7 +176,7 @@ const Index = () => {
       </section>
 
       {/* AI agent */}
-      <section className="bg-surface-2 py-20 md:py-28">
+      <section id="ai-agent" className="bg-surface-2 py-20 md:py-28">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-2xl text-center">
             <p className="text-xs font-semibold uppercase tracking-widest text-brand">
@@ -190,26 +193,8 @@ const Index = () => {
           </div>
 
           <div className="mx-auto mt-10 max-w-xl">
-            <div className="mb-4 flex justify-center gap-2">
-              {([
-                { key: "caregiver", label: "I want to work as a caregiver" },
-                { key: "family", label: "I need care for a loved one" },
-              ] as const).map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setAgentMode(tab.key)}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                    agentMode === tab.key
-                      ? "bg-brand text-brand-foreground"
-                      : "bg-surface-1 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
             <div className="overflow-hidden rounded-2xl border border-border bg-surface-1 shadow-lg">
+              {agentMode && (
               <div className="flex items-center gap-3 border-b border-border px-4 py-3">
                 <img
                   src={assistantMark}
@@ -226,6 +211,7 @@ const Index = () => {
                   </p>
                 </div>
               </div>
+              )}
 
               <div className="max-h-[640px] overflow-y-auto">
                 {agentMode === "caregiver" && (
@@ -245,27 +231,57 @@ const Index = () => {
                   />
                 )}
                 {!agentMode && (
-                  <div className="flex min-h-[380px] flex-col items-center justify-center gap-5 px-6 py-12 text-center">
-                    <p className="max-w-sm text-lg font-semibold leading-snug">
-                      Hi, I'm the CareMuch assistant. What brings you here today?
-                    </p>
-                    <div className="grid w-full max-w-sm gap-2.5">
+                  <div className="space-y-6 p-6 text-center">
+                    <img
+                      src={assistantMark}
+                      alt="CareMuch assistant"
+                      width={512}
+                      height={512}
+                      className="mx-auto h-16 w-16 object-contain"
+                    />
+                    <div className="space-y-1.5">
+                      <h3 className="text-2xl font-semibold text-foreground">
+                        Welcome to CareMuch
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        A few guided questions — just tap the answer that fits best. What
+                        brings you here today?
+                      </p>
+                    </div>
+
+                    <div className="grid gap-3 text-left">
                       <button
+                        type="button"
                         onClick={() => setAgentMode("family")}
-                        className="rounded-xl border border-border px-4 py-3 text-left text-sm font-medium transition-colors hover:border-brand hover:bg-brand-soft"
+                        className="flex items-start gap-3 rounded-xl border border-border bg-surface-1 p-4 transition-colors hover:border-brand hover:bg-brand-soft"
                       >
-                        I need care for a loved one
+                        <HeartHandshake className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+                        <span>
+                          <span className="block text-sm font-semibold text-foreground">
+                            I need care for a loved one
+                          </span>
+                          <span className="block text-sm text-muted-foreground">
+                            Tell us about your needs and we'll match the right caregiver.
+                          </span>
+                        </span>
                       </button>
+
                       <button
+                        type="button"
                         onClick={() => setAgentMode("caregiver")}
-                        className="rounded-xl border border-border px-4 py-3 text-left text-sm font-medium transition-colors hover:border-brand hover:bg-brand-soft"
+                        className="flex items-start gap-3 rounded-xl border border-border bg-surface-1 p-4 transition-colors hover:border-brand hover:bg-brand-soft"
                       >
-                        I want to work as a caregiver
+                        <UserRoundPlus className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+                        <span>
+                          <span className="block text-sm font-semibold text-foreground">
+                            I want to work as a caregiver
+                          </span>
+                          <span className="block text-sm text-muted-foreground">
+                            Answer a short screening, then finish your application.
+                          </span>
+                        </span>
                       </button>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      This is the live assistant — your answers are saved to the agency dashboard.
-                    </p>
                   </div>
                 )}
               </div>
