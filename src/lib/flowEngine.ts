@@ -170,7 +170,7 @@ export function applyAnswer(
     optionLabels: selected.map((o) => o.label),
     freeText: input.freeText ?? null,
     skipped,
-    scoreDelta: skipped ? 0 : selected.reduce((sum, o) => sum + Number(o.score_weight || 0), 0),
+    scoreDelta: skipped ? 0 : selected.reduce((sum, o) => sum + optionPoints(o), 0),
     sequenceIndex: state.answers.length,
   };
 
@@ -182,7 +182,7 @@ export function applyAnswer(
     state: {
       currentNodeId: target,
       answers: [...state.answers, answer],
-      finished: !targetNode || targetNode.node_type === "terminal",
+      finished: !targetNode,
     },
   };
 }
@@ -294,8 +294,7 @@ export const BAND_LABELS: Record<ScoreBand, string> = {
 
 /** Rough progress for the header: answered vs. total questions in the flow. */
 export function progress(flow: ConversationFlow, state: FlowState) {
-  const questionNodes = flow.nodes.filter((n) => n.node_type !== "terminal");
-  const total = Math.max(questionNodes.length, 1);
+  const total = Math.max(flow.nodes.length, 1);
   const step = Math.min(state.answers.length + (state.finished ? 0 : 1), total);
   return { step, total, percent: Math.round((state.answers.length / total) * 100) };
 }
@@ -313,7 +312,6 @@ export function findOrphanNodes(flow: ConversationFlow): FlowNode[] {
     seen.add(id);
     const node = getNode(flow, id);
     if (!node) continue;
-    if (node.node_type === "terminal") continue;
     const targets = new Set<string>();
     node.options.forEach((o) => {
       const t = nextNodeId(flow, node, [o]);
@@ -325,4 +323,37 @@ export function findOrphanNodes(flow: ConversationFlow): FlowNode[] {
   }
 
   return flow.nodes.filter((n) => !seen.has(n.id));
+}
+
+export interface FlowValidation {
+  orphans: FlowNode[];
+  /** Answers whose branch points at an earlier question (creates loops). */
+  backwardBranches: { node: FlowNode; option: FlowOption }[];
+  /** Questions claimed as the next step by more than one earlier question. */
+  multiParent: FlowNode[];
+}
+
+/** Structural checks surfaced in the conversation builder. */
+export function validateFlow(flow: ConversationFlow): FlowValidation {
+  const orphans = findOrphanNodes(flow);
+  const backwardBranches: { node: FlowNode; option: FlowOption }[] = [];
+  const parents: Record<string, Set<string>> = {};
+
+  for (const node of flow.nodes) {
+    const claim = (targetId: string | null) => {
+      if (!targetId) return;
+      (parents[targetId] ??= new Set()).add(node.id);
+    };
+    claim(node.default_next_node_id);
+    for (const option of node.options) {
+      claim(option.next_node_id);
+      const target = getNode(flow, option.next_node_id);
+      if (target && target.sort_order <= node.sort_order) {
+        backwardBranches.push({ node, option });
+      }
+    }
+  }
+
+  const multiParent = flow.nodes.filter((n) => (parents[n.id]?.size ?? 0) > 1);
+  return { orphans, backwardBranches, multiParent };
 }
