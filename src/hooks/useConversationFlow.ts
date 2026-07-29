@@ -44,7 +44,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
     const { data: nodeRows, error: nodeError } = await supabase
       .from("flow_nodes")
       .select(
-        "id, flow_id, node_key, prompt, helper_text, node_type, allow_skip, allow_free_text, free_text_label, sort_order, default_next_node_id"
+        "id, flow_id, node_key, prompt, helper_text, node_type, allow_skip, allow_free_text, free_text_label, sort_order, default_next_node_id, dynamic_source_table, default_weights, sub_question_template"
       )
       .eq("flow_id", flowRow.id)
       .order("sort_order");
@@ -144,6 +144,7 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
           free_text: result.answer.freeText,
           skipped: result.answer.skipped,
           score_delta: result.answer.scoreDelta,
+          dynamic_item_ids: (result.answer.dynamicItemIds ?? []) as never,
           sequence_index: result.answer.sequenceIndex,
         });
         if (insertError) console.error("Could not save answer", insertError);
