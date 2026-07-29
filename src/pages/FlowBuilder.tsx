@@ -36,26 +36,38 @@ const NODE_TYPES = [
 
 const AUTO_NEXT = "__auto";
 
+type BuilderFlow = ConversationFlow & {
+  status: string;
+  published_at: string | null;
+  draft_of: string | null;
+  version: number;
+};
+
 export default function FlowBuilder() {
-  const [flows, setFlows] = useState<ConversationFlow[]>([]);
-  const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
+  const [flows, setFlows] = useState<BuilderFlow[]>([]);
+  const [activeAudience, setActiveAudience] = useState<string | null>(null);
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [versioning, setVersioning] = useState(false);
 
   const loadFlows = useCallback(async () => {
     const { data, error } = await supabase
       .from("conversation_flows")
-      .select("id, audience, name, description, entry_node_id, strong_fit_threshold, review_threshold")
+      .select(
+        "id, audience, name, description, entry_node_id, strong_fit_threshold, review_threshold, status, published_at, draft_of, version"
+      )
+      .in("status", ["published", "draft"])
       .order("audience");
     if (error) {
       toast({ title: "Could not load conversations", description: error.message, variant: "destructive" });
       return;
     }
-    const list = (data || []).map((f: any) => ({ ...f, nodes: [] })) as ConversationFlow[];
+    const list = (data || []).map((f: any) => ({ ...f, nodes: [] })) as BuilderFlow[];
     setFlows(list);
-    setActiveFlowId((prev) => prev ?? list[0]?.id ?? null);
+    setActiveAudience((prev) => prev ?? list[0]?.audience ?? null);
+    return list;
   }, []);
 
   const loadNodes = useCallback(async (flowId: string) => {
