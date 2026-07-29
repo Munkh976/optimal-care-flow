@@ -67,7 +67,7 @@ const CareTypes = () => {
     setSelectedCareType(careType);
     setFormData({
       code: careType.code,
-      category: careType.category,
+      category: careType.category_id || careType.category,
       name: careType.name,
       description: careType.description || "",
       keywords: careType.keywords || "",
@@ -127,10 +127,12 @@ const CareTypes = () => {
       const durationValue = parseFloat(formData.duration);
 
       if (selectedCareType) {
+        const selectedCategory = (categories || []).find((cat: any) => cat.id === formData.category);
         const { error } = await supabase
           .from("care_types")
           .update({
-            category: formData.category,
+            category_id: selectedCategory?.id || null,
+            category: selectedCategory?.name || formData.category,
             name: formData.name,
             description: formData.description,
             keywords: formData.keywords,
@@ -142,11 +144,13 @@ const CareTypes = () => {
         if (error) throw error;
         toast.success("Care service updated successfully");
       } else {
+        const selectedCategory = (categories || []).find((cat: any) => cat.id === formData.category);
         const { error } = await supabase
           .from("care_types")
           .insert({
             code: formData.code,
-            category: formData.category,
+            category_id: selectedCategory?.id || null,
+            category: selectedCategory?.name || formData.category,
             name: formData.name,
             description: formData.description,
             keywords: formData.keywords,
@@ -343,7 +347,7 @@ const CareTypes = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {(categories || []).map((cat: any) => (
-                      <SelectItem key={cat.id} value={cat.name}>
+                      <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}
                       </SelectItem>
                     ))}

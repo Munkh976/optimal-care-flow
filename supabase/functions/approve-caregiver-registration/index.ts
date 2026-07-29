@@ -200,6 +200,47 @@ serve(async (req) => {
       caregiverId = inserted.id;
     }
 
+    const selectedCareServiceCodes = Array.isArray(reg.care_type_codes)
+      ? Array.from(new Set(
+          reg.care_type_codes.filter((code: unknown): code is string =>
+            typeof code === 'string' && code.trim().length > 0
+          )
+        ))
+      : [];
+
+    if (selectedCareServiceCodes.length > 0) {
+      const { data: activeServices, error: servicesError } = await admin
+        .from('care_types')
+        .select('code')
+        .in('code', selectedCareServiceCodes)
+        .eq('is_active', true);
+
+      if (servicesError) return json({ error: servicesError.message }, 400);
+
+      const activeCodes = new Set((activeServices ?? []).map((service) => service.code));
+      const validCareServiceCodes = selectedCareServiceCodes.filter((code) => activeCodes.has(code));
+      if (validCareServiceCodes.length !== selectedCareServiceCodes.length) {
+        return json({ error: 'One or more selected Care Services are no longer active' }, 400);
+      }
+
+      const { error: clearSkillsError } = await admin
+        .from('caregiver_skills')
+        .delete()
+        .eq('caregiver_id', caregiverId);
+      if (clearSkillsError) return json({ error: clearSkillsError.message }, 400);
+
+      const { error: skillsError } = await admin.from('caregiver_skills').insert(
+        validCareServiceCodes.map((code) => ({
+          caregiver_id: caregiverId,
+          care_type_code: code,
+          proficiency_level: 'experienced',
+          years_experience: 0,
+          is_certified: false,
+        }))
+      );
+      if (skillsError) return json({ error: skillsError.message }, 400);
+    }
+
     // Grant the caregiver role
     await admin.from('user_roles')
       .upsert({ user_id: authUserId, role: 'caregiver', agency_id: agencyId }, { onConflict: 'user_id,role' });
