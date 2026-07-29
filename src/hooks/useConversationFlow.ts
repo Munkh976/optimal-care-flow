@@ -203,12 +203,14 @@ export function useConversationFlow(audience: string, options?: { persist?: bool
   const linkRegistration = useCallback(
     async (registrationId: string) => {
       if (!sessionId) return;
-      await supabase
-        .from("conversation_sessions")
-        .update({ registration_id: registrationId })
-        .eq("id", sessionId);
+      const { error: linkError } = await supabase.rpc("flow_session_link_registration", {
+        p_session_id: sessionId,
+        p_token: sessionToken ?? "",
+        p_registration_id: registrationId,
+      });
+      if (linkError) console.error("Could not link screening to application", linkError);
     },
-    [sessionId]
+    [sessionId, sessionToken]
   );
 
   return {

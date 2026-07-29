@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { AppLayout } from "@/components/AppLayout";
 import { usePermissions } from "@/hooks/usePermissions";
+import { ScreeningResultDialog, ScreeningSession } from "@/components/caregivers/ScreeningResultDialog";
+import { BAND_LABELS, ScoreBand } from "@/lib/flowEngine";
+import { ClipboardList } from "lucide-react";
 
 interface CaregiverRegistration {
   id: string;
@@ -43,6 +46,8 @@ const CaregiverApprovals = () => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<{ email: string; password: string | null } | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [screenings, setScreenings] = useState<Record<string, ScreeningSession>>({});
+  const [openScreening, setOpenScreening] = useState<CaregiverRegistration | null>(null);
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; registrationId: string | null; reason: string }>({
     open: false,
     registrationId: null,
@@ -71,6 +76,20 @@ const CaregiverApprovals = () => {
 
       if (error) throw error;
       setRegistrations(data as CaregiverRegistration[] || []);
+
+      const ids = (data || []).map((r: any) => r.id);
+      if (ids.length) {
+        const { data: sessions } = await supabase
+          .from("conversation_sessions")
+          .select("id, registration_id, status, total_score, band, trait_scores, completed_at, started_at")
+          .in("registration_id", ids)
+          .order("completed_at", { ascending: false });
+        const map: Record<string, ScreeningSession> = {};
+        (sessions || []).forEach((s: any) => {
+          if (s.registration_id && !map[s.registration_id]) map[s.registration_id] = s as ScreeningSession;
+        });
+        setScreenings(map);
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -261,6 +280,37 @@ const CaregiverApprovals = () => {
                     </div>
                   )}
 
+                  <div className="rounded-lg border border-border bg-muted/30 p-3">
+                    {screenings[registration.id] ? (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="font-medium">Assistant screening</span>
+                          <Badge
+                            variant={
+                              screenings[registration.id].band === "strong_fit" ? "default" : "secondary"
+                            }
+                          >
+                            {screenings[registration.id].band
+                              ? BAND_LABELS[screenings[registration.id].band as ScoreBand] ??
+                                screenings[registration.id].band
+                              : "Not scored"}
+                          </Badge>
+                          <span className="text-muted-foreground">
+                            Score {screenings[registration.id].total_score}
+                          </span>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => setOpenScreening(registration)}>
+                          <ClipboardList className="mr-2 h-4 w-4" />
+                          View transcript
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No assistant screening was completed with this application.
+                      </p>
+                    )}
+                  </div>
+
                   {registration.status === "pending" && canReviewApplications && (
                     <div className="flex gap-2 pt-2">
                       <Button
@@ -358,6 +408,16 @@ const CaregiverApprovals = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ScreeningResultDialog
+          open={!!openScreening}
+          onOpenChange={(open) => !open && setOpenScreening(null)}
+          session={openScreening ? screenings[openScreening.id] ?? null : null}
+          applicantName={
+            openScreening ? `${openScreening.first_name} ${openScreening.last_name}` : ""
+          }
+          applicantEmail={openScreening?.email ?? ""}
+        />
       </div>
     </AppLayout>
   );

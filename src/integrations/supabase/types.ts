@@ -1812,6 +1812,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      flow_session_link_registration: {
+        Args: {
+          p_registration_id: string
+          p_session_id: string
+          p_token: string
+        }
+        Returns: undefined
+      }
       flow_session_progress: {
         Args: { p_node_id: string; p_session_id: string; p_token: string }
         Returns: undefined
