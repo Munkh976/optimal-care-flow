@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Download, Loader2 } from "lucide-react";
-import { BAND_LABELS, ScoreBand } from "@/lib/flowEngine";
+import { BAND_LABELS, ScoreBand, TRAIT_LABELS } from "@/lib/flowEngine";
 
 export interface ScreeningSession {
   id: string;
