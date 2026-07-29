@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Activity, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { caregiverRegistrationSchema, firstError } from "@/lib/validation";
+import { US_STATES } from "@/constants/usStates";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { ScoreResult } from "@/lib/flowEngine";
 
@@ -203,17 +204,30 @@ const CaregiverRegistration = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
+                  <Label htmlFor="state">State *</Label>
+                  <Select
                     value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  />
+                    onValueChange={(value) => setFormData({ ...formData, state: value })}
+                  >
+                    <SelectTrigger id="state">
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {US_STATES.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="zipCode">ZIP Code</Label>
+                  <Label htmlFor="zipCode">ZIP Code *</Label>
                   <Input
                     id="zipCode"
+                    inputMode="numeric"
+                    placeholder="12345"
+                    maxLength={10}
                     value={formData.zipCode}
                     onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
                   />

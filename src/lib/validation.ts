@@ -158,8 +158,14 @@ export const caregiverRegistrationSchema = z.object({
     .regex(/^[0-9+()\-.\s]*$/, { message: "Phone contains invalid characters" }),
   address: optionalText(200, "Address"),
   city: optionalText(100, "City"),
-  state: optionalText(50, "State"),
-  zipCode: optionalText(20, "ZIP code"),
+  state: z
+    .string()
+    .trim()
+    .length(2, { message: "Select a state" }),
+  zipCode: z
+    .string()
+    .trim()
+    .regex(/^\d{5}(-\d{4})?$/, { message: "Enter a valid ZIP code (12345 or 12345-6789)" }),
   employmentType: z.enum(["full_time", "part_time", "on_call"]),
   hourlyRate: z
     .string()
