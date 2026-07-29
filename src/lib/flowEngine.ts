@@ -128,13 +128,25 @@ export function nextNodeId(
   node: FlowNode,
   options: FlowOption[]
 ): string | null {
-  const branch = options.find((o) => o.next_node_id);
-  if (branch?.next_node_id) return branch.next_node_id;
-  if (node.default_next_node_id) return node.default_next_node_id;
+  // A branch may only move forward. Anything pointing at the current question or
+  // an earlier one is ignored, so bad data can never create a loop.
+  const forward = (targetId: string | null | undefined): string | null => {
+    if (!targetId) return null;
+    const target = getNode(flow, targetId);
+    if (!target) return null;
+    return target.sort_order > node.sort_order ? target.id : null;
+  };
+
+  for (const option of options) {
+    const branch = forward(option.next_node_id);
+    if (branch) return branch;
+  }
+
+  const fallback = forward(node.default_next_node_id);
+  if (fallback) return fallback;
 
   const sorted = [...flow.nodes].sort((a, b) => a.sort_order - b.sort_order);
-  const idx = sorted.findIndex((n) => n.id === node.id);
-  const following = idx >= 0 ? sorted[idx + 1] : undefined;
+  const following = sorted.find((n) => n.sort_order > node.sort_order);
   return following?.id ?? null;
 }
 
