@@ -37,6 +37,7 @@ const NODE_TYPES = [
 ];
 
 const AUTO_NEXT = "__auto";
+const FIXED_ANSWERS = "__fixed";
 
 type BuilderFlow = ConversationFlow & {
   status: string;
