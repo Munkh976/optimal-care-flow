@@ -1815,6 +1815,7 @@ export type Database = {
           created_at: string | null
           end_date: string
           id: string
+          is_demo: boolean
           notes: string | null
           reason: string | null
           request_type: Database["public"]["Enums"]["request_type"]
@@ -1829,6 +1830,7 @@ export type Database = {
           created_at?: string | null
           end_date: string
           id?: string
+          is_demo?: boolean
           notes?: string | null
           reason?: string | null
           request_type: Database["public"]["Enums"]["request_type"]
@@ -1843,6 +1845,7 @@ export type Database = {
           created_at?: string | null
           end_date?: string
           id?: string
+          is_demo?: boolean
           notes?: string | null
           reason?: string | null
           request_type?: Database["public"]["Enums"]["request_type"]
