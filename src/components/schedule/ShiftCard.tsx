@@ -57,7 +57,7 @@ export const ShiftCard = ({
 
             {showCaregiver &&
               (shift.shift_assignments || []).some((a: any) => a?.status !== "cancelled") && (
-announced
+
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <User className="h-4 w-4" />
                 <span>Caregiver assigned</span>
