@@ -330,6 +330,23 @@ export const AssignShiftDialog = ({
               rows={2}
             />
           </div>
+
+          {overridePrompt && (
+            <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
+                <AlertTriangle className="h-4 w-4" />
+                Manager override required
+              </div>
+              <p className="text-sm text-muted-foreground">{overridePrompt}</p>
+              <Label>Override reason</Label>
+              <Textarea
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder="Explain why this assignment should proceed..."
+                rows={2}
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter>
