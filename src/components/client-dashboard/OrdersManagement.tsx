@@ -361,17 +361,17 @@ export const OrdersManagement = ({
 
       if (shiftsError) throw shiftsError;
 
-      // shift_assignments is the source of truth for who works a shift.
+      // Clients request a caregiver; only agency staff may create the assignment
+      // (server-side eligibility rules). Record the request on the shift instead.
       if (bookingData.caregiver?.id && createdShifts?.length) {
-        const { error: assignError } = await supabase.from("shift_assignments").insert(
-          createdShifts.map((s: any) => ({
-            shift_id: s.id,
-            caregiver_id: bookingData.caregiver.id,
-            status: "scheduled" as never,
-            assignment_method: "manual" as never,
-          }))
-        );
-        if (assignError) throw assignError;
+        const requested = [bookingData.caregiver.first_name, bookingData.caregiver.last_name]
+          .filter(Boolean)
+          .join(" ") || "a specific caregiver";
+        const { error: noteError } = await supabase
+          .from("shifts")
+          .update({ special_instructions: `Client requested ${requested}.` })
+          .in("id", createdShifts.map((s: any) => s.id));
+        if (noteError) throw noteError;
       }
 
       toast.success("Care plan submitted successfully!");

@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
 import { AppLayout } from "@/components/AppLayout";
+import { pickUpShift } from "@/lib/shiftAssignment";
 
 interface OpenShift {
   id: string;
@@ -81,13 +82,23 @@ const AvailableShifts = () => {
     }
   };
 
-  // Self pick-up is intentionally disabled.
-  // A caregiver may not write to shift_assignments directly (RLS 2A: staff-only writes).
-  // This action must run server-side behind a SECURITY DEFINER RPC / edge function that
-  // verifies caller ownership of the caregiver record, that the shift is open, and the
-  // eligibility rules (weekly-hours cap, overlap, travel buffer, approved time off).
-  // Tracked for the server-side rules phase.
-  const PICKUP_ENABLED = false;
+  // Self pick-up runs server-side: caregiver_pick_up_shift verifies caller ownership,
+  // that the shift is open, and every eligibility rule. Caregivers get zero overrides.
+  const [pickingUp, setPickingUp] = useState<string | null>(null);
+
+  const handlePickUp = async (shiftId: string) => {
+    setPickingUp(shiftId);
+    try {
+      await pickUpShift(shiftId);
+      toast.success("Shift picked up");
+      fetchCaregiverAndShifts();
+    } catch (e: any) {
+      toast.error(e.message || "Could not pick up this shift");
+    } finally {
+      setPickingUp(null);
+    }
+  };
+
 
 
   const getCareTypeLabel = (code: string) => {
@@ -206,11 +217,13 @@ const AvailableShifts = () => {
                       </Badge>
                     </div>
                     <Button
-                      disabled={!PICKUP_ENABLED}
-                      title="Self pick-up is temporarily unavailable — ask your scheduler to assign this shift."
-                      onClick={(e) => e.stopPropagation()}
+                      disabled={pickingUp === shift.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePickUp(shift.id);
+                      }}
                     >
-                      Pick Up Shift
+                      {pickingUp === shift.id ? "Picking up…" : "Pick Up Shift"}
                     </Button>
 
                   </div>

@@ -16,6 +16,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { queueNotification } from "@/lib/notifications";
+import { releaseShiftAssignments } from "@/lib/shiftAssignment";
 
 type Decision = "approved" | "denied";
 
@@ -72,11 +73,11 @@ export function TimeOffDecisionDialog({ request, decision, open, onOpenChange, o
         const shiftIds = conflicts.map((s) => s.id);
 
         if (action === "release") {
-          await supabase
-            .from("shifts")
-            .update({ caregiver_id: null, status: "unassigned" as never })
-            .in("id", shiftIds);
-          await supabase.from("shift_assignments").delete().in("shift_id", shiftIds);
+          // Assignments are trigger-protected: release runs server-side.
+          await releaseShiftAssignments(
+            shiftIds,
+            `Released for approved time off ${request.start_date} – ${request.end_date}`
+          );
         } else {
           const { data: assignments } = await supabase
             .from("shift_assignments")

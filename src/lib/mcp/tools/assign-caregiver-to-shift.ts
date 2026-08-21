@@ -15,25 +15,14 @@ export default defineTool({
     if (!ctx.isAuthenticated()) return errorResult("Not authenticated");
     const client = supabaseForUser(ctx);
 
-    // shift_assignments is the source of truth; shifts.caregiver_id/status follow via trigger.
-    const { data: existing, error: existingError } = await client
-      .from("shift_assignments")
-      .select("id")
-      .eq("shift_id", shift_id)
-      .neq("status", "completed" as never)
-      .limit(1);
-    if (existingError) return errorResult(existingError.message);
-
-    const mutation = existing?.length
-      ? client
-          .from("shift_assignments")
-          .update({ caregiver_id, status: "scheduled" as never })
-          .eq("id", existing[0].id)
-      : client
-          .from("shift_assignments")
-          .insert({ shift_id, caregiver_id, status: "scheduled" as never, assignment_method: "manual" as never });
-
-    const { error: assignError } = await mutation;
+    // Eligibility + tenancy are enforced in the database.
+    const { error: assignError } = await client.rpc("assign_caregiver_to_shift" as never, {
+      _shift_id: shift_id,
+      _caregiver_id: caregiver_id,
+      _method: "manual",
+      _notes: null,
+      _override_reason: null,
+    } as never);
     if (assignError) return errorResult(assignError.message);
 
     const { data, error } = await client

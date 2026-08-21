@@ -1914,7 +1914,22 @@ export type Database = {
         Args: { caregiver_email: string }
         Returns: undefined
       }
+      assign_caregiver_to_shift: {
+        Args: {
+          _caregiver_id: string
+          _method?: Database["public"]["Enums"]["assignment_method"]
+          _notes?: string
+          _override_reason?: string
+          _shift_id: string
+        }
+        Returns: Json
+      }
       caregiver_agency_id: { Args: { _caregiver_id: string }; Returns: string }
+      caregiver_pick_up_shift: { Args: { _shift_id: string }; Returns: Json }
+      check_assignment_eligibility: {
+        Args: { _caregiver_id: string; _shift_id: string }
+        Returns: Json
+      }
       create_flow_draft: { Args: { p_flow_id: string }; Returns: string }
       current_agency_id: { Args: never; Returns: string }
       derived_shift_caregiver: { Args: { _shift_id: string }; Returns: string }
@@ -2024,6 +2039,10 @@ export type Database = {
       order_agency_id: { Args: { _order_id: string }; Returns: string }
       order_client_id: { Args: { _order_id: string }; Returns: string }
       publish_flow_draft: { Args: { p_draft_id: string }; Returns: string }
+      release_shift_assignments: {
+        Args: { _reason?: string; _shift_ids: string[] }
+        Returns: number
+      }
       shift_assignment_agency_id: {
         Args: { _shift_id: string }
         Returns: string
