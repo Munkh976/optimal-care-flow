@@ -1019,6 +1019,27 @@ export type Database = {
           },
         ]
       }
+      demo_purge_audit: {
+        Row: {
+          dry_run: boolean
+          id: string
+          ran_at: string
+          result: Json
+        }
+        Insert: {
+          dry_run?: boolean
+          id?: string
+          ran_at?: string
+          result: Json
+        }
+        Update: {
+          dry_run?: boolean
+          id?: string
+          ran_at?: string
+          result?: Json
+        }
+        Relationships: []
+      }
       flow_nodes: {
         Row: {
           allow_free_text: boolean
@@ -2079,6 +2100,7 @@ export type Database = {
       order_client_id: { Args: { _order_id: string }; Returns: string }
       publish_flow_draft: { Args: { p_draft_id: string }; Returns: string }
       purge_demo_data: { Args: never; Returns: Json }
+      purge_demo_data_dry_run: { Args: never; Returns: Json }
       release_shift_assignments: {
         Args: { _reason?: string; _shift_ids: string[] }
         Returns: number
