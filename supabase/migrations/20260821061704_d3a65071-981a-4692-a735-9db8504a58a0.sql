@@ -1,0 +1,9 @@
+ALTER TABLE public.caregivers ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
+ALTER TABLE public.shifts ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
+ALTER TABLE public.shift_assignments ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
+ALTER TABLE public.caregiver_skills ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
+ALTER TABLE public.client_orders ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
+ALTER TABLE public.order_services ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
+ALTER TABLE public.caregiver_certifications ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
+ALTER TABLE public.caregiver_availability ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
