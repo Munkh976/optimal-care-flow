@@ -104,7 +104,10 @@ const Reports = () => {
       // Calculate stats
       const completedShifts = shifts?.filter(s => s.status === "completed").length || 0;
       const totalHours = shifts?.reduce((sum, s) => sum + (Number(s.duration_hours) || 0), 0) || 0;
-      const unassignedShifts = shifts?.filter((s) => !s.caregiver_id).length || 0;
+      const activeAssignment = (s: any) =>
+        (s.shift_assignments || []).find((a: any) => a?.status !== "cancelled") || null;
+      const unassignedShifts = shifts?.filter((s: any) => !activeAssignment(s)).length || 0;
+
       const coverageRate = shifts?.length ? ((shifts.length - unassignedShifts) / shifts.length) * 100 : 0;
 
       // Calculate growth rate (compare with previous period)
