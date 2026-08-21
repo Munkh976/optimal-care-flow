@@ -450,6 +450,7 @@ export type Database = {
           state: string | null
           updated_at: string | null
           user_id: string | null
+          virtual_office_id: string | null
           zip_code: string | null
         }
         Insert: {
@@ -483,6 +484,7 @@ export type Database = {
           state?: string | null
           updated_at?: string | null
           user_id?: string | null
+          virtual_office_id?: string | null
           zip_code?: string | null
         }
         Update: {
@@ -516,6 +518,7 @@ export type Database = {
           state?: string | null
           updated_at?: string | null
           user_id?: string | null
+          virtual_office_id?: string | null
           zip_code?: string | null
         }
         Relationships: [
@@ -524,6 +527,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "caregivers_virtual_office_id_fkey"
+            columns: ["virtual_office_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_office"
             referencedColumns: ["id"]
           },
         ]
@@ -692,6 +702,7 @@ export type Database = {
           email: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
+          family_id: string | null
           first_name: string
           id: string
           is_active: boolean | null
@@ -704,6 +715,7 @@ export type Database = {
           state: string
           updated_at: string | null
           user_id: string | null
+          virtual_office_id: string | null
           zip_code: string
         }
         Insert: {
@@ -716,6 +728,7 @@ export type Database = {
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          family_id?: string | null
           first_name: string
           id?: string
           is_active?: boolean | null
@@ -728,6 +741,7 @@ export type Database = {
           state: string
           updated_at?: string | null
           user_id?: string | null
+          virtual_office_id?: string | null
           zip_code: string
         }
         Update: {
@@ -740,6 +754,7 @@ export type Database = {
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          family_id?: string | null
           first_name?: string
           id?: string
           is_active?: boolean | null
@@ -752,6 +767,7 @@ export type Database = {
           state?: string
           updated_at?: string | null
           user_id?: string | null
+          virtual_office_id?: string | null
           zip_code?: string
         }
         Relationships: [
@@ -760,6 +776,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
             referencedColumns: ["id"]
           },
           {
@@ -774,6 +797,13 @@ export type Database = {
             columns: ["preferred_caregiver_id"]
             isOneToOne: false
             referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_virtual_office_id_fkey"
+            columns: ["virtual_office_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_office"
             referencedColumns: ["id"]
           },
         ]
@@ -1039,6 +1069,113 @@ export type Database = {
           result?: Json
         }
         Relationships: []
+      }
+      families: {
+        Row: {
+          agency_id: string
+          created_at: string
+          family_name: string
+          id: string
+          is_active: boolean
+          is_demo: boolean
+          notes: string | null
+          updated_at: string
+          virtual_office_id: string | null
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          family_name: string
+          id?: string
+          is_active?: boolean
+          is_demo?: boolean
+          notes?: string | null
+          updated_at?: string
+          virtual_office_id?: string | null
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          family_name?: string
+          id?: string
+          is_active?: boolean
+          is_demo?: boolean
+          notes?: string | null
+          updated_at?: string
+          virtual_office_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "families_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "families_virtual_office_id_fkey"
+            columns: ["virtual_office_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_office"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          family_id: string
+          first_name: string
+          id: string
+          is_decision_maker: boolean
+          is_demo: boolean
+          is_primary: boolean
+          last_name: string
+          phone: string | null
+          relationship: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          family_id: string
+          first_name: string
+          id?: string
+          is_decision_maker?: boolean
+          is_demo?: boolean
+          is_primary?: boolean
+          last_name: string
+          phone?: string | null
+          relationship?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          family_id?: string
+          first_name?: string
+          id?: string
+          is_decision_maker?: boolean
+          is_demo?: boolean
+          is_primary?: boolean
+          last_name?: string
+          phone?: string | null
+          relationship?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_contacts_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       flow_nodes: {
         Row: {
@@ -1942,6 +2079,98 @@ export type Database = {
           },
         ]
       }
+      virtual_office: {
+        Row: {
+          address: string | null
+          agency_id: string
+          branding: Json
+          city: string | null
+          code: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          is_demo: boolean
+          is_primary: boolean
+          late_trade_hours: number | null
+          max_weekly_hours: number | null
+          name: string
+          operating_hours: Json
+          service_area: Json
+          service_states: string[]
+          service_zipcodes: string[]
+          smart_match_weights: Json | null
+          state: string | null
+          timezone: string
+          travel_buffer_minutes: number | null
+          updated_at: string
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          agency_id: string
+          branding?: Json
+          city?: string | null
+          code?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_demo?: boolean
+          is_primary?: boolean
+          late_trade_hours?: number | null
+          max_weekly_hours?: number | null
+          name: string
+          operating_hours?: Json
+          service_area?: Json
+          service_states?: string[]
+          service_zipcodes?: string[]
+          smart_match_weights?: Json | null
+          state?: string | null
+          timezone?: string
+          travel_buffer_minutes?: number | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          agency_id?: string
+          branding?: Json
+          city?: string | null
+          code?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_demo?: boolean
+          is_primary?: boolean
+          late_trade_hours?: number | null
+          max_weekly_hours?: number | null
+          name?: string
+          operating_hours?: Json
+          service_area?: Json
+          service_states?: string[]
+          service_zipcodes?: string[]
+          smart_match_weights?: Json | null
+          state?: string | null
+          timezone?: string
+          travel_buffer_minutes?: number | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "virtual_office_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       caregiver_performance: {
@@ -1994,6 +2223,7 @@ export type Database = {
       current_agency_id: { Args: never; Returns: string }
       derived_shift_caregiver: { Args: { _shift_id: string }; Returns: string }
       discard_flow_draft: { Args: { p_draft_id: string }; Returns: undefined }
+      family_agency_id: { Args: { _family_id: string }; Returns: string }
       flow_session_complete: {
         Args: {
           p_band: string
