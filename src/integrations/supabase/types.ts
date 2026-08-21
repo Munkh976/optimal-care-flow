@@ -2078,6 +2078,7 @@ export type Database = {
       order_agency_id: { Args: { _order_id: string }; Returns: string }
       order_client_id: { Args: { _order_id: string }; Returns: string }
       publish_flow_draft: { Args: { p_draft_id: string }; Returns: string }
+      purge_demo_data: { Args: never; Returns: Json }
       release_shift_assignments: {
         Args: { _reason?: string; _shift_ids: string[] }
         Returns: number
