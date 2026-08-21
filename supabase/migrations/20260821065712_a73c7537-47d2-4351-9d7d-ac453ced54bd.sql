@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.family_agency_id(uuid) FROM PUBLIC, anon;
