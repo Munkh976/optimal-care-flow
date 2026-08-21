@@ -5,7 +5,8 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-const SYSTEM_AGENCY_ID = '00000000-0000-0000-0000-000000000000';
+// Legacy shared-tenant id. No longer used as a fallback; approvals must resolve a real agency.
+const LEGACY_SYSTEM_AGENCY_ID = '00000000-0000-0000-0000-000000000000';
 
 type ReviewAction = 'approve' | 'reject';
 
