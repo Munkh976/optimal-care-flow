@@ -70,55 +70,59 @@ Deno.serve(async () => {
       SELECT override_reason, override_by::text, (override_at IS NOT NULL) AS has_ts
       FROM public.shift_assignments WHERE shift_id='${SHIFT_MON_PM}';`, "ok");
 
-    // 7. caregiver pick-up over cap (cap still 1)
-    await run("7_pickup_over_cap", `${reset}
-      SELECT public.release_shift_assignments(ARRAY['${SHIFT_MON_PM}']::uuid[], 'test reset') FROM (SELECT set_config('request.jwt.claims','{"sub":"${STAFF}","role":"authenticated"}',true)) x;
-      ${asUser(CG_USER)}
+    // 7. caregiver pick-up refused while weekly cap is still 1
+    await run("7_release_pm_as_staff", `${asUser(STAFF)}
+      SELECT public.release_shift_assignments(ARRAY['${SHIFT_MON_PM}']::uuid[], 'test reset') AS released;`, "ok");
+    await run("7b_pickup_over_cap", `${asUser(CG_USER)}
       SELECT public.caregiver_pick_up_shift('${SHIFT_MON_PM}') AS r;`, "fail");
 
-    // 8. caregiver pick-up eligible (restore cap, release Monday shift first)
-    await run("8_pickup_eligible", `${reset}
-      UPDATE public.agency SET max_weekly_hours = 40 WHERE id = (SELECT agency_id FROM public.shifts WHERE id='${SHIFT_MON}');
-      SELECT set_config('request.jwt.claims','{"sub":"${STAFF}","role":"authenticated"}',true);
-      SET LOCAL ROLE authenticated;
+    // 8. caregiver pick-up eligible after cap restored and Monday shift released
+    await run("8_restore_cap_and_release", `UPDATE public.agency SET max_weekly_hours = 40
+        WHERE id = (SELECT agency_id FROM public.shifts WHERE id='${SHIFT_MON}');`, "ok");
+    await run("8b_release_monday", `${asUser(STAFF)}
       SELECT public.release_shift_assignments(ARRAY['${SHIFT_MON}']::uuid[], 'test reset') AS released;`, "ok");
-    await run("8b_pickup_eligible_call", `${reset}${asUser(CG_USER)}
+    await run("8c_shift_back_to_open", `SELECT status::text, caregiver_id::text FROM public.shifts WHERE id='${SHIFT_MON}';`, "ok");
+    await run("8d_pickup_eligible", `${asUser(CG_USER)}
       SELECT public.caregiver_pick_up_shift('${SHIFT_MON}') AS r;`, "ok");
+    await run("8e_derived_after_pickup", `SELECT status::text, caregiver_id::text FROM public.shifts WHERE id='${SHIFT_MON}';`, "ok");
 
-    // 9. caregiver calls staff assign function for another caregiver
-    await run("9_caregiver_calls_assign", `${reset}${asUser(CG_USER)}
+    // 9. caregiver calls the staff-only assign function
+    await run("9_caregiver_calls_assign", `${asUser(CG_USER)}
       SELECT public.assign_caregiver_to_shift('${SHIFT_MON_PM}','${ERDENE}','manual',null,null) AS r;`, "fail");
 
     // 10. direct PostgREST-style insert by staff
-    await run("10_direct_insert_staff", `${reset}${asUser(STAFF)}
+    await run("10_direct_insert_staff", `${asUser(STAFF)}
       INSERT INTO public.shift_assignments (shift_id, caregiver_id, status, assignment_method)
       VALUES ('${SHIFT_MON_PM}','${TIM}','scheduled','manual');`, "fail");
 
-    // 11. direct caregiver_id change by staff
-    await run("11_direct_caregiver_id_update", `${reset}${asUser(STAFF)}
-      UPDATE public.shift_assignments SET caregiver_id='${ERDENE}' WHERE shift_id='${SHIFT_MON}';`, "fail");
+    // 11-12. direct tampering on the ACTIVE picked-up assignment
+    await run("11_direct_caregiver_id_update", `${asUser(STAFF)}
+      UPDATE public.shift_assignments SET caregiver_id='${ERDENE}'
+       WHERE shift_id='${SHIFT_MON}' AND status <> 'cancelled';`, "fail");
+    await run("12_direct_cancel_active", `${asUser(STAFF)}
+      UPDATE public.shift_assignments SET status='cancelled'
+       WHERE shift_id='${SHIFT_MON}' AND status <> 'cancelled';`, "fail");
+    await run("12b_override_tamper", `${asUser(STAFF)}
+      UPDATE public.shift_assignments SET override_reason='faked'
+       WHERE shift_id='${SHIFT_MON}' AND status <> 'cancelled';`, "fail");
 
-    // 12. direct cancel + override tampering
-    await run("12_direct_cancel", `${reset}${asUser(STAFF)}
-      UPDATE public.shift_assignments SET status='cancelled' WHERE shift_id='${SHIFT_MON}';`, "fail");
-    await run("12b_override_tamper", `${reset}${asUser(STAFF)}
-      UPDATE public.shift_assignments SET override_reason='faked' WHERE shift_id='${SHIFT_MON}';`, "fail");
-
-    // 13. operational timeclock update still works
-    await run("13_timeclock_update", `${reset}${asUser(STAFF)}
+    // 13. operational timeclock update still works for staff
+    await run("13_timeclock_update", `${asUser(STAFF)}
       UPDATE public.shift_assignments
-         SET clock_in_time=now(), clock_out_time=now(), actual_hours_worked=4, mileage=12, notes='clocked', status='completed'
-       WHERE shift_id='${SHIFT_MON}'
-      RETURNING status::text, actual_hours_worked, mileage;`, "ok");
+         SET clock_in_time=now(), clock_out_time=now(), actual_hours_worked=4, mileage=12,
+             notes='clocked', status='completed'
+       WHERE shift_id='${SHIFT_MON}' AND status <> 'cancelled';`, "ok");
+    await run("13b_timeclock_read", `SELECT status::text, actual_hours_worked::text, mileage::text
+      FROM public.shift_assignments WHERE shift_id='${SHIFT_MON}' AND status='completed';`, "ok");
 
-    // 14. completed assignment delete still protected
-    await run("14_delete_completed", `${reset}
-      DELETE FROM public.shift_assignments WHERE shift_id='${SHIFT_MON}';`, "fail");
+    // 14. completed assignment cannot be deleted
+    await run("14_delete_completed", `${asUser(STAFF)}
+      DELETE FROM public.shift_assignments WHERE shift_id='${SHIFT_MON}' AND status='completed';`, "fail");
 
-    // 15. shifts.caregiver_id remains derived after direct tamper attempt
-    await run("15_derived_after_direct_write", `${reset}
-      UPDATE public.shifts SET caregiver_id='${ERDENE}' WHERE id='${SHIFT_MON}';
-      SELECT caregiver_id::text FROM public.shifts WHERE id='${SHIFT_MON}';`, "ok");
+    // 15. shifts.caregiver_id is re-derived after a direct write attempt
+    await run("15_direct_write_shifts_caregiver", `${asUser(STAFF)}
+      UPDATE public.shifts SET caregiver_id='${ERDENE}' WHERE id='${SHIFT_MON}';`, "ok");
+    await run("15b_derived_value", `SELECT caregiver_id::text FROM public.shifts WHERE id='${SHIFT_MON}';`, "ok");
   } finally {
     await client.queryArray("ROLLBACK").catch(() => {});
     const counts = await client.queryObject<{ shifts: bigint; assignments: bigint }>(
