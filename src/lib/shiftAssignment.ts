@@ -47,7 +47,10 @@ export const assignedCaregiverId = (shift: any): string | null => {
 
 /**
  * Single write path for assigning a caregiver to a shift.
- * Writes the assignment; shifts.caregiver_id/status follow via database trigger.
+ * All eligibility enforcement lives in the database: this calls the
+ * SECURITY DEFINER function `assign_caregiver_to_shift`, which refuses hard
+ * blockers outright and demands an override reason for soft blockers.
+ * Direct writes to shift_assignments are blocked by RLS + trigger.
  */
 export async function assignShift(input: AssignShiftInput) {
   const {
@@ -58,41 +61,13 @@ export async function assignShift(input: AssignShiftInput) {
     endTime,
     notes,
     method = "manual",
+    overrideReason,
   } = input;
 
   const hours = durationHours(startTime, endTime);
   if (hours <= 0) throw new Error("End time must be after start time");
 
-  const { data: existing, error: existingError } = await supabase
-    .from("shift_assignments")
-    .select("id, status")
-    .eq("shift_id", shiftId)
-    .neq("status", "completed" as never)
-    .limit(1);
-  if (existingError) throw existingError;
-
-  if (existing && existing.length > 0) {
-    const { error } = await supabase
-      .from("shift_assignments")
-      .update({
-        caregiver_id: caregiverId,
-        status: "scheduled" as never,
-        assignment_method: method as never,
-        notes: notes || null,
-      })
-      .eq("id", existing[0].id);
-    if (error) throw error;
-  } else {
-    const { error } = await supabase.from("shift_assignments").insert({
-      shift_id: shiftId,
-      caregiver_id: caregiverId,
-      status: "scheduled" as never,
-      assignment_method: method as never,
-      notes: notes || null,
-    });
-    if (error) throw error;
-  }
-
+  // Shift details first so the server evaluates eligibility against final times.
   const { error: shiftError } = await supabase
     .from("shifts")
     .update({
@@ -103,6 +78,48 @@ export async function assignShift(input: AssignShiftInput) {
     })
     .eq("id", shiftId);
   if (shiftError) throw shiftError;
+
+  const { data, error } = await supabase.rpc("assign_caregiver_to_shift" as never, {
+    _shift_id: shiftId,
+    _caregiver_id: caregiverId,
+    _method: method,
+    _notes: notes || null,
+    _override_reason: overrideReason?.trim() || null,
+  } as never);
+
+  if (error) {
+    if (/override reason required/i.test(error.message)) {
+      throw new OverrideRequiredError(
+        error.message.replace(/^Override reason required:\s*/i, "")
+      );
+    }
+    throw new Error(error.message.replace(/^Assignment refused:\s*/i, ""));
+  }
+  return data as unknown as {
+    assignment_id: string;
+    overridden: boolean;
+    eligibility: unknown;
+  };
+}
+
+/** Caregiver self pick-up of an open shift. No overrides are possible. */
+export async function pickUpShift(shiftId: string) {
+  const { data, error } = await supabase.rpc("caregiver_pick_up_shift" as never, {
+    _shift_id: shiftId,
+  } as never);
+  if (error) throw new Error(error.message.replace(/^Pick-up refused:\s*/i, ""));
+  return data;
+}
+
+/** Staff-only release of caregivers from shifts (e.g. approved time off). */
+export async function releaseShiftAssignments(shiftIds: string[], reason?: string) {
+  if (!shiftIds.length) return 0;
+  const { data, error } = await supabase.rpc("release_shift_assignments" as never, {
+    _shift_ids: shiftIds,
+    _reason: reason || null,
+  } as never);
+  if (error) throw error;
+  return (data as unknown as number) ?? 0;
 }
 
 /** Returns human-readable warnings for a proposed assignment. */
