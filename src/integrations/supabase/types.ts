@@ -1905,6 +1905,7 @@ export type Database = {
         Returns: undefined
       }
       create_flow_draft: { Args: { p_flow_id: string }; Returns: string }
+      current_agency_id: { Args: never; Returns: string }
       discard_flow_draft: { Args: { p_draft_id: string }; Returns: undefined }
       flow_session_complete: {
         Args: {
@@ -2004,7 +2005,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_agency_staff: { Args: { _user_id: string }; Returns: boolean }
+      is_my_assigned_shift: { Args: { _shift_id: string }; Returns: boolean }
+      my_caregiver_ids: { Args: never; Returns: string[] }
+      my_client_ids: { Args: never; Returns: string[] }
+      order_agency_id: { Args: { _order_id: string }; Returns: string }
+      order_client_id: { Args: { _order_id: string }; Returns: string }
       publish_flow_draft: { Args: { p_draft_id: string }; Returns: string }
+      shift_assignment_agency_id: {
+        Args: { _shift_id: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role:
