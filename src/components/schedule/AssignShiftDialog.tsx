@@ -25,6 +25,7 @@ import {
 import { AlertTriangle, CalendarDays, Clock, Loader2, MapPin, User } from "lucide-react";
 import {
   assignShift,
+  OverrideRequiredError,
   checkAssignmentConflicts,
   durationHours,
 } from "@/lib/shiftAssignment";
@@ -61,6 +62,8 @@ export const AssignShiftDialog = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [conflicts, setConflicts] = useState<string[]>([]);
+  const [overrideReason, setOverrideReason] = useState("");
+  const [overridePrompt, setOverridePrompt] = useState<string | null>(null);
 
   const client = shift?.clients || shift?.client;
 
@@ -165,13 +168,19 @@ export const AssignShiftDialog = ({
         startTime,
         endTime,
         notes,
+        overrideReason: overridePrompt ? overrideReason : null,
         method: defaultCaregiverId === caregiverId && matchContext ? "ai_suggested" : "manual",
       });
       toast.success("Shift assigned");
       onOpenChange(false);
       onAssigned?.();
     } catch (e: any) {
-      toast.error(e.message || "Failed to assign shift");
+      if (e instanceof OverrideRequiredError) {
+        setOverridePrompt(e.message);
+        toast.warning("This assignment needs a manager override reason");
+      } else {
+        toast.error(e.message || "Failed to assign shift");
+      }
     } finally {
       setSaving(false);
     }
