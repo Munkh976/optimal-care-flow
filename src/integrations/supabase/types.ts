@@ -567,6 +567,7 @@ export type Database = {
           client_id: string
           created_at: string | null
           id: string
+          is_demo: boolean
           notes: string | null
           priority: number | null
           updated_at: string | null
@@ -576,6 +577,7 @@ export type Database = {
           client_id: string
           created_at?: string | null
           id?: string
+          is_demo?: boolean
           notes?: string | null
           priority?: number | null
           updated_at?: string | null
@@ -585,6 +587,7 @@ export type Database = {
           client_id?: string
           created_at?: string | null
           id?: string
+          is_demo?: boolean
           notes?: string | null
           priority?: number | null
           updated_at?: string | null
@@ -1455,6 +1458,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          is_demo: boolean
           rating: number
           shift_id: string
           updated_at: string
@@ -1467,6 +1471,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_demo?: boolean
           rating: number
           shift_id: string
           updated_at?: string
@@ -1479,6 +1484,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_demo?: boolean
           rating?: number
           shift_id?: string
           updated_at?: string
@@ -1523,6 +1529,7 @@ export type Database = {
           decision_notes: string | null
           eligibility_snapshot: Json | null
           id: string
+          is_demo: boolean
           new_caregiver_id: string | null
           original_caregiver_id: string
           reason: string | null
@@ -1543,6 +1550,7 @@ export type Database = {
           decision_notes?: string | null
           eligibility_snapshot?: Json | null
           id?: string
+          is_demo?: boolean
           new_caregiver_id?: string | null
           original_caregiver_id: string
           reason?: string | null
@@ -1563,6 +1571,7 @@ export type Database = {
           decision_notes?: string | null
           eligibility_snapshot?: Json | null
           id?: string
+          is_demo?: boolean
           new_caregiver_id?: string | null
           original_caregiver_id?: string
           reason?: string | null
