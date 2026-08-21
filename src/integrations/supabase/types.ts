@@ -183,6 +183,7 @@ export type Database = {
           end_time: string
           id: string
           is_available: boolean | null
+          is_demo: boolean
           start_time: string
           updated_at: string | null
         }
@@ -193,6 +194,7 @@ export type Database = {
           end_time: string
           id?: string
           is_available?: boolean | null
+          is_demo?: boolean
           start_time: string
           updated_at?: string | null
         }
@@ -203,6 +205,7 @@ export type Database = {
           end_time?: string
           id?: string
           is_available?: boolean | null
+          is_demo?: boolean
           start_time?: string
           updated_at?: string | null
         }
@@ -232,6 +235,7 @@ export type Database = {
           document_url: string | null
           expiry_date: string
           id: string
+          is_demo: boolean
           is_verified: boolean | null
           issued_date: string | null
           updated_at: string | null
@@ -244,6 +248,7 @@ export type Database = {
           document_url?: string | null
           expiry_date: string
           id?: string
+          is_demo?: boolean
           is_verified?: boolean | null
           issued_date?: string | null
           updated_at?: string | null
@@ -256,6 +261,7 @@ export type Database = {
           document_url?: string | null
           expiry_date?: string
           id?: string
+          is_demo?: boolean
           is_verified?: boolean | null
           issued_date?: string | null
           updated_at?: string | null
@@ -361,6 +367,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_certified: boolean | null
+          is_demo: boolean
           proficiency_level: string | null
           updated_at: string | null
           years_experience: number | null
@@ -371,6 +378,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_certified?: boolean | null
+          is_demo?: boolean
           proficiency_level?: string | null
           updated_at?: string | null
           years_experience?: number | null
@@ -381,6 +389,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_certified?: boolean | null
+          is_demo?: boolean
           proficiency_level?: string | null
           updated_at?: string | null
           years_experience?: number | null
@@ -426,6 +435,7 @@ export type Database = {
           hourly_rate: number | null
           id: string
           is_active: boolean | null
+          is_demo: boolean
           last_name: string
           location_address: string | null
           location_city: string | null
@@ -458,6 +468,7 @@ export type Database = {
           hourly_rate?: number | null
           id?: string
           is_active?: boolean | null
+          is_demo?: boolean
           last_name: string
           location_address?: string | null
           location_city?: string | null
@@ -490,6 +501,7 @@ export type Database = {
           hourly_rate?: number | null
           id?: string
           is_active?: boolean | null
+          is_demo?: boolean
           last_name?: string
           location_address?: string | null
           location_city?: string | null
@@ -606,6 +618,7 @@ export type Database = {
           end_date: string
           frequency: string
           id: string
+          is_demo: boolean
           notes: string | null
           order_number: string
           start_date: string
@@ -623,6 +636,7 @@ export type Database = {
           end_date: string
           frequency?: string
           id?: string
+          is_demo?: boolean
           notes?: string | null
           order_number?: string
           start_date: string
@@ -640,6 +654,7 @@ export type Database = {
           end_date?: string
           frequency?: string
           id?: string
+          is_demo?: boolean
           notes?: string | null
           order_number?: string
           start_date?: string
@@ -677,6 +692,7 @@ export type Database = {
           first_name: string
           id: string
           is_active: boolean | null
+          is_demo: boolean
           last_name: string
           medical_conditions: string[] | null
           notes: string | null
@@ -700,6 +716,7 @@ export type Database = {
           first_name: string
           id?: string
           is_active?: boolean | null
+          is_demo?: boolean
           last_name: string
           medical_conditions?: string[] | null
           notes?: string | null
@@ -723,6 +740,7 @@ export type Database = {
           first_name?: string
           id?: string
           is_active?: boolean | null
+          is_demo?: boolean
           last_name?: string
           medical_conditions?: string[] | null
           notes?: string | null
@@ -1136,6 +1154,7 @@ export type Database = {
           frequency: string
           id: string
           is_active: boolean
+          is_demo: boolean
           notes: string | null
           order_id: string
           start_time: string
@@ -1150,6 +1169,7 @@ export type Database = {
           frequency?: string
           id?: string
           is_active?: boolean
+          is_demo?: boolean
           notes?: string | null
           order_id: string
           start_time: string
@@ -1164,6 +1184,7 @@ export type Database = {
           frequency?: string
           id?: string
           is_active?: boolean
+          is_demo?: boolean
           notes?: string | null
           order_id?: string
           start_time?: string
@@ -1346,6 +1367,7 @@ export type Database = {
           clock_out_time: string | null
           created_at: string | null
           id: string
+          is_demo: boolean
           is_locked: boolean | null
           mileage: number | null
           notes: string | null
@@ -1367,6 +1389,7 @@ export type Database = {
           clock_out_time?: string | null
           created_at?: string | null
           id?: string
+          is_demo?: boolean
           is_locked?: boolean | null
           mileage?: number | null
           notes?: string | null
@@ -1388,6 +1411,7 @@ export type Database = {
           clock_out_time?: string | null
           created_at?: string | null
           id?: string
+          is_demo?: boolean
           is_locked?: boolean | null
           mileage?: number | null
           notes?: string | null
@@ -1600,6 +1624,7 @@ export type Database = {
           duration_hours: number
           end_time: string
           id: string
+          is_demo: boolean
           is_recurring: boolean | null
           order_id: string | null
           order_service_id: string | null
@@ -1624,6 +1649,7 @@ export type Database = {
           duration_hours: number
           end_time: string
           id?: string
+          is_demo?: boolean
           is_recurring?: boolean | null
           order_id?: string | null
           order_service_id?: string | null
@@ -1648,6 +1674,7 @@ export type Database = {
           duration_hours?: number
           end_time?: string
           id?: string
+          is_demo?: boolean
           is_recurring?: boolean | null
           order_id?: string | null
           order_service_id?: string | null
