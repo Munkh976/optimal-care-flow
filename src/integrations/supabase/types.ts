@@ -1917,6 +1917,7 @@ export type Database = {
       caregiver_agency_id: { Args: { _caregiver_id: string }; Returns: string }
       create_flow_draft: { Args: { p_flow_id: string }; Returns: string }
       current_agency_id: { Args: never; Returns: string }
+      derived_shift_caregiver: { Args: { _shift_id: string }; Returns: string }
       discard_flow_draft: { Args: { p_draft_id: string }; Returns: undefined }
       flow_session_complete: {
         Args: {
