@@ -80,6 +80,136 @@ export type Database = {
         }
         Relationships: []
       }
+      care_requests: {
+        Row: {
+          agency_id: string
+          care_type_codes: string[]
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          estimated_hours_per_week: number | null
+          family_id: string | null
+          id: string
+          is_demo: boolean
+          location_address: string | null
+          location_city: string | null
+          location_state: string | null
+          location_zip_code: string | null
+          notes: string | null
+          priority: string
+          recurrence_hint: string | null
+          request_number: string | null
+          requested_caregiver_id: string | null
+          requested_end_date: string | null
+          requested_end_time: string | null
+          requested_start_date: string | null
+          requested_start_time: string | null
+          source: string
+          status: Database["public"]["Enums"]["care_request_status"]
+          updated_at: string
+          virtual_office_id: string | null
+        }
+        Insert: {
+          agency_id: string
+          care_type_codes?: string[]
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_hours_per_week?: number | null
+          family_id?: string | null
+          id?: string
+          is_demo?: boolean
+          location_address?: string | null
+          location_city?: string | null
+          location_state?: string | null
+          location_zip_code?: string | null
+          notes?: string | null
+          priority?: string
+          recurrence_hint?: string | null
+          request_number?: string | null
+          requested_caregiver_id?: string | null
+          requested_end_date?: string | null
+          requested_end_time?: string | null
+          requested_start_date?: string | null
+          requested_start_time?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["care_request_status"]
+          updated_at?: string
+          virtual_office_id?: string | null
+        }
+        Update: {
+          agency_id?: string
+          care_type_codes?: string[]
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_hours_per_week?: number | null
+          family_id?: string | null
+          id?: string
+          is_demo?: boolean
+          location_address?: string | null
+          location_city?: string | null
+          location_state?: string | null
+          location_zip_code?: string | null
+          notes?: string | null
+          priority?: string
+          recurrence_hint?: string | null
+          request_number?: string | null
+          requested_caregiver_id?: string | null
+          requested_end_date?: string | null
+          requested_end_time?: string | null
+          requested_start_date?: string | null
+          requested_start_time?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["care_request_status"]
+          updated_at?: string
+          virtual_office_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "care_requests_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_requests_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_requests_requested_caregiver_id_fkey"
+            columns: ["requested_caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "care_requests_requested_caregiver_id_fkey"
+            columns: ["requested_caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_requests_virtual_office_id_fkey"
+            columns: ["virtual_office_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_office"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       care_service_categories: {
         Row: {
           code_prefix: string | null
@@ -278,6 +408,109 @@ export type Database = {
             foreignKeyName: "caregiver_certifications_caregiver_id_fkey"
             columns: ["caregiver_id"]
             isOneToOne: false
+            referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      caregiver_preferences: {
+        Row: {
+          agency_id: string
+          caregiver_id: string
+          created_at: string
+          desired_hourly_rate: number | null
+          desired_weekly_earnings: number | null
+          desired_weekly_hours: number | null
+          flexibility: string
+          id: string
+          is_demo: boolean
+          max_travel_miles: number | null
+          max_travel_minutes: number | null
+          max_weekly_hours: number | null
+          min_weekly_hours: number | null
+          notes: string | null
+          open_to_short_notice: boolean
+          preferred_care_type_codes: string[]
+          preferred_cities: string[]
+          preferred_days: number[]
+          preferred_end_time: string | null
+          preferred_start_time: string | null
+          preferred_time_of_day: string[]
+          preferred_zip_codes: string[]
+          updated_at: string
+          willing_to_travel_outside_area: boolean
+        }
+        Insert: {
+          agency_id: string
+          caregiver_id: string
+          created_at?: string
+          desired_hourly_rate?: number | null
+          desired_weekly_earnings?: number | null
+          desired_weekly_hours?: number | null
+          flexibility?: string
+          id?: string
+          is_demo?: boolean
+          max_travel_miles?: number | null
+          max_travel_minutes?: number | null
+          max_weekly_hours?: number | null
+          min_weekly_hours?: number | null
+          notes?: string | null
+          open_to_short_notice?: boolean
+          preferred_care_type_codes?: string[]
+          preferred_cities?: string[]
+          preferred_days?: number[]
+          preferred_end_time?: string | null
+          preferred_start_time?: string | null
+          preferred_time_of_day?: string[]
+          preferred_zip_codes?: string[]
+          updated_at?: string
+          willing_to_travel_outside_area?: boolean
+        }
+        Update: {
+          agency_id?: string
+          caregiver_id?: string
+          created_at?: string
+          desired_hourly_rate?: number | null
+          desired_weekly_earnings?: number | null
+          desired_weekly_hours?: number | null
+          flexibility?: string
+          id?: string
+          is_demo?: boolean
+          max_travel_miles?: number | null
+          max_travel_minutes?: number | null
+          max_weekly_hours?: number | null
+          min_weekly_hours?: number | null
+          notes?: string | null
+          open_to_short_notice?: boolean
+          preferred_care_type_codes?: string[]
+          preferred_cities?: string[]
+          preferred_days?: number[]
+          preferred_end_time?: string | null
+          preferred_start_time?: string | null
+          preferred_time_of_day?: string[]
+          preferred_zip_codes?: string[]
+          updated_at?: string
+          willing_to_travel_outside_area?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "caregiver_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "caregiver_preferences_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: true
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "caregiver_preferences_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: true
             referencedRelation: "caregivers"
             referencedColumns: ["id"]
           },
@@ -1784,6 +2017,7 @@ export type Database = {
         Row: {
           agency_id: string
           ai_match_score: number | null
+          care_request_id: string | null
           care_type_code: string
           caregiver_id: string | null
           client_id: string
@@ -1809,6 +2043,7 @@ export type Database = {
         Insert: {
           agency_id: string
           ai_match_score?: number | null
+          care_request_id?: string | null
           care_type_code: string
           caregiver_id?: string | null
           client_id: string
@@ -1834,6 +2069,7 @@ export type Database = {
         Update: {
           agency_id?: string
           ai_match_score?: number | null
+          care_request_id?: string | null
           care_type_code?: string
           caregiver_id?: string | null
           client_id?: string
@@ -1862,6 +2098,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_care_request_id_fkey"
+            columns: ["care_request_id"]
+            isOneToOne: false
+            referencedRelation: "care_requests"
             referencedColumns: ["id"]
           },
           {
@@ -2362,6 +2605,13 @@ export type Database = {
         | "completed"
         | "no_show"
         | "cancelled"
+      care_request_status:
+        | "new"
+        | "reviewing"
+        | "matched"
+        | "scheduled"
+        | "fulfilled"
+        | "cancelled"
       care_type:
         | "personal_care"
         | "companionship"
@@ -2548,6 +2798,14 @@ export const Constants = {
         "in_progress",
         "completed",
         "no_show",
+        "cancelled",
+      ],
+      care_request_status: [
+        "new",
+        "reviewing",
+        "matched",
+        "scheduled",
+        "fulfilled",
         "cancelled",
       ],
       care_type: [
