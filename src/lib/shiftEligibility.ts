@@ -5,14 +5,18 @@ export type EligibilityIssue = {
   code: string;
   label: string;
   detail: string;
+  /** Soft blockers can be overridden by staff with a written reason. Hard ones never can. */
+  overridable?: boolean;
 };
 
 export type EligibilityResult = {
   /** No hard blockers: the caregiver may take this shift. */
   eligible: boolean;
-  /** Eligible and no soft flags: can be auto-approved without a manager. */
+  /** Eligible and no soft blockers: can be assigned without a manager override. */
   autoApprovable: boolean;
   blockers: EligibilityIssue[];
+  /** Soft blockers — staff may override them with a reason. */
+  overridable: EligibilityIssue[];
   flags: EligibilityIssue[];
   weeklyHours: number;
   projectedWeeklyHours: number;
