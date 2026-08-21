@@ -81,13 +81,23 @@ const AvailableShifts = () => {
     }
   };
 
-  // Self pick-up is intentionally disabled.
-  // A caregiver may not write to shift_assignments directly (RLS 2A: staff-only writes).
-  // This action must run server-side behind a SECURITY DEFINER RPC / edge function that
-  // verifies caller ownership of the caregiver record, that the shift is open, and the
-  // eligibility rules (weekly-hours cap, overlap, travel buffer, approved time off).
-  // Tracked for the server-side rules phase.
-  const PICKUP_ENABLED = false;
+  // Self pick-up runs server-side: caregiver_pick_up_shift verifies caller ownership,
+  // that the shift is open, and every eligibility rule. Caregivers get zero overrides.
+  const [pickingUp, setPickingUp] = useState<string | null>(null);
+
+  const handlePickUp = async (shiftId: string) => {
+    setPickingUp(shiftId);
+    try {
+      await pickUpShift(shiftId);
+      toast.success("Shift picked up");
+      fetchAvailableShifts();
+    } catch (e: any) {
+      toast.error(e.message || "Could not pick up this shift");
+    } finally {
+      setPickingUp(null);
+    }
+  };
+
 
 
   const getCareTypeLabel = (code: string) => {
