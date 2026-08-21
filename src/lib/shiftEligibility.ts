@@ -172,7 +172,7 @@ export async function evaluateEligibility(input: EligibilityInput): Promise<Elig
   }
 
   const buffer = rules.travelBufferMinutes;
-  (sameDayRes.data || []).forEach((other: any) => {
+  (sameDayRes.data || []).map((row: any) => row.shifts).filter((other: any) => other && other.id !== shift.id).forEach((other: any) => {
     const os = toMinutes(hhmm(other.start_time));
     const oe = toMinutes(hhmm(other.end_time));
     if (start < oe && os < end) {
