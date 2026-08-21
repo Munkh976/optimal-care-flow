@@ -127,8 +127,9 @@ const Dashboard = () => {
         supabase.from("clients").select("id", { count: "exact", head: true })
           .eq("agency_id", agencyId).eq("is_active", true),
         supabase.from("caregivers").select("id, is_active").eq("agency_id", agencyId),
-        supabase.from("shifts").select("id, shift_date, status, caregiver_id")
+        supabase.from("shifts").select("id, shift_date, status, shift_assignments ( id, status, caregiver_id )")
           .eq("agency_id", agencyId).gte("shift_date", today).lte("shift_date", iso(weekEnd)),
+
         supabase.from("client_orders").select("id", { count: "exact", head: true })
           .eq("agency_id", agencyId).is("archived_at", null).neq("status", "completed"),
         supabase.from("time_off_requests").select("id", { count: "exact", head: true })
@@ -141,9 +142,12 @@ const Dashboard = () => {
 
     const caregivers = caregiversRes.data || [];
     const weekShifts = weekShiftsRes.data || [];
+    const isAssigned = (s: any) =>
+      (s.shift_assignments || []).some((a: any) => a?.status !== "cancelled");
     const todays = weekShifts.filter((s: any) => s.shift_date === today);
-    const todayUnassigned = todays.filter((s: any) => !s.caregiver_id).length;
-    const weekUnassigned = weekShifts.filter((s: any) => !s.caregiver_id).length;
+    const todayUnassigned = todays.filter((s: any) => !isAssigned(s)).length;
+    const weekUnassigned = weekShifts.filter((s: any) => !isAssigned(s)).length;
+
 
     setStats({
       activeClients: clientsRes.count || 0,
@@ -167,21 +171,24 @@ const Dashboard = () => {
     
     const { data: urgentShifts } = await supabase
       .from("shifts")
-      .select("id, shift_date, start_time, care_type_code, order_title, clients(first_name, last_name), care_types(name)")
+      .select("id, shift_date, start_time, care_type_code, order_title, clients(first_name, last_name), care_types(name), shift_assignments(id, status)")
       .eq("agency_id", agencyId)
-      .is("caregiver_id", null)
       .gte("shift_date", today)
       .lte("shift_date", twoDaysFromNow.toISOString().split('T')[0])
       .order("shift_date", { ascending: true })
-      .limit(5);
+      .limit(50);
 
-    setUrgentRequests((urgentShifts || []).map((shift: any) => ({
-      id: shift.id,
-      client_name: `${shift.clients?.first_name || ''} ${shift.clients?.last_name || ''}`,
-      care_type: shift.care_types?.name || shift.order_title || shift.care_type_code,
-      shift_date: shift.shift_date,
-      start_time: shift.start_time,
-    })));
+    setUrgentRequests((urgentShifts || [])
+      .filter((shift: any) => !isAssigned(shift))
+      .slice(0, 5)
+      .map((shift: any) => ({
+        id: shift.id,
+        client_name: `${shift.clients?.first_name || ''} ${shift.clients?.last_name || ''}`,
+        care_type: shift.care_types?.name || shift.order_title || shift.care_type_code,
+        shift_date: shift.shift_date,
+        start_time: shift.start_time,
+      })));
+
 
     const items: ActionItem[] = [];
     if (weekUnassigned > 0) {

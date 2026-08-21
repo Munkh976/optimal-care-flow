@@ -66,7 +66,12 @@ export const AssignShiftDialog = ({
 
   useEffect(() => {
     if (!open || !shift) return;
-    setCaregiverId(defaultCaregiverId || shift.caregiver_id || "");
+    setCaregiverId(
+      defaultCaregiverId ||
+        (shift.shift_assignments || []).find((a: any) => a?.status !== "cancelled")?.caregiver_id ||
+        ""
+    );
+
     setCareTypeCode(shift.care_type_code || "");
     setStartTime(hhmm(shift.start_time));
     setEndTime(hhmm(shift.end_time));

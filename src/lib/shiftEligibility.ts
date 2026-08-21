@@ -100,18 +100,19 @@ export async function evaluateEligibility(input: EligibilityInput): Promise<Elig
       supabase.from("caregiver_skills").select("care_type_code").eq("caregiver_id", caregiverId),
       supabase.from("caregiver_certifications").select("certification_name, expiry_date").eq("caregiver_id", caregiverId),
       supabase
-        .from("shifts")
-        .select("id, duration_hours")
+        .from("shift_assignments")
+        .select("shift_id, shifts!inner ( id, duration_hours, shift_date )")
         .eq("caregiver_id", caregiverId)
-        .gte("shift_date", weekStart)
-        .lte("shift_date", weekEnd)
-        .neq("id", shift.id),
+        .neq("status", "cancelled" as never)
+        .gte("shifts.shift_date", weekStart)
+        .lte("shifts.shift_date", weekEnd),
       supabase
-        .from("shifts")
-        .select("id, start_time, end_time")
+        .from("shift_assignments")
+        .select("shift_id, shifts!inner ( id, start_time, end_time, shift_date )")
         .eq("caregiver_id", caregiverId)
-        .eq("shift_date", shift.shift_date)
-        .neq("id", shift.id),
+        .neq("status", "cancelled" as never)
+        .eq("shifts.shift_date", shift.shift_date),
+
       supabase
         .from("time_off_requests")
         .select("id")
@@ -171,7 +172,7 @@ export async function evaluateEligibility(input: EligibilityInput): Promise<Elig
   }
 
   const buffer = rules.travelBufferMinutes;
-  (sameDayRes.data || []).forEach((other: any) => {
+  (sameDayRes.data || []).map((row: any) => row.shifts).filter((other: any) => other && other.id !== shift.id).forEach((other: any) => {
     const os = toMinutes(hhmm(other.start_time));
     const oe = toMinutes(hhmm(other.end_time));
     if (start < oe && os < end) {
@@ -189,7 +190,11 @@ export async function evaluateEligibility(input: EligibilityInput): Promise<Elig
     }
   });
 
-  const weeklyHours = (weekRes.data || []).reduce((sum: number, s: any) => sum + Number(s.duration_hours || 0), 0);
+  const weeklyHours = (weekRes.data || [])
+    .map((row: any) => row.shifts)
+    .filter((s: any) => s && s.id !== shift.id)
+    .reduce((sum: number, s: any) => sum + Number(s.duration_hours || 0), 0);
+
   const projectedWeeklyHours = Math.round((weeklyHours + Number(shiftHours)) * 100) / 100;
   if (projectedWeeklyHours > rules.maxWeeklyHours) {
     blockers.push({

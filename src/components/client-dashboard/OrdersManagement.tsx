@@ -339,7 +339,6 @@ export const OrdersManagement = ({
           shiftsToCreate.push({
             client_id: clientProfile.id,
             agency_id: clientProfile.agency_id,
-            caregiver_id: bookingData.caregiver.id,
             order_id: newOrder.id,
             shift_date: shiftDate,
             start_time: startTime,
@@ -355,11 +354,25 @@ export const OrdersManagement = ({
         }
       }
 
-      const { error: shiftsError } = await supabase
+      const { data: createdShifts, error: shiftsError } = await supabase
         .from("shifts")
-        .insert(shiftsToCreate);
+        .insert(shiftsToCreate)
+        .select("id");
 
       if (shiftsError) throw shiftsError;
+
+      // shift_assignments is the source of truth for who works a shift.
+      if (bookingData.caregiver?.id && createdShifts?.length) {
+        const { error: assignError } = await supabase.from("shift_assignments").insert(
+          createdShifts.map((s: any) => ({
+            shift_id: s.id,
+            caregiver_id: bookingData.caregiver.id,
+            status: "scheduled" as never,
+            assignment_method: "manual" as never,
+          }))
+        );
+        if (assignError) throw assignError;
+      }
 
       toast.success("Care plan submitted successfully!");
       setStep(3);

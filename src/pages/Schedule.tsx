@@ -236,13 +236,15 @@ const Schedule = () => {
 
   const getAssignedCaregiver = useCallback(
     (shift: any) => {
-      const assignment = shiftAssignments.find((a) => a.shift_id === shift.id);
-      const caregiverId = assignment?.caregiver_id || shift.caregiver_id;
-      if (!caregiverId) return null;
-      return caregivers.find((c) => c.id === caregiverId) || null;
+      const assignment = shiftAssignments.find(
+        (a) => a.shift_id === shift.id && a.status !== "cancelled"
+      );
+      if (!assignment?.caregiver_id) return null;
+      return caregivers.find((c) => c.id === assignment.caregiver_id) || null;
     },
     [shiftAssignments, caregivers]
   );
+
 
   const filteredShifts = useMemo(() => {
     return shifts.filter((s) => {

@@ -34,17 +34,18 @@ export const CareTeam = ({ clientId }: CareTeamProps) => {
     if (!clientId) return;
 
     try {
-      // Get caregivers assigned to this client's shifts
+      // Get caregivers assigned to this client's shifts (source of truth: shift_assignments)
       const { data: shifts, error: shiftsError } = await supabase
-        .from("shifts")
-        .select("caregiver_id")
-        .eq("client_id", clientId)
-        .not("caregiver_id", "is", null);
+        .from("shift_assignments")
+        .select("caregiver_id, status, shifts!inner ( client_id )")
+        .neq("status", "cancelled")
+        .eq("shifts.client_id", clientId);
 
       if (shiftsError) throw shiftsError;
 
       if (shifts && shifts.length > 0) {
-        const caregiverIds = [...new Set(shifts.map(s => s.caregiver_id))].filter(Boolean);
+        const caregiverIds = [...new Set(shifts.map((a: any) => a.caregiver_id))].filter(Boolean);
+
 
         const { data: caregiversData, error: caregiversError } = await supabase
           .from("caregivers")

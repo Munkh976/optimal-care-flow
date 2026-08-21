@@ -121,14 +121,17 @@ const ClientDashboard = () => {
         .gte("shift_date", today)
         .lte("shift_date", nextWeek.toISOString().split('T')[0]);
       
-      // Fetch caregivers
+      // Fetch caregivers (source of truth: shift_assignments)
       const { data: caregiverShifts } = await supabase
-        .from("shifts")
-        .select("caregiver_id")
-        .eq("client_id", clientData.id)
-        .not("caregiver_id", "is", null);
-      
-      const uniqueCaregivers = new Set(caregiverShifts?.map(s => s.caregiver_id) || []);
+        .from("shift_assignments")
+        .select("caregiver_id, status, shifts!inner ( client_id )")
+        .neq("status", "cancelled")
+        .eq("shifts.client_id", clientData.id);
+
+      const uniqueCaregivers = new Set(
+        (caregiverShifts || []).map((a: any) => a.caregiver_id).filter(Boolean)
+      );
+
       
       // Calculate total hours this month
       const monthStart = new Date();

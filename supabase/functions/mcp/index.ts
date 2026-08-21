@@ -147,7 +147,13 @@ var assign_caregiver_to_shift_default = defineTool6({
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ shift_id, caregiver_id }, ctx) => {
     if (!ctx.isAuthenticated()) return errorResult("Not authenticated");
-    const { data, error } = await supabaseForUser(ctx).from("shifts").update({ caregiver_id, status: "assigned" }).eq("id", shift_id).select("id, shift_date, start_time, end_time, status, caregiver_id");
+    const client = supabaseForUser(ctx);
+    const { data: existing, error: existingError } = await client.from("shift_assignments").select("id").eq("shift_id", shift_id).neq("status", "completed").limit(1);
+    if (existingError) return errorResult(existingError.message);
+    const mutation = existing?.length ? client.from("shift_assignments").update({ caregiver_id, status: "scheduled" }).eq("id", existing[0].id) : client.from("shift_assignments").insert({ shift_id, caregiver_id, status: "scheduled", assignment_method: "manual" });
+    const { error: assignError } = await mutation;
+    if (assignError) return errorResult(assignError.message);
+    const { data, error } = await client.from("shifts").select("id, shift_date, start_time, end_time, status, caregiver_id").eq("id", shift_id);
     if (error) return errorResult(error.message);
     if (!data?.length) return errorResult("Shift not found or you do not have permission to update it.");
     return textResult({ shift: data[0] });

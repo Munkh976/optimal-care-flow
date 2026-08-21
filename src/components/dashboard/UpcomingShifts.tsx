@@ -21,7 +21,7 @@ const UpcomingShifts = () => {
         .select(`
           *,
           clients:client_id (first_name, last_name, city),
-          caregivers:caregiver_id (first_name, last_name)
+          shift_assignments (status, caregivers (first_name, last_name))
         `)
         .eq("agency_id", user.id)
         .gte("shift_date", today)
@@ -127,11 +127,12 @@ const UpcomingShifts = () => {
                       </span>
                     )}
                   </div>
-                  {shift.caregivers && (
+                  {shift.shift_assignments?.find((a: any) => a?.status !== "cancelled")?.caregivers && (
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <User className="h-3 w-3" />
                       <span>
-                        {shift.caregivers.first_name} {shift.caregivers.last_name}
+                        {shift.shift_assignments.find((a: any) => a?.status !== "cancelled").caregivers.first_name}{" "}
+                        {shift.shift_assignments.find((a: any) => a?.status !== "cancelled").caregivers.last_name}
                       </span>
                     </div>
                   )}

@@ -105,16 +105,9 @@ const AvailableShifts = () => {
 
       if (assignError) throw assignError;
 
-      // Update shift status
-      const { error: updateError } = await supabase
-        .from("shifts")
-        .update({ 
-          status: "assigned",
-          caregiver_id: caregiverId 
-        })
-        .eq("id", shiftId);
+      // shifts.caregiver_id / status are derived from the assignment by a DB trigger.
 
-      if (updateError) throw updateError;
+
 
       toast.success("Shift picked up successfully!");
       fetchCaregiverAndShifts();
