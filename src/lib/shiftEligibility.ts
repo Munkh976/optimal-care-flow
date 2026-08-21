@@ -79,11 +79,44 @@ export type EligibilityInput = {
 
 const hhmm = (t: string) => (t || "").slice(0, 5);
 
+type ServerIssue = { code: string; label: string; detail: string };
+
 /**
  * Single source of truth for "can this caregiver take this shift?".
- * Used by the trade board, Assign Shift dialog and Smart Assign.
+ * The database function `check_assignment_eligibility` is authoritative — the
+ * same rules the assignment RPC enforces on write. The local implementation
+ * below is only a fallback preview when the RPC is unreachable.
  */
 export async function evaluateEligibility(input: EligibilityInput): Promise<EligibilityResult> {
+  const { data, error } = await supabase.rpc("check_assignment_eligibility" as never, {
+    _shift_id: input.shift.id,
+    _caregiver_id: input.caregiverId,
+  } as never);
+
+  if (error || !data) return evaluateEligibilityLocal(input);
+
+  const r = data as unknown as {
+    hard: ServerIssue[];
+    soft: ServerIssue[];
+    advisory: ServerIssue[];
+    weekly_hours: number;
+    projected_weekly_hours: number;
+  };
+  const hard = (r.hard || []).map((i) => ({ ...i, overridable: false }));
+  const soft = (r.soft || []).map((i) => ({ ...i, overridable: true }));
+  return {
+    eligible: hard.length === 0,
+    autoApprovable: hard.length === 0 && soft.length === 0,
+    blockers: [...hard, ...soft],
+    overridable: soft,
+    flags: (r.advisory || []).map((i) => ({ ...i, overridable: true })),
+    weeklyHours: Number(r.weekly_hours ?? 0),
+    projectedWeeklyHours: Number(r.projected_weekly_hours ?? 0),
+  };
+}
+
+/** Client-side preview of the same rules; used only as an offline fallback. */
+export async function evaluateEligibilityLocal(input: EligibilityInput): Promise<EligibilityResult> {
   const rules = input.rules ?? DEFAULT_RULES;
   const { caregiverId, shift } = input;
   const blockers: EligibilityIssue[] = [];
