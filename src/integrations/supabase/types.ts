@@ -1239,7 +1239,7 @@ export type Database = {
       }
       profiles: {
         Row: {
-          agency_id: string
+          agency_id: string | null
           business_license: string | null
           created_at: string | null
           default_ft_min_hours: number | null
@@ -1253,7 +1253,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          agency_id: string
+          agency_id?: string | null
           business_license?: string | null
           created_at?: string | null
           default_ft_min_hours?: number | null
@@ -1267,7 +1267,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          agency_id?: string
+          agency_id?: string | null
           business_license?: string | null
           created_at?: string | null
           default_ft_min_hours?: number | null
