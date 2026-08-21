@@ -142,9 +142,12 @@ const Dashboard = () => {
 
     const caregivers = caregiversRes.data || [];
     const weekShifts = weekShiftsRes.data || [];
+    const isAssigned = (s: any) =>
+      (s.shift_assignments || []).some((a: any) => a?.status !== "cancelled");
     const todays = weekShifts.filter((s: any) => s.shift_date === today);
-    const todayUnassigned = todays.filter((s: any) => !s.caregiver_id).length;
-    const weekUnassigned = weekShifts.filter((s: any) => !s.caregiver_id).length;
+    const todayUnassigned = todays.filter((s: any) => !isAssigned(s)).length;
+    const weekUnassigned = weekShifts.filter((s: any) => !isAssigned(s)).length;
+
 
     setStats({
       activeClients: clientsRes.count || 0,
