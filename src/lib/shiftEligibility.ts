@@ -190,7 +190,11 @@ export async function evaluateEligibility(input: EligibilityInput): Promise<Elig
     }
   });
 
-  const weeklyHours = (weekRes.data || []).reduce((sum: number, s: any) => sum + Number(s.duration_hours || 0), 0);
+  const weeklyHours = (weekRes.data || [])
+    .map((row: any) => row.shifts)
+    .filter((s: any) => s && s.id !== shift.id)
+    .reduce((sum: number, s: any) => sum + Number(s.duration_hours || 0), 0);
+
   const projectedWeeklyHours = Math.round((weeklyHours + Number(shiftHours)) * 100) / 100;
   if (projectedWeeklyHours > rules.maxWeeklyHours) {
     blockers.push({
