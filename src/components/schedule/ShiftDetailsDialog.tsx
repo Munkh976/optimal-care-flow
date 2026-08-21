@@ -13,7 +13,8 @@ export const ShiftDetailsDialog = ({ shift, open, onOpenChange, onAssign }: Shif
   if (!shift) return null;
 
   const isUnassigned =
-    (!shift.shift_assignments || shift.shift_assignments.length === 0) && !shift.caregiver_id;
+    !(shift.shift_assignments || []).some((a: any) => a?.status !== "cancelled");
+
 
   // Different views pass either `clients`/`care_types` (Supabase relations) or
   // pre-mapped `client`/`care_type` objects — support both.
