@@ -127,8 +127,9 @@ const Dashboard = () => {
         supabase.from("clients").select("id", { count: "exact", head: true })
           .eq("agency_id", agencyId).eq("is_active", true),
         supabase.from("caregivers").select("id, is_active").eq("agency_id", agencyId),
-        supabase.from("shifts").select("id, shift_date, status, caregiver_id")
+        supabase.from("shifts").select("id, shift_date, status, shift_assignments ( id, status, caregiver_id )")
           .eq("agency_id", agencyId).gte("shift_date", today).lte("shift_date", iso(weekEnd)),
+
         supabase.from("client_orders").select("id", { count: "exact", head: true })
           .eq("agency_id", agencyId).is("archived_at", null).neq("status", "completed"),
         supabase.from("time_off_requests").select("id", { count: "exact", head: true })
