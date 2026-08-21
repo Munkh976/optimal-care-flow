@@ -100,18 +100,19 @@ export async function evaluateEligibility(input: EligibilityInput): Promise<Elig
       supabase.from("caregiver_skills").select("care_type_code").eq("caregiver_id", caregiverId),
       supabase.from("caregiver_certifications").select("certification_name, expiry_date").eq("caregiver_id", caregiverId),
       supabase
-        .from("shifts")
-        .select("id, duration_hours")
+        .from("shift_assignments")
+        .select("shift_id, shifts!inner ( id, duration_hours, shift_date )")
         .eq("caregiver_id", caregiverId)
-        .gte("shift_date", weekStart)
-        .lte("shift_date", weekEnd)
-        .neq("id", shift.id),
+        .neq("status", "cancelled" as never)
+        .gte("shifts.shift_date", weekStart)
+        .lte("shifts.shift_date", weekEnd),
       supabase
-        .from("shifts")
-        .select("id, start_time, end_time")
+        .from("shift_assignments")
+        .select("shift_id, shifts!inner ( id, start_time, end_time, shift_date )")
         .eq("caregiver_id", caregiverId)
-        .eq("shift_date", shift.shift_date)
-        .neq("id", shift.id),
+        .neq("status", "cancelled" as never)
+        .eq("shifts.shift_date", shift.shift_date),
+
       supabase
         .from("time_off_requests")
         .select("id")
