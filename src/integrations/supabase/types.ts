@@ -1782,6 +1782,7 @@ export type Database = {
       }
       time_off_requests: {
         Row: {
+          agency_id: string
           approved_by_user_id: string | null
           caregiver_id: string
           created_at: string | null
@@ -1795,6 +1796,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          agency_id: string
           approved_by_user_id?: string | null
           caregiver_id: string
           created_at?: string | null
@@ -1808,6 +1810,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          agency_id?: string
           approved_by_user_id?: string | null
           caregiver_id?: string
           created_at?: string | null
@@ -1821,6 +1824,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "time_off_requests_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "time_off_requests_caregiver_id_fkey"
             columns: ["caregiver_id"]
@@ -1904,6 +1914,7 @@ export type Database = {
         Args: { caregiver_email: string }
         Returns: undefined
       }
+      caregiver_agency_id: { Args: { _caregiver_id: string }; Returns: string }
       create_flow_draft: { Args: { p_flow_id: string }; Returns: string }
       current_agency_id: { Args: never; Returns: string }
       discard_flow_draft: { Args: { p_draft_id: string }; Returns: undefined }
