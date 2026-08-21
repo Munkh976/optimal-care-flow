@@ -8,7 +8,17 @@ export type AssignShiftInput = {
   endTime: string; // HH:mm
   notes?: string | null;
   method?: "manual" | "ai_suggested" | "auto_assigned";
+  /** Required when the server reports SOFT blockers (weekly cap, time off, availability). */
+  overrideReason?: string | null;
 };
+
+/** Thrown when the database refuses an assignment because a soft rule needs an override. */
+export class OverrideRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OverrideRequiredError";
+  }
+}
 
 export const toMinutes = (t: string) => {
   const [h, m] = (t || "").split(":").map(Number);
