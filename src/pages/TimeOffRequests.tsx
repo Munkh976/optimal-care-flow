@@ -141,6 +141,7 @@ const TimeOffRequests = () => {
     
     const { error } = await supabase
       .from("time_off_requests")
+      // agency_id is derived server-side from the caregiver record
       .insert([{
         caregiver_id: parsed.data.caregiver_id,
         start_date: parsed.data.start_date,
@@ -148,7 +149,7 @@ const TimeOffRequests = () => {
         request_type: parsed.data.request_type,
         reason: parsed.data.reason ?? "",
         status: "pending" as const
-      }]);
+      }] as any);
 
     if (error) {
       toast({
