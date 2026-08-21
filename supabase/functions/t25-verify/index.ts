@@ -14,10 +14,15 @@ Deno.serve(async () => {
   await client.connect();
   const results: any[] = [];
   const run = async (name: string, sql: string, expect: "ok" | "fail") => {
+    await client.queryArray("SAVEPOINT sp");
     try {
       const r = await client.queryObject(sql);
-      results.push({ test: name, expected: expect, outcome: "ok", rows: r.rows });
+      await client.queryArray("RESET ROLE");
+      await client.queryArray("RELEASE SAVEPOINT sp");
+      results.push({ test: name, expected: expect, outcome: "ok", rows: r.rows.map((x) => JSON.parse(JSON.stringify(x, (_k, v) => typeof v === "bigint" ? Number(v) : v))) });
     } catch (e) {
+      await client.queryArray("ROLLBACK TO SAVEPOINT sp").catch(() => {});
+      await client.queryArray("RESET ROLE").catch(() => {});
       results.push({ test: name, expected: expect, outcome: "error", message: String((e as Error).message) });
     }
   };
