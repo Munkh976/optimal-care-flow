@@ -1,0 +1,1 @@
+REVOKE ALL ON public.demo_purge_audit FROM anon;
