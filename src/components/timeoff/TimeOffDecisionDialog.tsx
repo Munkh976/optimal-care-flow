@@ -16,6 +16,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { queueNotification } from "@/lib/notifications";
+import { releaseShiftAssignments } from "@/lib/shiftAssignment";
 
 type Decision = "approved" | "denied";
 
