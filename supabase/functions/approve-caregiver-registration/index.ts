@@ -59,7 +59,7 @@ serve(async (req) => {
     if (!callerProfile?.agency_id) return json({ error: 'Your profile is missing an agency' }, 400);
 
     const agencyId = callerProfile.agency_id as string;
-    if (agencyId === SYSTEM_AGENCY_ID) {
+    if (agencyId === LEGACY_SYSTEM_AGENCY_ID) {
       return json({ error: 'Use an agency admin or manager account to review caregiver applications' }, 403);
     }
 
@@ -145,7 +145,7 @@ serve(async (req) => {
       .eq('id', authUserId)
       .maybeSingle();
 
-    if (existingProfile?.agency_id && ![agencyId, SYSTEM_AGENCY_ID].includes(existingProfile.agency_id)) {
+    if (existingProfile?.agency_id && ![agencyId, LEGACY_SYSTEM_AGENCY_ID].includes(existingProfile.agency_id)) {
       return json({ error: 'An account with this email is already linked to another agency' }, 400);
     }
 
