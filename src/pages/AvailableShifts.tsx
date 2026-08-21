@@ -81,41 +81,14 @@ const AvailableShifts = () => {
     }
   };
 
-  const handlePickUpShift = async (shiftId: string) => {
-    if (!caregiverId) {
-      toast.error("Caregiver profile not found");
-      return;
-    }
+  // Self pick-up is intentionally disabled.
+  // A caregiver may not write to shift_assignments directly (RLS 2A: staff-only writes).
+  // This action must run server-side behind a SECURITY DEFINER RPC / edge function that
+  // verifies caller ownership of the caregiver record, that the shift is open, and the
+  // eligibility rules (weekly-hours cap, overlap, travel buffer, approved time off).
+  // Tracked for the server-side rules phase.
+  const PICKUP_ENABLED = false;
 
-    if (!shiftId) {
-      toast.error("Invalid shift");
-      return;
-    }
-
-    try {
-      // Create assignment
-      const { error: assignError } = await supabase
-        .from("shift_assignments")
-        .insert({
-          shift_id: shiftId,
-          caregiver_id: caregiverId,
-          status: "scheduled",
-          assignment_method: "picked_up"
-        });
-
-      if (assignError) throw assignError;
-
-      // shifts.caregiver_id / status are derived from the assignment by a DB trigger.
-
-
-
-      toast.success("Shift picked up successfully!");
-      fetchCaregiverAndShifts();
-    } catch (error: any) {
-      console.error("Error:", error);
-      toast.error(error.message || "Failed to pick up shift");
-    }
-  };
 
   const getCareTypeLabel = (code: string) => {
     return code.split('_').map(word => 
@@ -232,14 +205,14 @@ const AvailableShifts = () => {
                         {getCareTypeLabel(shift.care_type_code)}
                       </Badge>
                     </div>
-                    <Button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePickUpShift(shift.id);
-                      }}
+                    <Button
+                      disabled={!PICKUP_ENABLED}
+                      title="Self pick-up is temporarily unavailable — ask your scheduler to assign this shift."
+                      onClick={(e) => e.stopPropagation()}
                     >
                       Pick Up Shift
                     </Button>
+
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
