@@ -148,10 +148,13 @@ var assign_caregiver_to_shift_default = defineTool6({
   handler: async ({ shift_id, caregiver_id }, ctx) => {
     if (!ctx.isAuthenticated()) return errorResult("Not authenticated");
     const client = supabaseForUser(ctx);
-    const { data: existing, error: existingError } = await client.from("shift_assignments").select("id").eq("shift_id", shift_id).neq("status", "completed").limit(1);
-    if (existingError) return errorResult(existingError.message);
-    const mutation = existing?.length ? client.from("shift_assignments").update({ caregiver_id, status: "scheduled" }).eq("id", existing[0].id) : client.from("shift_assignments").insert({ shift_id, caregiver_id, status: "scheduled", assignment_method: "manual" });
-    const { error: assignError } = await mutation;
+    const { error: assignError } = await client.rpc("assign_caregiver_to_shift", {
+      _shift_id: shift_id,
+      _caregiver_id: caregiver_id,
+      _method: "manual",
+      _notes: null,
+      _override_reason: null
+    });
     if (assignError) return errorResult(assignError.message);
     const { data, error } = await client.from("shifts").select("id, shift_date, start_time, end_time, status, caregiver_id").eq("id", shift_id);
     if (error) return errorResult(error.message);
