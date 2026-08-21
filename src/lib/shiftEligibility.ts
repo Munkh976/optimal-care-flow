@@ -337,6 +337,7 @@ export async function evaluateEligibilityLocal(input: EligibilityInput): Promise
     eligible: blockers.length === 0,
     autoApprovable: blockers.length === 0 && flags.length === 0,
     blockers,
+    overridable: [],
     flags,
     weeklyHours: Math.round(weeklyHours * 100) / 100,
     projectedWeeklyHours,
