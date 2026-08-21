@@ -1303,6 +1303,121 @@ export type Database = {
         }
         Relationships: []
       }
+      earnings_lines: {
+        Row: {
+          agency_id: string
+          caregiver_id: string
+          computed_at: string
+          computed_by: string | null
+          created_at: string
+          gross_amount: number
+          hours_used: number
+          id: string
+          is_demo: boolean
+          overtime_amount: number
+          overtime_hours: number
+          overtime_rate: number | null
+          rate_source: Database["public"]["Enums"]["earnings_rate_source"]
+          rate_used: number
+          regular_amount: number
+          regular_hours: number
+          shift_assignment_id: string
+          shift_id: string
+          status: Database["public"]["Enums"]["earnings_line_status"]
+          time_entry_id: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          caregiver_id: string
+          computed_at?: string
+          computed_by?: string | null
+          created_at?: string
+          gross_amount?: number
+          hours_used: number
+          id?: string
+          is_demo?: boolean
+          overtime_amount?: number
+          overtime_hours?: number
+          overtime_rate?: number | null
+          rate_source: Database["public"]["Enums"]["earnings_rate_source"]
+          rate_used: number
+          regular_amount?: number
+          regular_hours?: number
+          shift_assignment_id: string
+          shift_id: string
+          status?: Database["public"]["Enums"]["earnings_line_status"]
+          time_entry_id: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          caregiver_id?: string
+          computed_at?: string
+          computed_by?: string | null
+          created_at?: string
+          gross_amount?: number
+          hours_used?: number
+          id?: string
+          is_demo?: boolean
+          overtime_amount?: number
+          overtime_hours?: number
+          overtime_rate?: number | null
+          rate_source?: Database["public"]["Enums"]["earnings_rate_source"]
+          rate_used?: number
+          regular_amount?: number
+          regular_hours?: number
+          shift_assignment_id?: string
+          shift_id?: string
+          status?: Database["public"]["Enums"]["earnings_line_status"]
+          time_entry_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "earnings_lines_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "earnings_lines_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "earnings_lines_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "earnings_lines_shift_assignment_id_fkey"
+            columns: ["shift_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "shift_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "earnings_lines_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "earnings_lines_time_entry_id_fkey"
+            columns: ["time_entry_id"]
+            isOneToOne: false
+            referencedRelation: "time_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       families: {
         Row: {
           agency_id: string
@@ -2217,6 +2332,111 @@ export type Database = {
         }
         Relationships: []
       }
+      time_entries: {
+        Row: {
+          agency_id: string
+          approved_at: string | null
+          approved_by: string | null
+          break_minutes: number
+          caregiver_id: string
+          created_at: string
+          created_by: string | null
+          ended_at: string
+          hours_worked: number
+          id: string
+          is_demo: boolean
+          mileage: number | null
+          notes: string | null
+          shift_assignment_id: string
+          shift_id: string
+          source: Database["public"]["Enums"]["time_entry_source"]
+          started_at: string
+          status: Database["public"]["Enums"]["time_entry_status"]
+          updated_at: string
+          voided_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          approved_at?: string | null
+          approved_by?: string | null
+          break_minutes?: number
+          caregiver_id: string
+          created_at?: string
+          created_by?: string | null
+          ended_at: string
+          hours_worked: number
+          id?: string
+          is_demo?: boolean
+          mileage?: number | null
+          notes?: string | null
+          shift_assignment_id: string
+          shift_id: string
+          source?: Database["public"]["Enums"]["time_entry_source"]
+          started_at: string
+          status?: Database["public"]["Enums"]["time_entry_status"]
+          updated_at?: string
+          voided_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          break_minutes?: number
+          caregiver_id?: string
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string
+          hours_worked?: number
+          id?: string
+          is_demo?: boolean
+          mileage?: number | null
+          notes?: string | null
+          shift_assignment_id?: string
+          shift_id?: string
+          source?: Database["public"]["Enums"]["time_entry_source"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["time_entry_status"]
+          updated_at?: string
+          voided_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "time_entries_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_shift_assignment_id_fkey"
+            columns: ["shift_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "shift_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_off_requests: {
         Row: {
           agency_id: string
@@ -2462,6 +2682,19 @@ export type Database = {
         Args: { _caregiver_id: string; _shift_id: string }
         Returns: Json
       }
+      compute_earnings_batch: {
+        Args: {
+          _agency_id: string
+          _from: string
+          _recompute?: boolean
+          _to: string
+        }
+        Returns: Json
+      }
+      compute_earnings_for_time_entry: {
+        Args: { _recompute?: boolean; _time_entry_id: string }
+        Returns: Json
+      }
       create_flow_draft: { Args: { p_flow_id: string }; Returns: string }
       current_agency_id: { Args: never; Returns: string }
       derived_shift_caregiver: { Args: { _shift_id: string }; Returns: string }
@@ -2625,6 +2858,8 @@ export type Database = {
         | "completed"
         | "abandoned"
         | "submitted"
+      earnings_line_status: "calculated" | "voided"
+      earnings_rate_source: "shift" | "caregiver"
       flow_audience: "caregiver_screening" | "family_intake" | "general"
       flow_node_type:
         | "single_select"
@@ -2642,6 +2877,8 @@ export type Database = {
         | "completed"
         | "cancelled"
         | "unassigned"
+      time_entry_source: "clock" | "manual" | "correction" | "import"
+      time_entry_status: "draft" | "submitted" | "approved" | "rejected"
       trade_status:
         | "pending"
         | "accepted"
@@ -2823,6 +3060,8 @@ export const Constants = {
         "abandoned",
         "submitted",
       ],
+      earnings_line_status: ["calculated", "voided"],
+      earnings_rate_source: ["shift", "caregiver"],
       flow_audience: ["caregiver_screening", "family_intake", "general"],
       flow_node_type: [
         "single_select",
@@ -2842,6 +3081,8 @@ export const Constants = {
         "cancelled",
         "unassigned",
       ],
+      time_entry_source: ["clock", "manual", "correction", "import"],
+      time_entry_status: ["draft", "submitted", "approved", "rejected"],
       trade_status: ["pending", "accepted", "declined", "cancelled", "expired"],
       trade_type: ["trade_board", "direct_trade", "agency_coverage"],
     },
