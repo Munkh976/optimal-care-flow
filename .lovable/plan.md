@@ -1,35 +1,124 @@
-# Lemonade-style conversation UX for /assistant
+# 2C-1 Step 1 — Proposed model: Virtual Office + Families (additive only)
 
-Rebuild the caregiver screening surface as a single scrolling, white, mobile-first conversation with section dots, inline answer buttons, and a bottom sheet for multi-select / free-text steps. No database migration is required — everything needed (prompt, helper_text, node_type, allow_skip, allow_free_text, free_text_label, options) already exists in `flow_nodes` / `flow_options`, and answered history already lives in the flow engine state.
+No UI. No changes to 2A RLS on existing tables, 2B triggers, or 2.5 eligibility functions.
 
-## What gets built
+## A. virtual_office
 
-**New conversation surface** (replaces `ChatWidget` on `/assistant` for the caregiver flow; the existing widget stays available for the family intake / registration embed until the new one is proven, then both switch over).
+One agency owns many virtual offices; a VO is an operational sub-unit, never a tenant.
 
-Structure, top to bottom:
-- Back arrow, top left — rewinds one question (uses existing `back()`); hidden on the first question.
-- Centered section title in gray medium weight ("Your background", etc.).
-- Dot progress row under the title — teal dots for answered questions in the current section, gray for upcoming. Title + dot count animate when the section changes.
-- Scrolling transcript: each answered question renders as bold black question text (left aligned, 24px padding) followed by a gray rounded pill aligned right, with a small circular pencil button to the pill's left that rewinds to that question.
-- Current question: bold black text, optional gray helper text, then either inline buttons (Pattern A) or the "Answer" trigger (Pattern B).
-- Gray "Skip this question →" link when `allow_skip` is true.
-- Typing indicator: three animated dots for 400ms after each answer, then the next question fades in and the view scrolls to it.
+```
+virtual_office
+  id                 uuid PK default gen_random_uuid()
+  agency_id          uuid NOT NULL  FK -> agency(id) ON DELETE CASCADE
+  name               text NOT NULL
+  code               text NULL            -- short label e.g. "VO-MI"
+  is_primary         boolean NOT NULL default false
+  is_active          boolean NOT NULL default true
+  timezone           text NOT NULL default 'America/New_York'
+  -- branding
+  branding           jsonb NOT NULL default '{}'   -- logo_url, colors, display_name
+  -- service area
+  service_states     text[] NOT NULL default '{}'
+  service_zipcodes   text[] NOT NULL default '{}'
+  service_area       jsonb NOT NULL default '{}'   -- future radius/geo detail
+  -- operating hours
+  operating_hours    jsonb NOT NULL default '{}'   -- { "1": [{"start":"08:00","end":"18:00"}], ... }
+  -- scheduling overrides (NULL = inherit from agency)
+  max_weekly_hours       integer NULL
+  travel_buffer_minutes  integer NULL
+  late_trade_hours       integer NULL
+  smart_match_weights    jsonb NULL
+  contact_email      text NULL
+  contact_phone      text NULL
+  address/city/state/zip_code  text NULL
+  is_demo            boolean NOT NULL default false
+  created_at/updated_at timestamptz NOT NULL default now()
+```
 
-**Pattern A — inline buttons.** Single-select nodes with 4 or fewer options: full-width rounded rectangle buttons, white fill, light gray border, bold centered text, optional leading care-context icon. Tapping hides the buttons instantly, shows the pill, runs the typing delay, reveals the next question.
+Constraints: `UNIQUE (agency_id, name)`; partial `UNIQUE (agency_id) WHERE is_primary` (one primary per agency); `updated_at` trigger reusing `update_updated_at_column()`.
 
-**Pattern B — bottom sheet.** Multi-select nodes, free-text nodes, and the focused single-select (Q1 experience): the question shows a teal "Answer" button / "Tap to select…" placeholder row. Tapping opens a bottom sheet with a handle bar, the question repeated as heading, teal checkboxes (multi-select) or a large textarea using `free_text_label` as placeholder, and a teal "Continue" button. On Continue the sheet closes, the pill appears, typing indicator runs, next question fades in.
+**jsonb vs child tables:** service area and operating hours stay jsonb (plus scalar `service_states`/`service_zipcodes` arrays for indexable matching). They are read whole, written whole, and never joined/aggregated — child tables would add joins and RLS surface with no query benefit. Revisit only if we need per-window scheduling queries.
 
-Pattern selection is derived from the node itself — `node_type` multi-select or free-text → Pattern B; single-select with ≤4 options → Pattern A; single-select with more options also falls back to Pattern B. This keeps managers' Flow Builder edits working without a hardcoded question list.
+**Scheduling rules — inherit with override:** the four agency columns stay exactly as they are and 2.5 keeps reading them. `virtual_office` carries the same four columns as NULLable overrides. When VO becomes real we introduce a resolver (`effective_scheduling_rules(vo_id)` = `COALESCE(vo.col, agency.col)`) and switch eligibility to it in a later phase. Nothing in this phase reads the override columns — they are inert storage.
 
-**Pill summaries:** single answer → the label; multi-select → first item + "and X more" past two items; free text → the text, truncated; skipped → "Skipped".
+## B. families
 
-**Sections:** a small client-side config maps each question's position in the published flow order to one of the five sections (Your background 3, Your availability 3, Your qualifications 1, How you care 2, Getting started 3), with a safe fallback that groups any extra questions into the final section so a manager adding a question never breaks the header.
+Target: Agency → Virtual Office → Family → Client → Care Plan → Care Request.
 
-## Technical details
+```
+families
+  id                 uuid PK
+  agency_id          uuid NOT NULL FK -> agency(id) ON DELETE CASCADE
+  virtual_office_id  uuid NULL FK -> virtual_office(id) ON DELETE SET NULL
+  family_name        text NOT NULL          -- e.g. "Johnson Family"
+  notes              text NULL
+  is_active          boolean NOT NULL default true
+  is_demo            boolean NOT NULL default false
+  created_at/updated_at timestamptz NOT NULL
+```
 
-- New files: `src/components/chat/ConversationSurface.tsx` (layout, transcript, typing indicator, section header), `src/components/chat/AnswerSheet.tsx` (bottom sheet built on the existing shadcn Sheet with `side="bottom"`), `src/components/chat/AnswerPill.tsx`, `src/components/chat/SectionProgress.tsx`, `src/lib/conversationSections.ts`.
-- `src/pages/Assistant.tsx` renders the new surface for the caregiver flow; the topic chooser and family intake path are kept.
-- Colors, radii, and the teal accent are added as semantic tokens in `index.css` / `tailwind.config.ts` (`--conversation-accent`, pill and border tokens) — no hardcoded hex in components. Light surface is forced for this page only.
-- Reuses `useConversationFlow` unchanged: `answer()`, `back()`, `complete()`, `state.answers` for transcript, `flow.nodes` for section math. `linkRegistration` / completion callbacks keep working so caregiver registration and the manager screening review are unaffected.
-- Existing `QuestionCard` / `NavControls` / `ChatWidget` stay for the embedded registration step in this pass.
-- Verified in the browser with Playwright: full run through all questions, back/pencil rewind, skip, and sheet interactions, at mobile and desktop widths.
+Minimal split: families holds *grouping* only. No address, phone, or email duplicated from clients — clients keep every field they have today.
+
+```
+family_contacts                       -- recommended: child table, not columns
+  id                 uuid PK
+  family_id          uuid NOT NULL FK -> families(id) ON DELETE CASCADE
+  user_id            uuid NULL FK -> auth.users(id) ON DELETE SET NULL
+  first_name         text NOT NULL
+  last_name          text NOT NULL
+  email              text NULL
+  phone              text NULL
+  relationship       text NULL            -- daughter, POA, spouse
+  is_primary         boolean NOT NULL default false
+  is_decision_maker  boolean NOT NULL default false
+  is_demo            boolean NOT NULL default false
+  created_at/updated_at timestamptz NOT NULL
+```
+
+Child table wins: a family realistically has several decision-makers (daughter + POA + spouse), each potentially a login. Flattening to columns caps it arbitrarily and blocks per-contact auth linkage.
+
+**Existing clients:** add `clients.family_id uuid NULL FK -> families(id) ON DELETE SET NULL`. Backfill one family per existing client (1:1, name = `"<last_name> Family"`). No client column is modified other than setting the new `family_id`. Client Management UI is untouched — `family_id` is nullable and unused by current code.
+
+**Existing rows → virtual_office:** recommend the least-disruptive path — auto-create one primary VO per agency now, and add nullable `virtual_office_id` to `clients`, `caregivers`, and `families` only, backfilled to the agency's primary VO. Do **not** add it to `shifts` yet: shifts derive their VO through the client/care plan, 156 demo rows would need touching, and 2B triggers sit on that table. Shift-level VO is deferred to the phase that actually routes work by VO.
+
+## C. Cross-cutting
+
+**Backfill + is_demo (exact rows):**
+- `virtual_office`: 2 rows (one primary per agency). `System Agency` (sentinel) → `is_demo = false`. `CareMuch Agency` → `is_demo = false` (it is the real tenant; its VO is real infrastructure, not seed data).
+- `families`: 5 rows, one per existing client, all 5 → `is_demo = true` (all 5 clients are demo).
+- `family_contacts`: 0 rows created — no contact data is invented from clients.
+- `clients.family_id`: 5 rows updated. `clients.virtual_office_id`: 5 rows. `caregivers.virtual_office_id`: 8 rows. All point at CareMuch Agency's primary VO.
+
+**Purge order** — extend the ordered delete list only, guard logic unchanged. Append after the existing `caregivers` delete:
+```
+… shift_trades → … → time_off_requests → clients → caregivers
+  → family_contacts → families → virtual_office
+```
+`clients.family_id` and `*.virtual_office_id` are `ON DELETE SET NULL`, so a demo family/VO delete can never orphan a real client.
+
+**RLS (new tables only), consistent with 2A:**
+- `virtual_office`: SELECT for any authenticated user whose `agency_id = virtual_office.agency_id` (via `current_agency_id()`); INSERT/UPDATE/DELETE restricted to `is_agency_staff(auth.uid())` within the same agency; `system_admin` full access.
+- `families`: same staff-write / agency-read shape; additionally a client may read their own family (`family_id IN (SELECT family_id FROM clients WHERE id IN (SELECT my_client_ids()))`).
+- `family_contacts`: inherits scope through `families` (agency check via a `family_agency_id(_family_id)` SECURITY DEFINER helper, `search_path = public`, mirroring existing helpers); a contact whose `user_id = auth.uid()` may read their own row.
+- GRANTs in the same migration: `SELECT, INSERT, UPDATE, DELETE` to `authenticated`; `ALL` to `service_role`; no `anon` grant (no anon policy).
+
+**Full constraint list:**
+| constraint | detail |
+|---|---|
+| FK | `virtual_office.agency_id → agency.id` NOT NULL, CASCADE |
+| FK | `families.agency_id → agency.id` NOT NULL, CASCADE |
+| FK | `families.virtual_office_id → virtual_office.id` NULL, SET NULL |
+| FK | `family_contacts.family_id → families.id` NOT NULL, CASCADE |
+| FK | `family_contacts.user_id → auth.users.id` NULL, SET NULL |
+| FK | `clients.family_id → families.id` NULL, SET NULL |
+| FK | `clients.virtual_office_id → virtual_office.id` NULL, SET NULL |
+| FK | `caregivers.virtual_office_id → virtual_office.id` NULL, SET NULL |
+| NOT NULL | VO: agency_id, name, is_primary, is_active, timezone, branding, service_states, service_zipcodes, service_area, operating_hours, is_demo, timestamps |
+| NOT NULL | families: agency_id, family_name, is_active, is_demo, timestamps |
+| NOT NULL | family_contacts: family_id, first_name, last_name, is_primary, is_decision_maker, is_demo, timestamps |
+| UNIQUE | `(agency_id, name)` on virtual_office; partial unique primary per agency |
+
+**Confirmation:** the only writes to existing tables are (1) three new nullable link columns (`clients.family_id`, `clients.virtual_office_id`, `caregivers.virtual_office_id`) and (2) their backfills. No existing column is dropped, retyped, or re-meaninged; agency scheduling columns are untouched; 2.5 eligibility continues to read `agency`.
+
+## Step 2 (after approval)
+Create tables/columns/constraints/RLS/backfills, extend purge list, then validate row counts, FKs, one 2.5 eligibility run, client resolution, and unchanged shift/assignment counts.
