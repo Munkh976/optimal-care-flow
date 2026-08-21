@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
 import { AppLayout } from "@/components/AppLayout";
+import { pickUpShift } from "@/lib/shiftAssignment";
 
 interface OpenShift {
   id: string;
@@ -90,7 +91,7 @@ const AvailableShifts = () => {
     try {
       await pickUpShift(shiftId);
       toast.success("Shift picked up");
-      fetchAvailableShifts();
+      fetchCaregiverAndShifts();
     } catch (e: any) {
       toast.error(e.message || "Could not pick up this shift");
     } finally {
@@ -216,11 +217,13 @@ const AvailableShifts = () => {
                       </Badge>
                     </div>
                     <Button
-                      disabled={!PICKUP_ENABLED}
-                      title="Self pick-up is temporarily unavailable — ask your scheduler to assign this shift."
-                      onClick={(e) => e.stopPropagation()}
+                      disabled={pickingUp === shift.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePickUp(shift.id);
+                      }}
                     >
-                      Pick Up Shift
+                      {pickingUp === shift.id ? "Picking up…" : "Pick Up Shift"}
                     </Button>
 
                   </div>
