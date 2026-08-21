@@ -171,21 +171,24 @@ const Dashboard = () => {
     
     const { data: urgentShifts } = await supabase
       .from("shifts")
-      .select("id, shift_date, start_time, care_type_code, order_title, clients(first_name, last_name), care_types(name)")
+      .select("id, shift_date, start_time, care_type_code, order_title, clients(first_name, last_name), care_types(name), shift_assignments(id, status)")
       .eq("agency_id", agencyId)
-      .is("caregiver_id", null)
       .gte("shift_date", today)
       .lte("shift_date", twoDaysFromNow.toISOString().split('T')[0])
       .order("shift_date", { ascending: true })
-      .limit(5);
+      .limit(50);
 
-    setUrgentRequests((urgentShifts || []).map((shift: any) => ({
-      id: shift.id,
-      client_name: `${shift.clients?.first_name || ''} ${shift.clients?.last_name || ''}`,
-      care_type: shift.care_types?.name || shift.order_title || shift.care_type_code,
-      shift_date: shift.shift_date,
-      start_time: shift.start_time,
-    })));
+    setUrgentRequests((urgentShifts || [])
+      .filter((shift: any) => !isAssigned(shift))
+      .slice(0, 5)
+      .map((shift: any) => ({
+        id: shift.id,
+        client_name: `${shift.clients?.first_name || ''} ${shift.clients?.last_name || ''}`,
+        care_type: shift.care_types?.name || shift.order_title || shift.care_type_code,
+        shift_date: shift.shift_date,
+        start_time: shift.start_time,
+      })));
+
 
     const items: ActionItem[] = [];
     if (weekUnassigned > 0) {
