@@ -353,7 +353,7 @@ export const AssignShiftDialog = ({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm} disabled={saving || !caregiverId || hours <= 0}>
+          <Button onClick={handleConfirm} disabled={saving || !caregiverId || hours <= 0 || (!!overridePrompt && !overrideReason.trim())}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirm Assignment
           </Button>
