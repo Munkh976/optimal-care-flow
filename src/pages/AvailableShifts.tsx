@@ -205,14 +205,14 @@ const AvailableShifts = () => {
                         {getCareTypeLabel(shift.care_type_code)}
                       </Badge>
                     </div>
-                    <Button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePickUpShift(shift.id);
-                      }}
+                    <Button
+                      disabled={!PICKUP_ENABLED}
+                      title="Self pick-up is temporarily unavailable — ask your scheduler to assign this shift."
+                      onClick={(e) => e.stopPropagation()}
                     >
                       Pick Up Shift
                     </Button>
+
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
