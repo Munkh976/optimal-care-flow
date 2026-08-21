@@ -160,7 +160,7 @@ const Reports = () => {
 
       const byCaregiver = new Map<string, CaregiverMetric & { onTimeCount: number; clocked: number; completed: number }>();
       (shifts || []).forEach((s: any) => {
-        const cid = s.caregiver_id;
+        const cid = activeAssignment(s)?.caregiver_id;
         if (!cid) return;
         const entry =
           byCaregiver.get(cid) ||
