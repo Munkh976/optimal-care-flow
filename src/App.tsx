@@ -26,6 +26,8 @@ import RolePermissions from "./pages/RolePermissions";
 import SystemAdminDashboard from "./pages/SystemAdminDashboard";
 import AdminUtilities from "./pages/AdminUtilities";
 import AgencySettings from "./pages/AgencySettings";
+import VirtualOffices from "./pages/VirtualOffices";
+import VirtualOfficeConfig from "./pages/VirtualOfficeConfig";
 import CareTypes from "./pages/CareTypes";
 import OrderManagement from "./pages/OrderManagement";
 import NotFound from "./pages/NotFound";
@@ -81,6 +83,8 @@ const App = () => (
           <Route path="/caregiver-settings" element={<CaregiverSettings />} />
           <Route path="/admin-utilities" element={<AdminUtilities />} />
           <Route path="/agency-settings" element={<AgencySettings />} />
+          <Route path="/virtual-offices" element={<VirtualOffices />} />
+          <Route path="/virtual-offices/:id" element={<VirtualOfficeConfig />} />
           <Route path="/auto-schedule" element={<Navigate to="/schedule?tab=unassigned" replace />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/admin-user-management" element={<AdminUserManagement />} />

@@ -23,6 +23,7 @@ import {
   Shield,
   Building2,
   Inbox,
+  Network,
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -68,6 +69,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     care_needs: List,
     agency: Settings,
     agency_settings: Building2,
+    virtual_offices: Network,
     auto_schedule: Calendar,
     available_shifts: ClipboardList,
     caregiver_approvals: UserCheck,
