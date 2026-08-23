@@ -15,6 +15,8 @@ import { ScreeningResultDialog, ScreeningSession } from "@/components/caregivers
 import { BAND_LABELS, ScoreBand } from "@/lib/flowEngine";
 import { ClipboardList } from "lucide-react";
 import { useCareServices } from "@/hooks/useCareServices";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CaregiverRegistration {
   id: string;
@@ -37,13 +39,20 @@ interface CaregiverRegistration {
   availability?: any;
   care_type_codes?: string[];
   updated_at?: string;
+  virtual_office_id?: string | null;
+  notes?: string | null;
+}
+
+interface OfficeOption {
+  id: string;
+  name: string;
 }
 
 const CaregiverApprovals = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userRole, hasPermission } = usePermissions();
-  const { optionFor } = useCareServices();
+  const { optionFor, groupedOptions } = useCareServices();
   const [registrations, setRegistrations] = useState<CaregiverRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -51,6 +60,15 @@ const CaregiverApprovals = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [screenings, setScreenings] = useState<Record<string, ScreeningSession>>({});
   const [openScreening, setOpenScreening] = useState<CaregiverRegistration | null>(null);
+  const [offices, setOffices] = useState<OfficeOption[]>([]);
+  const [search, setSearch] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [serviceFilter, setServiceFilter] = useState("all");
+  const [employmentFilter, setEmploymentFilter] = useState("all");
+  const [bandFilter, setBandFilter] = useState("all");
+  const [officeFilter, setOfficeFilter] = useState("all");
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [savingNote, setSavingNote] = useState<string | null>(null);
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; registrationId: string | null; reason: string }>({
     open: false,
     registrationId: null,
@@ -68,6 +86,33 @@ const CaregiverApprovals = () => {
       return;
     }
     fetchRegistrations();
+    fetchOffices();
+  };
+
+  const fetchOffices = async () => {
+    const { data } = await supabase
+      .from("virtual_office")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name");
+    setOffices((data as OfficeOption[]) ?? []);
+  };
+
+  const saveNote = async (registrationId: string) => {
+    setSavingNote(registrationId);
+    const { error } = await supabase
+      .from("caregiver_registrations")
+      .update({ notes: noteDrafts[registrationId] ?? "" } as never)
+      .eq("id", registrationId);
+    setSavingNote(null);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setRegistrations((rows) =>
+      rows.map((r) => (r.id === registrationId ? { ...r, notes: noteDrafts[registrationId] ?? "" } : r))
+    );
+    toast({ title: "Note saved" });
   };
 
   const fetchRegistrations = async () => {
@@ -168,9 +213,35 @@ const CaregiverApprovals = () => {
     return <Badge variant="outline" className={variants[status]}>{status}</Badge>;
   };
 
-  const filteredRegistrations = registrations.filter(reg => {
-    if (filter === 'all') return true;
-    return reg.status === filter;
+  const term = search.trim().toLowerCase();
+  const place = locationFilter.trim().toLowerCase();
+  const filteredRegistrations = registrations.filter((reg) => {
+    if (filter !== 'all' && reg.status !== filter) return false;
+    if (
+      term &&
+      ![reg.first_name, reg.last_name, reg.email, reg.phone]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(term))
+    )
+      return false;
+    if (
+      place &&
+      ![reg.city, reg.state, reg.zip_code]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(place))
+    )
+      return false;
+    if (serviceFilter !== 'all' && !(reg.care_type_codes ?? []).includes(serviceFilter)) return false;
+    if (employmentFilter !== 'all' && reg.employment_type !== employmentFilter) return false;
+    if (officeFilter !== 'all') {
+      if (officeFilter === 'none' ? !!reg.virtual_office_id : reg.virtual_office_id !== officeFilter)
+        return false;
+    }
+    if (bandFilter !== 'all') {
+      const band = screenings[reg.id]?.band ?? null;
+      if (bandFilter === 'unscreened' ? !!screenings[reg.id] : band !== bandFilter) return false;
+    }
+    return true;
   });
   const canReviewApplications =
     !!userRole &&
@@ -225,6 +296,61 @@ const CaregiverApprovals = () => {
               Rejected
             </Button>
           </div>
+        </div>
+
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, email or phone"
+          />
+          <Input
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value)}
+            placeholder="City, state or ZIP"
+          />
+          <Select value={serviceFilter} onValueChange={setServiceFilter}>
+            <SelectTrigger><SelectValue placeholder="All Care Services" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Care Services</SelectItem>
+              {groupedOptions.flatMap((group) =>
+                group.options.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+          <Select value={employmentFilter} onValueChange={setEmploymentFilter}>
+            <SelectTrigger><SelectValue placeholder="Any employment type" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any employment type</SelectItem>
+              <SelectItem value="full_time">Full time</SelectItem>
+              <SelectItem value="part_time">Part time</SelectItem>
+              <SelectItem value="on_call">On call</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={bandFilter} onValueChange={setBandFilter}>
+            <SelectTrigger><SelectValue placeholder="Any screening result" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any screening result</SelectItem>
+              <SelectItem value="strong_fit">Strong fit</SelectItem>
+              <SelectItem value="review">Needs review</SelectItem>
+              <SelectItem value="not_a_fit">Not a fit</SelectItem>
+              <SelectItem value="unscreened">No screening</SelectItem>
+            </SelectContent>
+          </Select>
+          {offices.length > 1 && (
+            <Select value={officeFilter} onValueChange={setOfficeFilter}>
+              <SelectTrigger><SelectValue placeholder="All offices" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All offices</SelectItem>
+                {offices.map((office) => (
+                  <SelectItem key={office.id} value={office.id}>{office.name}</SelectItem>
+                ))}
+                <SelectItem value="none">No office (direct form)</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="grid gap-4">
@@ -327,6 +453,32 @@ const CaregiverApprovals = () => {
                         No assistant screening was completed with this application.
                       </p>
                     )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`note-${registration.id}`} className="text-sm font-medium">
+                      Internal notes
+                    </Label>
+                    <Textarea
+                      id={`note-${registration.id}`}
+                      rows={2}
+                      placeholder="Notes for your team (not shared with the applicant)"
+                      value={noteDrafts[registration.id] ?? registration.notes ?? ""}
+                      onChange={(e) =>
+                        setNoteDrafts((drafts) => ({ ...drafts, [registration.id]: e.target.value }))
+                      }
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        savingNote === registration.id ||
+                        (noteDrafts[registration.id] ?? registration.notes ?? "") === (registration.notes ?? "")
+                      }
+                      onClick={() => saveNote(registration.id)}
+                    >
+                      {savingNote === registration.id ? "Saving..." : "Save note"}
+                    </Button>
                   </div>
 
                   {registration.status === "pending" && canReviewApplications && (
