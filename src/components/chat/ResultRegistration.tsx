@@ -14,6 +14,8 @@ interface ResultRegistrationProps {
   careServiceItemIds?: string[];
   /** Scopes the application to a specific agency (public office pages). */
   agencyId?: string | null;
+  /** Scopes the application to a specific virtual office (public office pages). */
+  virtualOfficeId?: string | null;
   onExit?: () => void;
   onRegistered: (registrationId: string) => Promise<void> | void;
 }
@@ -25,6 +27,7 @@ export function ResultRegistration({
   score,
   careServiceItemIds = [],
   agencyId = null,
+  virtualOfficeId = null,
   onExit,
   onRegistered,
 }: ResultRegistrationProps) {
@@ -59,7 +62,8 @@ export function ResultRegistration({
         hourly_rate: rate,
         status: "pending",
         agency_id: agencyId,
-      });
+        virtual_office_id: virtualOfficeId,
+      } as never);
       if (error) throw error;
       await onRegistered(registrationId);
       setStage("done");

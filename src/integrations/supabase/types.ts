@@ -104,6 +104,7 @@ export type Database = {
           requested_end_time: string | null
           requested_start_date: string | null
           requested_start_time: string | null
+          session_id: string | null
           source: string
           status: Database["public"]["Enums"]["care_request_status"]
           updated_at: string
@@ -132,6 +133,7 @@ export type Database = {
           requested_end_time?: string | null
           requested_start_date?: string | null
           requested_start_time?: string | null
+          session_id?: string | null
           source?: string
           status?: Database["public"]["Enums"]["care_request_status"]
           updated_at?: string
@@ -160,6 +162,7 @@ export type Database = {
           requested_end_time?: string | null
           requested_start_date?: string | null
           requested_start_time?: string | null
+          session_id?: string | null
           source?: string
           status?: Database["public"]["Enums"]["care_request_status"]
           updated_at?: string
@@ -199,6 +202,13 @@ export type Database = {
             columns: ["requested_caregiver_id"]
             isOneToOne: false
             referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_requests_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_sessions"
             referencedColumns: ["id"]
           },
           {
@@ -530,6 +540,7 @@ export type Database = {
           hourly_rate: number | null
           id: string
           last_name: string
+          notes: string | null
           phone: string
           rejection_reason: string | null
           reviewed_at: string | null
@@ -537,6 +548,7 @@ export type Database = {
           state: string | null
           status: string | null
           updated_at: string | null
+          virtual_office_id: string | null
           zip_code: string | null
         }
         Insert: {
@@ -552,6 +564,7 @@ export type Database = {
           hourly_rate?: number | null
           id?: string
           last_name: string
+          notes?: string | null
           phone: string
           rejection_reason?: string | null
           reviewed_at?: string | null
@@ -559,6 +572,7 @@ export type Database = {
           state?: string | null
           status?: string | null
           updated_at?: string | null
+          virtual_office_id?: string | null
           zip_code?: string | null
         }
         Update: {
@@ -574,6 +588,7 @@ export type Database = {
           hourly_rate?: number | null
           id?: string
           last_name?: string
+          notes?: string | null
           phone?: string
           rejection_reason?: string | null
           reviewed_at?: string | null
@@ -581,6 +596,7 @@ export type Database = {
           state?: string | null
           status?: string | null
           updated_at?: string | null
+          virtual_office_id?: string | null
           zip_code?: string | null
         }
         Relationships: [
@@ -589,6 +605,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "caregiver_registrations_virtual_office_id_fkey"
+            columns: ["virtual_office_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_office"
             referencedColumns: ["id"]
           },
         ]
