@@ -19,10 +19,17 @@ export interface ContactDetails {
   phone?: string;
 }
 
+export interface FlowScope {
+  agencyId?: string | null;
+  virtualOfficeId?: string | null;
+}
+
 export function useConversationFlow(
   audience: string,
-  options?: { persist?: boolean; deferSession?: boolean }
+  options?: { persist?: boolean; deferSession?: boolean; scope?: FlowScope }
 ) {
+  const agencyId = options?.scope?.agencyId ?? null;
+  const virtualOfficeId = options?.scope?.virtualOfficeId ?? null;
   const persist = options?.persist !== false;
   // When deferred, the session row is only created on the first answer so we
   // never store empty rows for visitors who never engage.
@@ -107,6 +114,7 @@ export function useConversationFlow(
           flow_id: loaded.id,
           session_token: token,
           current_node_id: fresh.currentNodeId,
+          agency_id: agencyId,
         });
         if (createError) throw createError;
         if (cancelled) return;
@@ -134,6 +142,7 @@ export function useConversationFlow(
         id: created.id,
         flow_id: flowId,
         session_token: created.token,
+        agency_id: agencyId,
       });
       if (createError) {
         console.error("Could not start session", createError);
@@ -144,7 +153,7 @@ export function useConversationFlow(
       setSessionToken(created.token);
       return created;
     },
-    []
+    [agencyId]
   );
 
   const currentNode = useMemo(
@@ -278,6 +287,8 @@ export function useConversationFlow(
         p_phone: contact.phone,
         p_email: contact.email ?? null,
         p_preference: contact.preference,
+        p_agency_id: agencyId,
+        p_virtual_office_id: virtualOfficeId,
       });
       if (submitError) {
         console.error("Could not submit intake", submitError);
@@ -285,7 +296,7 @@ export function useConversationFlow(
       }
       return true;
     },
-    [flow, ensureSession]
+    [flow, ensureSession, agencyId, virtualOfficeId]
   );
 
   const linkRegistration = useCallback(

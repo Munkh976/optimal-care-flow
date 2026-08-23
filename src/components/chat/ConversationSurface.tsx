@@ -15,6 +15,9 @@ export interface ConversationSurfaceProps {
   onExit?: () => void;
   /** Render inside a page section (card) instead of taking the full viewport. */
   embedded?: boolean;
+  /** Scopes the resulting application/session to an agency office. */
+  agencyId?: string | null;
+  virtualOfficeId?: string | null;
 }
 
 function summarise(answer: FlowAnswer): string {
@@ -31,13 +34,17 @@ export function ConversationSurface({
   agencyName = "our care team",
   onExit,
   embedded = false,
+  agencyId = null,
+  virtualOfficeId = null,
 }: ConversationSurfaceProps) {
   const shell = embedded ? "h-full min-h-[540px]" : "min-h-screen";
   const [stage, setStage] = useState<"welcome" | "name" | "flow">("welcome");
   const [firstName, setFirstName] = useState("");
   const [nameDraft, setNameDraft] = useState("");
 
-  const flowState = useConversationFlow(audience);
+  const flowState = useConversationFlow(audience, {
+    scope: { agencyId, virtualOfficeId },
+  });
   const { flow, state, currentNode, loading, error, saving, score } = flowState;
   const [completed, setCompleted] = useState(false);
   const [typing, setTyping] = useState(false);
@@ -346,6 +353,7 @@ export function ConversationSurface({
                   agencyName={agencyName}
                   score={score}
                   careServiceItemIds={pickedCatalogIds}
+                  agencyId={agencyId}
                   onExit={onExit}
                   onRegistered={flowState.linkRegistration}
                 />
