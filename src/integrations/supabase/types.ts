@@ -2823,6 +2823,10 @@ export type Database = {
       }
       is_agency_staff: { Args: { _user_id: string }; Returns: boolean }
       is_my_assigned_shift: { Args: { _shift_id: string }; Returns: boolean }
+      is_published_public_agency: {
+        Args: { _agency_id: string }
+        Returns: boolean
+      }
       my_caregiver_ids: { Args: never; Returns: string[] }
       my_client_ids: { Args: never; Returns: string[] }
       order_agency_id: { Args: { _order_id: string }; Returns: string }
