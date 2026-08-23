@@ -39,6 +39,7 @@ import AdminUserManagement from "./pages/AdminUserManagement";
 import OAuthConsent from "./pages/OAuthConsent";
 import NotificationsOutbox from "./pages/NotificationsOutbox";
 import ClientInquiries from "./pages/ClientInquiries";
+import PublicOffice from "./pages/PublicOffice";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,9 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/a/:slug" element={<PublicOffice />} />
+          <Route path="/a/:slug/apply" element={<PublicOffice initialMode="apply" />} />
+          <Route path="/a/:slug/care" element={<PublicOffice initialMode="care" />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/caregivers" element={<Caregivers />} />
