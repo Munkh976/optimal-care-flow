@@ -354,6 +354,7 @@ export function ConversationSurface({
                   score={score}
                   careServiceItemIds={pickedCatalogIds}
                   agencyId={agencyId}
+                  virtualOfficeId={virtualOfficeId}
                   onExit={onExit}
                   onRegistered={flowState.linkRegistration}
                 />
