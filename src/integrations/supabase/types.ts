@@ -2754,35 +2754,21 @@ export type Database = {
         Args: { p_node_id: string; p_session_id: string; p_token: string }
         Returns: undefined
       }
-      flow_session_submit_intake:
-        | {
-            Args: {
-              p_email: string
-              p_name: string
-              p_phone: string
-              p_preference: string
-              p_session_id: string
-              p_token: string
-              p_total_score?: number
-              p_trait_scores?: Json
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_agency_id?: string
-              p_email: string
-              p_name: string
-              p_phone: string
-              p_preference: string
-              p_session_id: string
-              p_token: string
-              p_total_score?: number
-              p_trait_scores?: Json
-              p_virtual_office_id?: string
-            }
-            Returns: undefined
-          }
+      flow_session_submit_intake: {
+        Args: {
+          p_agency_id?: string
+          p_email: string
+          p_name: string
+          p_phone: string
+          p_preference: string
+          p_session_id: string
+          p_token: string
+          p_total_score?: number
+          p_trait_scores?: Json
+          p_virtual_office_id?: string
+        }
+        Returns: undefined
+      }
       flow_session_trim_answers: {
         Args: {
           p_from_index: number
