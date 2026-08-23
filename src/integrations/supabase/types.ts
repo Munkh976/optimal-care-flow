@@ -2560,9 +2560,11 @@ export type Database = {
           max_weekly_hours: number | null
           name: string
           operating_hours: Json
+          public_content: Json
           service_area: Json
           service_states: string[]
           service_zipcodes: string[]
+          slug: string | null
           smart_match_weights: Json | null
           state: string | null
           timezone: string
@@ -2587,9 +2589,11 @@ export type Database = {
           max_weekly_hours?: number | null
           name: string
           operating_hours?: Json
+          public_content?: Json
           service_area?: Json
           service_states?: string[]
           service_zipcodes?: string[]
+          slug?: string | null
           smart_match_weights?: Json | null
           state?: string | null
           timezone?: string
@@ -2614,9 +2618,11 @@ export type Database = {
           max_weekly_hours?: number | null
           name?: string
           operating_hours?: Json
+          public_content?: Json
           service_area?: Json
           service_states?: string[]
           service_zipcodes?: string[]
+          slug?: string | null
           smart_match_weights?: Json | null
           state?: string | null
           timezone?: string
@@ -2725,19 +2731,35 @@ export type Database = {
         Args: { p_node_id: string; p_session_id: string; p_token: string }
         Returns: undefined
       }
-      flow_session_submit_intake: {
-        Args: {
-          p_email: string
-          p_name: string
-          p_phone: string
-          p_preference: string
-          p_session_id: string
-          p_token: string
-          p_total_score?: number
-          p_trait_scores?: Json
-        }
-        Returns: undefined
-      }
+      flow_session_submit_intake:
+        | {
+            Args: {
+              p_email: string
+              p_name: string
+              p_phone: string
+              p_preference: string
+              p_session_id: string
+              p_token: string
+              p_total_score?: number
+              p_trait_scores?: Json
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_agency_id?: string
+              p_email: string
+              p_name: string
+              p_phone: string
+              p_preference: string
+              p_session_id: string
+              p_token: string
+              p_total_score?: number
+              p_trait_scores?: Json
+              p_virtual_office_id?: string
+            }
+            Returns: undefined
+          }
       flow_session_trim_answers: {
         Args: {
           p_from_index: number
@@ -2779,6 +2801,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_public_office: { Args: { p_slug: string }; Returns: Json }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
