@@ -12,6 +12,8 @@ interface ResultRegistrationProps {
   score: ScoreResult | null;
   /** Catalog ids the visitor picked during the conversation. */
   careServiceItemIds?: string[];
+  /** Scopes the application to a specific agency (public office pages). */
+  agencyId?: string | null;
   onExit?: () => void;
   onRegistered: (registrationId: string) => Promise<void> | void;
 }
@@ -22,6 +24,7 @@ export function ResultRegistration({
   agencyName,
   score,
   careServiceItemIds = [],
+  agencyId = null,
   onExit,
   onRegistered,
 }: ResultRegistrationProps) {
@@ -55,6 +58,7 @@ export function ResultRegistration({
         care_type_codes: careTypeCodes,
         hourly_rate: rate,
         status: "pending",
+        agency_id: agencyId,
       });
       if (error) throw error;
       await onRegistered(registrationId);

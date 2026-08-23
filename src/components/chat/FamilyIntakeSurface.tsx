@@ -11,6 +11,9 @@ export interface FamilyIntakeSurfaceProps {
   onExit?: () => void;
   /** Render inside a page section (card) instead of taking the full viewport. */
   embedded?: boolean;
+  /** Scopes the resulting care request to an agency office. */
+  agencyId?: string | null;
+  virtualOfficeId?: string | null;
 }
 
 const CONTACT_PREFERENCES = [
@@ -41,9 +44,17 @@ const contactSchema = z.object({
   preference: z.string().min(1, { message: "Choose how we should reach you" }),
 });
 
-export function FamilyIntakeSurface({ onExit, embedded = false }: FamilyIntakeSurfaceProps) {
+export function FamilyIntakeSurface({
+  onExit,
+  embedded = false,
+  agencyId = null,
+  virtualOfficeId = null,
+}: FamilyIntakeSurfaceProps) {
   const shell = embedded ? "h-full min-h-[540px]" : "min-h-screen";
-  const flowState = useConversationFlow("family_intake", { deferSession: true });
+  const flowState = useConversationFlow("family_intake", {
+    deferSession: true,
+    scope: { agencyId, virtualOfficeId },
+  });
   const { flow, state, currentNode, loading, error, saving } = flowState;
 
   const [selected, setSelected] = useState<string[]>([]);
