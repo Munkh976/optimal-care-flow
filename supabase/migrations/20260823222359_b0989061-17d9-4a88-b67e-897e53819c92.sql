@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.flow_session_submit_intake(uuid, text, text, text, text, text, numeric, jsonb);
