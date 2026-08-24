@@ -147,6 +147,17 @@ const ClientInquiries = () => {
         contact_preference: r.conversation_sessions?.contact_preference ?? null,
         submitted_at: r.conversation_sessions?.submitted_at ?? r.created_at,
         answers: r.session_id ? answersBySession[r.session_id] ?? [] : [],
+        client_id: r.client_id ?? null,
+        converted_client_name: r.clients
+          ? `${r.clients.first_name} ${r.clients.last_name}`
+          : null,
+        care_type_codes: r.care_type_codes ?? [],
+        location_address: r.location_address ?? null,
+        location_city: r.location_city ?? null,
+        location_state: r.location_state ?? null,
+        location_zip_code: r.location_zip_code ?? null,
+        flexibility: r.flexibility ?? null,
+        time_windows: r.care_request_time_windows ?? [],
       }))
     );
     setLoading(false);
