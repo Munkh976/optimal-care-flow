@@ -51,6 +51,14 @@ serve(async (req) => {
 
     if (caregiversError) throw caregiversError;
 
+    // Ratings come ONLY from the computed source (shift_ratings via caregiver_performance).
+    // caregivers.performance_rating is deprecated and must not influence ranking.
+    const { data: perfRows } = await supabaseClient
+      .from('caregiver_performance')
+      .select('caregiver_id, avg_rating, rating_count, completion_rate, on_time_rate')
+      .in('caregiver_id', (caregivers || []).map((c: any) => c.id));
+    const perfById = new Map((perfRows || []).map((p: any) => [p.caregiver_id, p]));
+
     // Use Lovable AI to match caregivers
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
@@ -60,7 +68,7 @@ Consider these factors:
 1. Skills match (certifications, required skills)
 2. Client care requirements vs caregiver capabilities
 3. Location match - CRITICAL: Check if client zip code is in caregiver's service_zipcodes array
-4. Performance rating and reliability
+4. Computed performance (average rating from real completed-shift ratings, completion and on-time rates). Some caregivers have NO ratings yet: treat them as NEUTRAL on this factor — score them on the other factors only. Never treat "not yet rated" as a low or zero rating.
 5. Preferred caregiver status
 6. Availability and work hours
 
@@ -88,8 +96,9 @@ ${i + 1}. ${c.first_name} ${c.last_name} (ID: ${c.id})
    - Role: ${c.role}
    - Skills: ${c.skills?.join(', ') || 'None'}
    - Certifications: ${c.certifications?.join(', ') || 'None'}
-   - Performance Rating: ${c.performance_rating}/5.0
-   - Reliability Score: ${c.reliability_score}/100
+   - Rating: ${perfById.get(c.id)?.avg_rating != null ? `${perfById.get(c.id).avg_rating}/5.0 from ${perfById.get(c.id).rating_count} rated shifts` : 'Not yet rated (neutral — do not penalise)'}
+   - Completion Rate: ${perfById.get(c.id)?.completion_rate ?? 'n/a'}%
+   - On-time Rate: ${perfById.get(c.id)?.on_time_rate ?? 'n/a'}%
    - Service Zip Codes: ${c.service_zipcodes?.join(', ') || 'Not specified'}
    - Hourly Rate: $${c.hourly_rate || 'N/A'}
 `).join('\n')}
@@ -180,8 +189,10 @@ Calculate match scores for each caregiver. Remember to heavily weight whether th
           last_name: caregiver.last_name,
           email: caregiver.email,
           phone: caregiver.phone,
-          performance_rating: caregiver.performance_rating,
-          reliability_score: caregiver.reliability_score,
+          avg_rating: perfById.get(caregiver.id)?.avg_rating ?? null,
+          rating_count: perfById.get(caregiver.id)?.rating_count ?? 0,
+          completion_rate: perfById.get(caregiver.id)?.completion_rate ?? null,
+          on_time_rate: perfById.get(caregiver.id)?.on_time_rate ?? null,
           hourly_rate: caregiver.hourly_rate,
           skills: caregiver.skills,
           certifications: caregiver.certifications,

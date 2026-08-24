@@ -16,7 +16,7 @@ export default defineTool({
     if (!ctx.isAuthenticated()) return errorResult("Not authenticated");
     let query = supabaseForUser(ctx)
       .from("caregivers")
-      .select("id, first_name, last_name, email, phone, role, city, state, skills, certifications, performance_rating, reliability_score, hourly_rate, is_active")
+      .select("id, first_name, last_name, email, phone, role, city, state, skills, certifications, reliability_score, hourly_rate, is_active")
       .limit(Math.min(limit ?? 50, 200));
     if (search) query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%`);
     if (city) query = query.ilike("city", city);
