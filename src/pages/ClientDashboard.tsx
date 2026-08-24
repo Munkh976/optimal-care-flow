@@ -221,7 +221,7 @@ const ClientDashboard = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-2">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 gap-2">
             <TabsTrigger value="overview" className="gap-2">
               <Home className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -233,6 +233,10 @@ const ClientDashboard = () => {
             <TabsTrigger value="schedule" className="gap-2">
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Schedule</span>
+            </TabsTrigger>
+            <TabsTrigger value="circle" className="gap-2">
+              <Heart className="h-4 w-4" />
+              <span className="hidden sm:inline">Care Circle</span>
             </TabsTrigger>
             <TabsTrigger value="team" className="gap-2">
               <Users className="h-4 w-4" />
@@ -247,6 +251,7 @@ const ClientDashboard = () => {
               <span className="hidden sm:inline">Settings</span>
             </TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="overview">
             <Overview
