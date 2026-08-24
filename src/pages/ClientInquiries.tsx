@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
-import { Inbox, Mail, MessageSquare, Phone } from "lucide-react";
+import { Inbox, Mail, MessageSquare, Phone, UserPlus } from "lucide-react";
+import { FlexibilityBadge } from "@/components/common/FlexibilityBadge";
+import { ConvertToClientDialog, type ConvertRequest } from "@/components/inquiries/ConvertToClientDialog";
 
 interface InquiryAnswer {
   prompt: string;
@@ -37,12 +39,22 @@ interface Inquiry {
   contact_preference: string | null;
   submitted_at: string | null;
   answers: InquiryAnswer[];
+  client_id: string | null;
+  converted_client_name: string | null;
+  care_type_codes: string[];
+  location_address: string | null;
+  location_city: string | null;
+  location_state: string | null;
+  location_zip_code: string | null;
+  flexibility: string | null;
+  time_windows: any[];
 }
 
 interface OfficeOption {
   id: string;
   name: string;
 }
+
 
 const STATUS_OPTIONS = [
   { value: "new", label: "New" },
