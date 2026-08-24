@@ -2912,14 +2912,17 @@ export type Database = {
         Row: {
           agency_id: string | null
           avg_rating: number | null
+          avg_rating_90d: number | null
           caregiver_id: string | null
           completion_rate: number | null
           hours_last_30d: number | null
+          lifetime_cancelled: number | null
           lifetime_completed: number | null
           lifetime_hours: number | null
           lifetime_no_shows: number | null
           on_time_rate: number | null
           rating_count: number | null
+          rating_count_90d: number | null
           shifts_last_30d: number | null
         }
         Relationships: [
