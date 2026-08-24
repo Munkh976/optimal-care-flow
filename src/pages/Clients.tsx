@@ -1230,6 +1230,14 @@ const Clients = () => {
         onOpenChange={(open) => !open && setFamilyDialogId(null)}
         onChanged={() => profile?.agency_id && fetchClients(profile.agency_id)}
       />
+
+      <ClientSchedulingDialog
+        client={schedulingClient}
+        open={!!schedulingClient}
+        onOpenChange={(open) => !open && setSchedulingClient(null)}
+        onSaved={() => profile?.agency_id && fetchClients(profile.agency_id)}
+      />
+
       </div>
 
     </AppLayout>
