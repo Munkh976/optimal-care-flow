@@ -255,8 +255,32 @@ export async function evaluateEligibilityLocal(input: EligibilityInput): Promise
     });
   }
 
+  const { data: exception } = await supabase
+    .from("caregiver_availability_exceptions")
+    .select("is_available, start_time, end_time, reason")
+    .eq("caregiver_id", caregiverId)
+    .eq("exception_date", shift.shift_date)
+    .maybeSingle();
+
   const avail = availRes.data || [];
-  if (avail.length > 0) {
+  if (exception) {
+    const exc: any = exception;
+    if (exc.is_available === false) {
+      blockers.push({
+        code: "availability_exception",
+        label: "Unavailable on this date",
+        detail: exc.reason || "Caregiver marked this date as unavailable.",
+      });
+    } else if (
+      !(toMinutes(hhmm(exc.start_time)) <= start && toMinutes(hhmm(exc.end_time)) >= end)
+    ) {
+      blockers.push({
+        code: "availability_exception",
+        label: "Outside availability for this date",
+        detail: `On this date the caregiver is only available ${hhmm(exc.start_time)}–${hhmm(exc.end_time)}.`,
+      });
+    }
+  } else if (avail.length > 0) {
     const dow = new Date(`${shift.shift_date}T00:00:00`).getDay();
     const windows = avail.filter((a: any) => a.day_of_week === dow && a.is_available !== false);
     const covered = windows.some(
@@ -270,6 +294,7 @@ export async function evaluateEligibilityLocal(input: EligibilityInput): Promise
       });
     }
   }
+
 
   if (client?.zip_code && Array.isArray(caregiver?.service_zipcodes) && caregiver.service_zipcodes.length > 0) {
     if (!caregiver.service_zipcodes.includes(client.zip_code)) {

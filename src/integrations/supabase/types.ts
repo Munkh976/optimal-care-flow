@@ -80,6 +80,85 @@ export type Database = {
         }
         Relationships: []
       }
+      care_request_time_windows: {
+        Row: {
+          agency_id: string
+          care_request_id: string
+          created_at: string
+          day_of_week: number
+          earliest_start: string | null
+          flexibility: string | null
+          id: string
+          is_demo: boolean
+          latest_end: string | null
+          min_duration_hours: number | null
+          notes: string | null
+          preferred_duration_hours: number | null
+          preferred_end: string | null
+          preferred_start: string | null
+          updated_at: string
+          virtual_office_id: string | null
+        }
+        Insert: {
+          agency_id: string
+          care_request_id: string
+          created_at?: string
+          day_of_week: number
+          earliest_start?: string | null
+          flexibility?: string | null
+          id?: string
+          is_demo?: boolean
+          latest_end?: string | null
+          min_duration_hours?: number | null
+          notes?: string | null
+          preferred_duration_hours?: number | null
+          preferred_end?: string | null
+          preferred_start?: string | null
+          updated_at?: string
+          virtual_office_id?: string | null
+        }
+        Update: {
+          agency_id?: string
+          care_request_id?: string
+          created_at?: string
+          day_of_week?: number
+          earliest_start?: string | null
+          flexibility?: string | null
+          id?: string
+          is_demo?: boolean
+          latest_end?: string | null
+          min_duration_hours?: number | null
+          notes?: string | null
+          preferred_duration_hours?: number | null
+          preferred_end?: string | null
+          preferred_start?: string | null
+          updated_at?: string
+          virtual_office_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "care_request_time_windows_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_request_time_windows_care_request_id_fkey"
+            columns: ["care_request_id"]
+            isOneToOne: false
+            referencedRelation: "care_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_request_time_windows_virtual_office_id_fkey"
+            columns: ["virtual_office_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_office"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       care_requests: {
         Row: {
           agency_id: string
@@ -89,6 +168,7 @@ export type Database = {
           created_by: string | null
           estimated_hours_per_week: number | null
           family_id: string | null
+          flexibility: string | null
           id: string
           is_demo: boolean
           location_address: string | null
@@ -118,6 +198,7 @@ export type Database = {
           created_by?: string | null
           estimated_hours_per_week?: number | null
           family_id?: string | null
+          flexibility?: string | null
           id?: string
           is_demo?: boolean
           location_address?: string | null
@@ -147,6 +228,7 @@ export type Database = {
           created_by?: string | null
           estimated_hours_per_week?: number | null
           family_id?: string | null
+          flexibility?: string | null
           id?: string
           is_demo?: boolean
           location_address?: string | null
@@ -317,39 +399,64 @@ export type Database = {
       }
       caregiver_availability: {
         Row: {
+          agency_id: string
           caregiver_id: string
           created_at: string | null
           day_of_week: number
+          earliest_start: string | null
           end_time: string
+          flexibility_minutes: number
           id: string
           is_available: boolean | null
           is_demo: boolean
+          latest_end: string | null
+          preferred_end: string | null
+          preferred_start: string | null
           start_time: string
           updated_at: string | null
         }
         Insert: {
+          agency_id: string
           caregiver_id: string
           created_at?: string | null
           day_of_week: number
+          earliest_start?: string | null
           end_time: string
+          flexibility_minutes?: number
           id?: string
           is_available?: boolean | null
           is_demo?: boolean
+          latest_end?: string | null
+          preferred_end?: string | null
+          preferred_start?: string | null
           start_time: string
           updated_at?: string | null
         }
         Update: {
+          agency_id?: string
           caregiver_id?: string
           created_at?: string | null
           day_of_week?: number
+          earliest_start?: string | null
           end_time?: string
+          flexibility_minutes?: number
           id?: string
           is_available?: boolean | null
           is_demo?: boolean
+          latest_end?: string | null
+          preferred_end?: string | null
+          preferred_start?: string | null
           start_time?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "caregiver_availability_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "caregiver_availability_caregiver_id_fkey"
             columns: ["caregiver_id"]
@@ -359,6 +466,70 @@ export type Database = {
           },
           {
             foreignKeyName: "caregiver_availability_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      caregiver_availability_exceptions: {
+        Row: {
+          agency_id: string
+          caregiver_id: string
+          created_at: string
+          end_time: string | null
+          exception_date: string
+          id: string
+          is_available: boolean
+          is_demo: boolean
+          reason: string | null
+          start_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          caregiver_id: string
+          created_at?: string
+          end_time?: string | null
+          exception_date: string
+          id?: string
+          is_available?: boolean
+          is_demo?: boolean
+          reason?: string | null
+          start_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          caregiver_id?: string
+          created_at?: string
+          end_time?: string | null
+          exception_date?: string
+          id?: string
+          is_available?: boolean
+          is_demo?: boolean
+          reason?: string | null
+          start_time?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "caregiver_availability_exceptions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "caregiver_availability_exceptions_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "caregiver_performance"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "caregiver_availability_exceptions_caregiver_id_fkey"
             columns: ["caregiver_id"]
             isOneToOne: false
             referencedRelation: "caregivers"
