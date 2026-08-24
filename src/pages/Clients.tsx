@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
 import { useCareServices } from "@/hooks/useCareServices";
 import { clientFormSchema, passwordResetSchema } from "@/lib/validation";
+import { FamilyDialog } from "@/components/families/FamilyDialog";
 
 const Clients = () => {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ const Clients = () => {
   const [profile, setProfile] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [clients, setClients] = useState<any[]>([]);
+  const [familyDialogId, setFamilyDialogId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
@@ -134,6 +136,7 @@ const Clients = () => {
         .from("clients")
         .select(`
           *,
+          families(id, family_name),
           client_care_needs(
             care_type_code,
             priority,
@@ -714,6 +717,7 @@ const Clients = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Family</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Location</TableHead>
@@ -731,8 +735,22 @@ const Clients = () => {
                         {client.first_name} {client.last_name}
                       </TableCell>
                       <TableCell>
+                        {client.families?.id ? (
+                          <Button
+                            variant="link"
+                            className="h-auto p-0 text-sm"
+                            onClick={() => setFamilyDialogId(client.families.id)}
+                          >
+                            {client.families.family_name}
+                          </Button>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <span className="text-sm">{client.profiles?.email || client.email || '-'}</span>
                       </TableCell>
+
                       <TableCell>
                         <span className="text-sm">{client.phone}</span>
                       </TableCell>
@@ -1191,7 +1209,15 @@ const Clients = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <FamilyDialog
+        familyId={familyDialogId}
+        open={!!familyDialogId}
+        onOpenChange={(open) => !open && setFamilyDialogId(null)}
+        onChanged={() => profile?.agency_id && fetchClients(profile.agency_id)}
+      />
       </div>
+
     </AppLayout>
   );
 };

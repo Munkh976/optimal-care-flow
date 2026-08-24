@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppLayout } from "@/components/AppLayout";
 import { 
-  Home, Package, Calendar, Users, History, Settings
+  Home, Package, Calendar, Users, History, Settings, Heart
 } from "lucide-react";
 import { Overview } from "@/components/client-dashboard/Overview";
 import { OrdersManagement } from "@/components/client-dashboard/OrdersManagement";
 import { MySchedule } from "@/components/client-dashboard/MySchedule";
 import { CareTeam } from "@/components/client-dashboard/CareTeam";
+import { CareCircle } from "@/components/client-dashboard/CareCircle";
 import { CareHistory } from "@/components/client-dashboard/CareHistory";
 import { ProfileSettings } from "@/components/client-dashboard/ProfileSettings";
 
@@ -220,7 +221,7 @@ const ClientDashboard = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-2">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 gap-2">
             <TabsTrigger value="overview" className="gap-2">
               <Home className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -232,6 +233,10 @@ const ClientDashboard = () => {
             <TabsTrigger value="schedule" className="gap-2">
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Schedule</span>
+            </TabsTrigger>
+            <TabsTrigger value="circle" className="gap-2">
+              <Heart className="h-4 w-4" />
+              <span className="hidden sm:inline">Care Circle</span>
             </TabsTrigger>
             <TabsTrigger value="team" className="gap-2">
               <Users className="h-4 w-4" />
@@ -246,6 +251,7 @@ const ClientDashboard = () => {
               <span className="hidden sm:inline">Settings</span>
             </TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="overview">
             <Overview
@@ -270,9 +276,14 @@ const ClientDashboard = () => {
             <MySchedule clientProfile={clientProfile} />
           </TabsContent>
 
+          <TabsContent value="circle">
+            <CareCircle clientId={clientProfile?.id || null} />
+          </TabsContent>
+
           <TabsContent value="team">
             <CareTeam clientId={clientProfile?.id || null} />
           </TabsContent>
+
 
           <TabsContent value="history">
             <CareHistory clientId={clientProfile?.id || null} />

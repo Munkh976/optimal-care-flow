@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
-import { Inbox, Mail, MessageSquare, Phone } from "lucide-react";
+import { Inbox, Mail, MessageSquare, Phone, UserPlus } from "lucide-react";
+import { FlexibilityBadge } from "@/components/common/FlexibilityBadge";
+import { ConvertToClientDialog, type ConvertRequest } from "@/components/inquiries/ConvertToClientDialog";
 
 interface InquiryAnswer {
   prompt: string;
@@ -37,12 +39,22 @@ interface Inquiry {
   contact_preference: string | null;
   submitted_at: string | null;
   answers: InquiryAnswer[];
+  client_id: string | null;
+  converted_client_name: string | null;
+  care_type_codes: string[];
+  location_address: string | null;
+  location_city: string | null;
+  location_state: string | null;
+  location_zip_code: string | null;
+  flexibility: string | null;
+  time_windows: any[];
 }
 
 interface OfficeOption {
   id: string;
   name: string;
 }
+
 
 const STATUS_OPTIONS = [
   { value: "new", label: "New" },
@@ -72,6 +84,7 @@ const ClientInquiries = () => {
   const [officeFilter, setOfficeFilter] = useState("all");
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [savingNote, setSavingNote] = useState<string | null>(null);
+  const [convertTarget, setConvertTarget] = useState<Inquiry | null>(null);
 
   const fetchRows = async () => {
     setLoading(true);
@@ -81,7 +94,7 @@ const ClientInquiries = () => {
     const { data, error } = await supabase
       .from("care_requests")
       .select(
-        "id, session_id, virtual_office_id, status, source, notes, created_at, families(family_name), conversation_sessions(client_name, client_phone, client_email, contact_preference, submitted_at)"
+        "id, session_id, virtual_office_id, status, source, notes, created_at, client_id, care_type_codes, location_address, location_city, location_state, location_zip_code, flexibility, families(family_name), clients(first_name, last_name), care_request_time_windows(day_of_week, preferred_start, preferred_end, flexibility), conversation_sessions(client_name, client_phone, client_email, contact_preference, submitted_at)"
       )
       .order("created_at", { ascending: false });
 
@@ -135,6 +148,17 @@ const ClientInquiries = () => {
         contact_preference: r.conversation_sessions?.contact_preference ?? null,
         submitted_at: r.conversation_sessions?.submitted_at ?? r.created_at,
         answers: r.session_id ? answersBySession[r.session_id] ?? [] : [],
+        client_id: r.client_id ?? null,
+        converted_client_name: r.clients
+          ? `${r.clients.first_name} ${r.clients.last_name}`
+          : null,
+        care_type_codes: r.care_type_codes ?? [],
+        location_address: r.location_address ?? null,
+        location_city: r.location_city ?? null,
+        location_state: r.location_state ?? null,
+        location_zip_code: r.location_zip_code ?? null,
+        flexibility: r.flexibility ?? null,
+        time_windows: r.care_request_time_windows ?? [],
       }))
     );
     setLoading(false);
@@ -280,7 +304,8 @@ const ClientInquiries = () => {
                       </Badge>
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FlexibilityBadge value={row.flexibility} />
                     <Badge variant={row.status === "new" ? "default" : "secondary"}>
                       {STATUS_LABELS[row.status] ?? row.status}
                     </Badge>
@@ -296,7 +321,18 @@ const ClientInquiries = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    {row.client_id ? (
+                      <Badge variant="outline" className="gap-1.5">
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Client: {row.converted_client_name ?? "linked"}
+                      </Badge>
+                    ) : (
+                      <Button size="sm" className="gap-2" onClick={() => setConvertTarget(row)}>
+                        <UserPlus className="h-4 w-4" /> Convert to client
+                      </Button>
+                    )}
                   </div>
+
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <dl className="grid gap-2 sm:grid-cols-2">
@@ -344,6 +380,16 @@ const ClientInquiries = () => {
           })}
         </div>
       </div>
+
+      <ConvertToClientDialog
+        request={convertTarget as ConvertRequest | null}
+        open={!!convertTarget}
+        onOpenChange={(open) => !open && setConvertTarget(null)}
+        onConverted={() => {
+          setConvertTarget(null);
+          fetchRows();
+        }}
+      />
     </AppLayout>
   );
 };

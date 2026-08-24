@@ -2895,6 +2895,23 @@ export type Database = {
         Args: { _recompute?: boolean; _time_entry_id: string }
         Returns: Json
       }
+      convert_care_request_to_client: {
+        Args: {
+          p_address?: string
+          p_care_type_codes?: string[]
+          p_city?: string
+          p_email?: string
+          p_existing_client_id?: string
+          p_family_name?: string
+          p_first_name?: string
+          p_last_name?: string
+          p_phone?: string
+          p_request_id: string
+          p_state?: string
+          p_zip_code?: string
+        }
+        Returns: Json
+      }
       create_flow_draft: { Args: { p_flow_id: string }; Returns: string }
       current_agency_id: { Args: never; Returns: string }
       derived_shift_caregiver: { Args: { _shift_id: string }; Returns: string }

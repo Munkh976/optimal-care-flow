@@ -1,0 +1,201 @@
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Heart, Users, CalendarClock, Phone, Mail } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { FlexibilityBadge } from "@/components/common/FlexibilityBadge";
+
+interface Caregiver {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  shifts: number;
+}
+
+interface Props {
+  clientId: string | null;
+}
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+const initials = (c: { first_name: string; last_name: string }) =>
+  `${c.first_name?.[0] ?? ""}${c.last_name?.[0] ?? ""}`.toUpperCase();
+
+export const CareCircle = ({ clientId }: Props) => {
+  const [primary, setPrimary] = useState<Caregiver | null>(null);
+  const [backups, setBackups] = useState<Caregiver[]>([]);
+  const [windows, setWindows] = useState<any[]>([]);
+  const [flexibility, setFlexibility] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!clientId) return;
+    const load = async () => {
+      setLoading(true);
+
+      const [{ data: client }, { data: assignments }, { data: requests }] = await Promise.all([
+        supabase.from("clients").select("preferred_caregiver_id").eq("id", clientId).maybeSingle(),
+        supabase
+          .from("shift_assignments")
+          .select("caregiver_id, status, shifts!inner ( client_id )")
+          .neq("status", "cancelled")
+          .eq("shifts.client_id", clientId),
+        supabase
+          .from("care_requests")
+          .select("id, flexibility, created_at")
+          .eq("client_id", clientId)
+          .order("created_at", { ascending: false })
+          .limit(1),
+      ]);
+
+      const counts = new Map<string, number>();
+      ((assignments as any[]) ?? []).forEach((a) => {
+        if (a.caregiver_id) counts.set(a.caregiver_id, (counts.get(a.caregiver_id) ?? 0) + 1);
+      });
+
+      const ids = [...counts.keys()];
+      let people: Caregiver[] = [];
+      const preferredId = (client as any)?.preferred_caregiver_id ?? null;
+      const lookupIds = [...new Set([...ids, ...(preferredId ? [preferredId] : [])])];
+
+      if (lookupIds.length > 0) {
+        const { data: cgs } = await supabase
+          .from("caregivers")
+          .select("id, first_name, last_name, email, phone")
+          .in("id", lookupIds);
+        people = ((cgs as any[]) ?? []).map((c) => ({ ...c, shifts: counts.get(c.id) ?? 0 }));
+      }
+
+      // Explicit designation wins; otherwise fall back to most assignments.
+      const sorted = [...people].sort((a, b) => b.shifts - a.shifts);
+      const chosen =
+        (preferredId ? people.find((p) => p.id === preferredId) : undefined) ?? sorted[0] ?? null;
+      setPrimary(chosen);
+      setBackups(sorted.filter((p) => p.id !== chosen?.id));
+
+      const request = ((requests as any[]) ?? [])[0];
+      setFlexibility(request?.flexibility ?? null);
+      if (request?.id) {
+        const { data: tw } = await supabase
+          .from("care_request_time_windows")
+          .select("day_of_week, preferred_start, preferred_end, flexibility")
+          .eq("care_request_id", request.id)
+          .order("day_of_week");
+        setWindows((tw as any[]) ?? []);
+      } else {
+        setWindows([]);
+      }
+
+      setLoading(false);
+    };
+    load();
+  }, [clientId]);
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">Loading your care circle...</p>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Heart className="h-5 w-5 text-primary" /> Your primary caregiver
+          </CardTitle>
+          <CardDescription>The person who knows your routine best.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {primary ? (
+            <div className="flex items-center gap-4">
+              <Avatar className="h-12 w-12">
+                <AvatarFallback>{initials(primary)}</AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="font-medium">
+                  {primary.first_name} {primary.last_name}
+                </p>
+                <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                  {primary.phone && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5" />
+                      {primary.phone}
+                    </span>
+                  )}
+                  {primary.email && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5" />
+                      {primary.email}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No caregiver assigned yet — your agency is arranging your care team.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" /> Backup caregivers
+          </CardTitle>
+          <CardDescription>Familiar faces who cover when your primary caregiver is away.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {backups.length === 0 && (
+            <p className="text-sm text-muted-foreground">No backup caregivers yet.</p>
+          )}
+          {backups.map((c) => (
+            <div key={c.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback>{initials(c)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-medium">
+                    {c.first_name} {c.last_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{c.phone ?? c.email ?? "—"}</p>
+                </div>
+              </div>
+              <Badge variant="outline">{c.shifts} shift{c.shifts === 1 ? "" : "s"}</Badge>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarClock className="h-5 w-5" /> Requested schedule
+          </CardTitle>
+          <CardDescription>The care times you asked for.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <FlexibilityBadge value={flexibility} />
+          {windows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No requested times on file.</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {windows.map((w, i) => (
+                <li key={i} className="flex justify-between rounded-md bg-muted/40 px-3 py-2">
+                  <span>{DAYS[w.day_of_week] ?? w.day_of_week}</span>
+                  <span className="text-muted-foreground">
+                    {w.preferred_start?.slice(0, 5) ?? "—"} – {w.preferred_end?.slice(0, 5) ?? "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
