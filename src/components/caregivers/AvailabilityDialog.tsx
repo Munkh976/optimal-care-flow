@@ -123,11 +123,13 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
       .filter((slot) => slot.is_available)
       .map((slot) => ({
         caregiver_id: caregiver.id,
+        agency_id: caregiver.agency_id,
         day_of_week: slot.day_of_week,
         start_time: slot.start_time,
         end_time: slot.end_time,
         is_available: true,
       }));
+
 
     if (slotsToInsert.length > 0) {
       const { error } = await supabase
