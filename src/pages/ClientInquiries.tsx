@@ -93,7 +93,7 @@ const ClientInquiries = () => {
     const { data, error } = await supabase
       .from("care_requests")
       .select(
-        "id, session_id, virtual_office_id, status, source, notes, created_at, families(family_name), conversation_sessions(client_name, client_phone, client_email, contact_preference, submitted_at)"
+        "id, session_id, virtual_office_id, status, source, notes, created_at, client_id, care_type_codes, location_address, location_city, location_state, location_zip_code, flexibility, families(family_name), clients(first_name, last_name), care_request_time_windows(day_of_week, preferred_start, preferred_end, flexibility), conversation_sessions(client_name, client_phone, client_email, contact_preference, submitted_at)"
       )
       .order("created_at", { ascending: false });
 
