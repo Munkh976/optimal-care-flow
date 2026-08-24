@@ -4,8 +4,10 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Clock, Plus, Trash2 } from "lucide-react";
 
 interface AvailabilityDialogProps {
   caregiver: any;
@@ -15,13 +17,39 @@ interface AvailabilityDialogProps {
 
 interface TimeSlot {
   day_of_week: number;
+  /** Preferred (ideal) window */
   start_time: string;
   end_time: string;
+  /** Acceptable (outer) window */
+  earliest_start: string;
+  latest_end: string;
+  flexibility_minutes: number;
   is_available: boolean;
 }
 
+interface ExceptionRow {
+  id?: string;
+  exception_date: string;
+  is_available: boolean;
+  start_time: string;
+  end_time: string;
+  reason: string;
+}
+
+const emptySlot = (day: number, available = false): TimeSlot => ({
+  day_of_week: day,
+  start_time: "09:00",
+  end_time: "17:00",
+  earliest_start: "09:00",
+  latest_end: "17:00",
+  flexibility_minutes: 0,
+  is_available: available,
+});
+
 export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityDialogProps) => {
   const [availability, setAvailability] = useState<TimeSlot[]>([]);
+  const [exceptions, setExceptions] = useState<ExceptionRow[]>([]);
+  const [removedExceptionIds, setRemovedExceptionIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const daysOfWeek = [
@@ -36,41 +64,61 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
 
   useEffect(() => {
     if (isOpen && caregiver) {
-      fetchAvailability();
+      fetchAll();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, caregiver]);
 
-  const fetchAvailability = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("caregiver_availability")
-      .select("*")
-      .eq("caregiver_id", caregiver.id)
-      .order("day_of_week");
+  const hhmm = (t?: string | null, fallback = "09:00") =>
+    typeof t === "string" && t.length >= 5 ? t.slice(0, 5) : fallback;
 
-    if (error) {
-      console.error("Error fetching availability:", error);
+  const fetchAll = async () => {
+    setLoading(true);
+    setRemovedExceptionIds([]);
+
+    const [weekly, exc] = await Promise.all([
+      supabase.from("caregiver_availability").select("*").eq("caregiver_id", caregiver.id).order("day_of_week"),
+      supabase
+        .from("caregiver_availability_exceptions")
+        .select("*")
+        .eq("caregiver_id", caregiver.id)
+        .order("exception_date"),
+    ]);
+
+    if (weekly.error) {
+      console.error("Error fetching availability:", weekly.error);
       toast.error("Failed to load availability");
-    } else {
-      if (data && data.length > 0) {
-        const normalizeTime = (t: string) => (typeof t === "string" ? t.slice(0, 5) : t);
-        const normalized = (data as any[]).map((slot) => ({
-          ...slot,
-          start_time: normalizeTime(slot.start_time as string),
-          end_time: normalizeTime(slot.end_time as string),
+    } else if (weekly.data && weekly.data.length > 0) {
+      setAvailability(
+        (weekly.data as any[]).map((slot) => ({
+          day_of_week: slot.day_of_week,
+          start_time: hhmm(slot.preferred_start ?? slot.start_time),
+          end_time: hhmm(slot.preferred_end ?? slot.end_time, "17:00"),
+          earliest_start: hhmm(slot.earliest_start ?? slot.start_time),
+          latest_end: hhmm(slot.latest_end ?? slot.end_time, "17:00"),
+          flexibility_minutes: Number(slot.flexibility_minutes ?? 0),
           is_available: slot.is_available ?? true,
-        }));
-        setAvailability(normalized as any);
-      } else {
-        const emptySlots = daysOfWeek.map((day) => ({
-          day_of_week: day.value,
-          start_time: "09:00",
-          end_time: "17:00",
-          is_available: false,
-        }));
-        setAvailability(emptySlots);
-      }
+        }))
+      );
+    } else {
+      setAvailability(daysOfWeek.map((d) => emptySlot(d.value)));
     }
+
+    if (exc.error) {
+      console.error("Error fetching availability exceptions:", exc.error);
+    } else {
+      setExceptions(
+        (exc.data as any[]).map((e) => ({
+          id: e.id,
+          exception_date: e.exception_date,
+          is_available: e.is_available,
+          start_time: hhmm(e.start_time),
+          end_time: hhmm(e.end_time, "17:00"),
+          reason: e.reason ?? "",
+        }))
+      );
+    }
+
     setLoading(false);
   };
 
@@ -79,66 +127,93 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
       const existing = prev.find((slot) => slot.day_of_week === dayValue);
       if (existing) {
         return prev.map((slot) =>
-          slot.day_of_week === dayValue
-            ? { ...slot, is_available: !slot.is_available }
-            : slot
+          slot.day_of_week === dayValue ? { ...slot, is_available: !slot.is_available } : slot
         );
-      } else {
-        return [
-          ...prev,
-          {
-            day_of_week: dayValue,
-            start_time: "09:00",
-            end_time: "17:00",
-            is_available: true,
-          },
-        ];
       }
+      return [...prev, emptySlot(dayValue, true)];
     });
   };
 
-  const handleTimeChange = (
-    dayValue: number,
-    field: "start_time" | "end_time",
-    value: string
-  ) => {
+  const updateSlot = (dayValue: number, patch: Partial<TimeSlot>) => {
     setAvailability((prev) =>
-      prev.map((slot) =>
-        slot.day_of_week === dayValue ? { ...slot, [field]: value } : slot
-      )
+      prev.map((slot) => (slot.day_of_week === dayValue ? { ...slot, ...patch } : slot))
     );
+  };
+
+  const addException = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    setExceptions((prev) => [
+      ...prev,
+      { exception_date: today, is_available: false, start_time: "09:00", end_time: "17:00", reason: "" },
+    ]);
+  };
+
+  const removeException = (index: number) => {
+    setExceptions((prev) => {
+      const row = prev[index];
+      if (row?.id) setRemovedExceptionIds((ids) => [...ids, row.id!]);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const updateException = (index: number, patch: Partial<ExceptionRow>) => {
+    setExceptions((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
 
   const handleSave = async () => {
     setLoading(true);
-    
-    // Delete existing availability
-    await supabase
-      .from("caregiver_availability")
-      .delete()
-      .eq("caregiver_id", caregiver.id);
 
-    // Insert only available slots
+    // --- Weekly availability: replace the caregiver's set ---
+    await supabase.from("caregiver_availability").delete().eq("caregiver_id", caregiver.id);
+
     const slotsToInsert = availability
       .filter((slot) => slot.is_available)
       .map((slot) => ({
         caregiver_id: caregiver.id,
         agency_id: caregiver.agency_id,
         day_of_week: slot.day_of_week,
-        start_time: slot.start_time,
-        end_time: slot.end_time,
+        // effective window used by scheduling is derived from the acceptable window
+        start_time: slot.earliest_start || slot.start_time,
+        end_time: slot.latest_end || slot.end_time,
+        preferred_start: slot.start_time,
+        preferred_end: slot.end_time,
+        earliest_start: slot.earliest_start || slot.start_time,
+        latest_end: slot.latest_end || slot.end_time,
+        flexibility_minutes: Number(slot.flexibility_minutes) || 0,
         is_available: true,
       }));
 
-
     if (slotsToInsert.length > 0) {
-      const { error } = await supabase
-        .from("caregiver_availability")
-        .insert(slotsToInsert);
-
+      const { error } = await supabase.from("caregiver_availability").insert(slotsToInsert);
       if (error) {
         console.error("Error saving availability:", error);
         toast.error("Failed to save availability");
+        setLoading(false);
+        return;
+      }
+    }
+
+    // --- Date exceptions ---
+    if (removedExceptionIds.length > 0) {
+      await supabase.from("caregiver_availability_exceptions").delete().in("id", removedExceptionIds);
+    }
+
+    for (const row of exceptions) {
+      const payload = {
+        caregiver_id: caregiver.id,
+        agency_id: caregiver.agency_id,
+        exception_date: row.exception_date,
+        is_available: row.is_available,
+        start_time: row.is_available ? row.start_time : null,
+        end_time: row.is_available ? row.end_time : null,
+        reason: row.reason || null,
+      };
+      const { error } = row.id
+        ? await supabase.from("caregiver_availability_exceptions").update(payload).eq("id", row.id)
+        : await supabase.from("caregiver_availability_exceptions").insert(payload);
+      if (error) {
+        console.error("Error saving exception:", error);
+        toast.error(`Failed to save exception for ${row.exception_date}`);
         setLoading(false);
         return;
       }
@@ -149,22 +224,45 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
     onClose();
   };
 
-  const generateTimeOptions = () => {
-    const times = [];
+  const timeOptions = (() => {
+    const times: string[] = [];
     for (let hour = 0; hour < 24; hour++) {
       for (let min = 0; min < 60; min += 30) {
-        const time = `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
-        times.push(time);
+        times.push(`${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`);
       }
     }
     return times;
-  };
+  })();
 
-  const timeOptions = generateTimeOptions();
+  const TimeSelect = ({
+    value,
+    onChange,
+    label,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    label: string;
+  }) => (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="w-[110px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="max-h-[240px]">
+          {timeOptions.map((time) => (
+            <SelectItem key={time} value={time}>
+              {time}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[760px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             <div className="flex items-center gap-2">
@@ -174,77 +272,158 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {daysOfWeek.map((day) => {
-            const slot = availability.find((s) => s.day_of_week === day.value);
-            const isAvailable = slot?.is_available || false;
+        <Tabs defaultValue="weekly" className="py-2">
+          <TabsList>
+            <TabsTrigger value="weekly">Weekly pattern</TabsTrigger>
+            <TabsTrigger value="exceptions">Date exceptions ({exceptions.length})</TabsTrigger>
+          </TabsList>
 
-            return (
-              <div
-                key={day.value}
-                className="flex items-center gap-4 p-4 border rounded-lg"
-              >
-                <div className="flex items-center space-x-2 w-32">
-                  <input
-                    type="checkbox"
-                    id={`day-${day.value}`}
-                    checked={isAvailable}
-                    onChange={() => handleToggleDay(day.value)}
-                    className="h-4 w-4"
-                  />
-                  <Label
-                    htmlFor={`day-${day.value}`}
-                    className="font-medium cursor-pointer"
-                  >
-                    {day.label}
-                  </Label>
+          <TabsContent value="weekly" className="space-y-3 pt-4">
+            <p className="text-xs text-muted-foreground">
+              Preferred hours are the caregiver's ideal window. Acceptable hours are the widest window they will
+              work — scheduling eligibility uses the acceptable window.
+            </p>
+
+            {daysOfWeek.map((day) => {
+              const slot = availability.find((s) => s.day_of_week === day.value) ?? emptySlot(day.value);
+              const isAvailable = slot.is_available;
+
+              return (
+                <div key={day.value} className="rounded-lg border p-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id={`day-${day.value}`}
+                      checked={isAvailable}
+                      onChange={() => handleToggleDay(day.value)}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor={`day-${day.value}`} className="font-medium cursor-pointer">
+                      {day.label}
+                    </Label>
+                  </div>
+
+                  {isAvailable && (
+                    <div className="mt-3 flex flex-wrap items-end gap-3">
+                      <TimeSelect
+                        label="Preferred from"
+                        value={slot.start_time}
+                        onChange={(v) => updateSlot(day.value, { start_time: v })}
+                      />
+                      <TimeSelect
+                        label="Preferred to"
+                        value={slot.end_time}
+                        onChange={(v) => updateSlot(day.value, { end_time: v })}
+                      />
+                      <TimeSelect
+                        label="Acceptable from"
+                        value={slot.earliest_start}
+                        onChange={(v) => updateSlot(day.value, { earliest_start: v })}
+                      />
+                      <TimeSelect
+                        label="Acceptable to"
+                        value={slot.latest_end}
+                        onChange={(v) => updateSlot(day.value, { latest_end: v })}
+                      />
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Flex (min)</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={480}
+                          step={15}
+                          className="w-[90px]"
+                          value={slot.flexibility_minutes}
+                          onChange={(e) =>
+                            updateSlot(day.value, { flexibility_minutes: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
+              );
+            })}
+          </TabsContent>
 
-                {isAvailable && (
-                  <div className="flex items-center gap-2 flex-1">
+          <TabsContent value="exceptions" className="space-y-3 pt-4">
+            <p className="text-xs text-muted-foreground">
+              One-off changes for a specific date. Use time off requests for paid or approved leave.
+            </p>
+
+            {exceptions.length === 0 && (
+              <p className="text-sm text-muted-foreground py-4 text-center">No date exceptions.</p>
+            )}
+
+            {exceptions.map((row, index) => (
+              <div key={row.id ?? `new-${index}`} className="rounded-lg border p-4 space-y-3">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Date</Label>
+                    <Input
+                      type="date"
+                      className="w-[160px]"
+                      value={row.exception_date}
+                      onChange={(e) => updateException(index, { exception_date: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Status</Label>
                     <Select
-                      value={slot?.start_time || "09:00"}
-                      onValueChange={(value) =>
-                        handleTimeChange(day.value, "start_time", value)
-                      }
+                      value={row.is_available ? "available" : "unavailable"}
+                      onValueChange={(v) => updateException(index, { is_available: v === "available" })}
                     >
-                      <SelectTrigger className="w-[120px]">
-                        <SelectValue placeholder="Start" />
+                      <SelectTrigger className="w-[170px]">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {timeOptions.map((time) => (
-                          <SelectItem key={time} value={time}>
-                            {time}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <span className="text-muted-foreground">to</span>
-
-                    <Select
-                      value={slot?.end_time || "17:00"}
-                      onValueChange={(value) =>
-                        handleTimeChange(day.value, "end_time", value)
-                      }
-                    >
-                      <SelectTrigger className="w-[120px]">
-                        <SelectValue placeholder="End" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {timeOptions.map((time) => (
-                          <SelectItem key={time} value={time}>
-                            {time}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="unavailable">Unavailable all day</SelectItem>
+                        <SelectItem value="available">Available (custom hours)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                )}
+
+                  {row.is_available && (
+                    <>
+                      <TimeSelect
+                        label="From"
+                        value={row.start_time}
+                        onChange={(v) => updateException(index, { start_time: v })}
+                      />
+                      <TimeSelect
+                        label="To"
+                        value={row.end_time}
+                        onChange={(v) => updateException(index, { end_time: v })}
+                      />
+                    </>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-auto text-destructive"
+                    onClick={() => removeException(index)}
+                    aria-label="Remove exception"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <Input
+                  placeholder="Reason (optional)"
+                  value={row.reason}
+                  onChange={(e) => updateException(index, { reason: e.target.value })}
+                />
               </div>
-            );
-          })}
-        </div>
+            ))}
+
+            <Button variant="outline" size="sm" onClick={addException}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add exception
+            </Button>
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>
