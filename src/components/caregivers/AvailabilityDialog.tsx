@@ -273,9 +273,35 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
       }
     }
 
-    toast.success("Availability updated successfully");
+    // --- Preferences (one row per caregiver) ---
+    const prefPayload = {
+      caregiver_id: caregiver.id,
+      agency_id: caregiver.agency_id,
+      flexibility: prefs.flexibility,
+      desired_weekly_hours: num(prefs.desired_weekly_hours),
+      min_weekly_hours: num(prefs.min_weekly_hours),
+      max_weekly_hours: num(prefs.max_weekly_hours),
+      desired_hourly_rate: num(prefs.desired_hourly_rate),
+      max_travel_minutes: num(prefs.max_travel_minutes),
+      max_travel_miles: num(prefs.max_travel_miles),
+      willing_to_travel_outside_area: prefs.willing_to_travel_outside_area,
+      open_to_short_notice: prefs.open_to_short_notice,
+      notes: prefs.notes.trim() || null,
+    };
+    const { error: prefError } = prefs.id
+      ? await supabase.from("caregiver_preferences").update(prefPayload as any).eq("id", prefs.id)
+      : await supabase.from("caregiver_preferences").insert(prefPayload as any);
+    if (prefError) {
+      console.error("Error saving preferences:", prefError);
+      toast.error("Failed to save preferences");
+      setLoading(false);
+      return;
+    }
+
+    toast.success("Availability and preferences updated");
     setLoading(false);
     onClose();
+
   };
 
   const timeOptions = (() => {
