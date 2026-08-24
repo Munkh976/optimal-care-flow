@@ -715,6 +715,7 @@ const Clients = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Family</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Location</TableHead>
@@ -732,8 +733,22 @@ const Clients = () => {
                         {client.first_name} {client.last_name}
                       </TableCell>
                       <TableCell>
+                        {client.families?.id ? (
+                          <Button
+                            variant="link"
+                            className="h-auto p-0 text-sm"
+                            onClick={() => setFamilyDialogId(client.families.id)}
+                          >
+                            {client.families.family_name}
+                          </Button>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <span className="text-sm">{client.profiles?.email || client.email || '-'}</span>
                       </TableCell>
+
                       <TableCell>
                         <span className="text-sm">{client.phone}</span>
                       </TableCell>
