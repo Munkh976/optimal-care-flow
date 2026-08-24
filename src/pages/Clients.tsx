@@ -134,6 +134,7 @@ const Clients = () => {
         .from("clients")
         .select(`
           *,
+          families(id, family_name),
           client_care_needs(
             care_type_code,
             priority,
