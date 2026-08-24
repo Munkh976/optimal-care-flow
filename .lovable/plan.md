@@ -1,69 +1,43 @@
-# Phase C — Family & Care-Request Workflow (V1)
+# Staff-Editable Flexibility & Preferences — Step 1: Inspection & Proposal
 
-Additive only. No LLM, no matching/scheduling engine. Extends existing surfaces; no parallel pages.
+Display + edit only. No engine, no LLM, no optimizer. Nothing in 2A RLS, 2B triggers, 2.5 eligibility, anon grants, the public page, or Phase A/B/C behaviour changes except adding staff-editing surfaces and one durable client attribute.
 
-## a. Conversion path (highest priority)
+## a. Caregiver side — what exists today
 
-What a care_request holds vs what a client needs:
+Editable surfaces found:
+- `AvailabilityDialog` (weekly pattern with preferred/acceptable windows + flex minutes, and date exceptions) is already mounted in **both** the caregiver's own settings (`CaregiverProfileSettings`) and the **staff Caregivers management page** (`src/pages/Caregivers.tsx`, row action "Manage Availability"). So structured availability is already staff-editable.
+- **Gap:** `caregiver_preferences` (flexibility stance, desired/min/max weekly hours, desired rate/earnings, travel limits, preferred days/areas, short-notice, notes) has **no UI at all** — neither staff nor caregiver. The table is populated only by intake defaults.
 
-| Needed by `clients` | Available on `care_request` |
-|---|---|
-| first_name / last_name (required) | `conversation_sessions.client_name` (single string) or `families.family_name` |
-| phone (required) | `conversation_sessions.client_phone` |
-| address / city / state / zip (required) | `location_address`, `location_city`, `location_state`, `location_zip_code` (often partial) |
-| email (optional) | `conversation_sessions.client_email` |
-| agency_id, virtual_office_id, family_id | already on the request |
-| care needs | `care_type_codes[]` → `client_care_needs` |
+RLS check (no changes needed):
+- `caregiver_availability` — "Agency users can manage caregiver availability" (ALL, agency match via profiles) + caregiver-self policy. Staff can already write.
+- `caregiver_availability_exceptions` — `cae_*` policies allow system admin, the caregiver themself, or agency staff scoped to `current_agency_id()`.
+- `caregiver_preferences` — `select`/`update` allow system admin, own caregiver, or agency staff in the same agency; `insert`/`delete` are staff/admin only. Agency-scoped, already correct.
 
-Because required address fields are frequently incomplete on an inbound request, conversion is a **staff-reviewed dialog**, not a one-click silent insert.
+Proposal: add a **"Preferences" tab inside the existing `AvailabilityDialog`** (renamed header to "Availability & Preferences"). It upserts one `caregiver_preferences` row keyed by `caregiver_id`, with `agency_id` taken from the caregiver. Fields: flexibility stance (continuity / balanced / flexible), desired / min / max weekly hours, desired hourly rate, max travel minutes & miles, willing-to-travel-outside-area, open-to-short-notice, notes. Because the dialog is shared, the same tab appears in the caregiver's own settings — which their own RLS already permits.
 
-**"Convert to client" action** on each ClientInquiries card:
-1. Opens a prefilled dialog (name split from `client_name`, phone/email, address fields, care services from `care_type_codes`, read-only flexibility + time windows).
-2. Staff can instead **link an existing client** (searchable select scoped to the agency) rather than creating a new one.
-3. On confirm (single RPC, so it is atomic):
-   - reuse `care_requests.family_id` if present, else create a `families` row named from the contact;
-   - insert `clients` (agency_id + virtual_office_id + family_id from the request) or link the chosen existing client;
-   - insert `client_care_needs` rows for each `care_type_code` not already present;
-   - set `care_requests.client_id` and status → `matched`.
+## b. Client side — the durability question
 
-**Care plan: NOT created at conversion** (least-assuming path). The request's time windows are display-only guidance; staff then click "Create care plan" which opens the existing `OrderWizardDialog` prefilled with the client and the request's service codes/windows. Once a care plan exists for that client, staff can move the request to `scheduled` from the existing status control.
+Today flexibility is **only historical**: it lives on `care_requests.flexibility` and `care_request_time_windows` (day-of-week preferred/earliest/latest + per-window flexibility). `clients` and `families` have **no flexibility column** (verified: zero matching columns). `CareCircle` currently reads the client's most recent care request — so once a request is converted and archived, or if the family's needs change, there is no editable ongoing stance.
 
-**Idempotency:** conversion is guarded by a new `care_requests.client_id` FK (already present in schema) — the RPC returns the existing client if `client_id` is already set, and the UI shows "Converted → <client name>" with a link instead of the Convert button. Re-running the RPC creates nothing.
+Proposed durable model (additive):
+1. `clients.scheduling_flexibility text not null default 'balanced'` with a check constraint matching the caregiver side (`continuity` | `balanced` | `flexible`), plus `clients.scheduling_notes text`.
+2. New table `public.client_time_windows` mirroring the request-window shape: `client_id`, `agency_id`, `day_of_week`, `preferred_start/end`, `earliest_start`, `latest_end`, `min_duration_hours`, `preferred_duration_hours`, `notes`, `is_demo`, timestamps. Staff-only + client-read RLS, agency-scoped, with GRANTs.
+3. **History preserved:** `care_requests.flexibility` and `care_request_time_windows` are never modified or deleted. Conversion seeds the client's durable values *once* from the request (backfill for already-converted clients too); afterwards the client value is the live one and the request keeps its intake snapshot forever.
 
-## b. Family model usage (minimal)
+## c. Scope, security, Care Circle
 
-No new heavy module. Two touches:
+- Both edit surfaces are staff-only and agency-scoped (client windows: staff write / the client themself read-only; caregiver prefs: staff write, caregiver self-edit as RLS already allows). Cross-agency writes are blocked by `current_agency_id()`.
+- Columns added: `clients.scheduling_flexibility`, `clients.scheduling_notes`, and the new `client_time_windows` table. Nothing removed or renamed.
+- Care Circle keeps the exact same layout and `FlexibilityBadge`; it just prefers the durable client value and `client_time_windows`, falling back to the latest request's values when the client has none.
 
-- **Clients page:** add a "Family" column/field. In the client add/edit form a family select ("None / existing family / + new family"), so a couple can share one family. Optional "Group by family" toggle on the list — pure presentation.
-- **Family detail drawer** (opened from a client row or from ClientInquiries): family name, notes, the clients belonging to it, and CRUD for `family_contacts` (name, relationship, phone/email, primary, decision-maker). Contact info lives only on contacts — no duplication of client contact data onto families.
+## d. Confirmation
 
-Existing clients already linked 1:1 to a family keep working; `family_id` stays nullable.
+Display + edit only. No scheduler, matcher, or eligibility rule reads these new fields — `check_assignment_eligibility` and `shiftEligibility.ts` stay untouched (they continue to use availability windows and exceptions, which already existed). Optimizing on flexibility remains V1.5.
 
-## c. Family Care Circle (extend ClientDashboard)
+## Files to touch (implementation step)
 
-Add one tab, "Care Circle", to the existing family portal (Care Team tab stays; Care Circle is the relationship-framed view):
-- **Primary caregiver** = caregiver with the most non-cancelled upcoming/recent assignments for this client.
-- **Backup caregiver(s)** = the remaining assigned caregivers.
-- **Care team** roster, reusing the existing `shift_assignments` read in `CareTeam.tsx` (extracted into a small shared hook, component unchanged in behaviour).
-- **Requested schedule** — the client's care-request time windows / care-plan lines, read-only.
-Scoped strictly to the signed-in client's own records. No other families, no community, no engine.
-
-## d. Flexibility display
-
-`care_requests.flexibility` and `care_request_time_windows.flexibility` render as a labelled badge (Continuity / Balanced / Flexible) on the inquiry card, in the conversion dialog, and in the Care Circle "requested schedule" block. Display-only — nothing reads it for decisions.
-
-## e. Security
-
-- New RPC `convert_care_request_to_client(...)` is `SECURITY DEFINER`, `search_path = public`, and starts by asserting the caller is agency staff for the request's `agency_id` (`is_agency_staff` + `current_agency_id()`); otherwise it raises. All inserts carry that same `agency_id`.
-- `families` / `family_contacts` already have agency-scoped staff policies from 2C-1; family-contact CRUD uses them as-is. Any missing INSERT/UPDATE/DELETE policy for staff on `family_contacts` is added agency-scoped.
-- No anon grants, no new anon-readable path, no changes to 2A RLS, 2B triggers, 2.5 eligibility, the public page, Phase A, or Phase B.
-
-## f. Additive surface
-
-Tables/columns touched:
-- `care_requests.client_id` — existing column/FK, now actually written (conversion marker).
-- New function `public.convert_care_request_to_client`.
-- Possible new policy on `family_contacts` (staff write) only if absent.
-- No column drops, no type changes, no new tables.
-
-Unchanged: Clients CRUD, ClientDashboard existing tabs, ClientInquiries list/status/notes, care-plan generation and `order_services`. Additions are the Convert action, family grouping/contacts, the Care Circle tab, and flexibility badges.
+- `supabase` migration: client columns + `client_time_windows` + RLS/GRANTs + one-time backfill from converted requests.
+- `src/components/caregivers/AvailabilityDialog.tsx` — add Preferences tab.
+- `src/components/clients/ClientSchedulingDialog.tsx` (new) — flexibility stance + weekly time windows.
+- `src/pages/Clients.tsx` — row action to open it.
+- `src/components/client-dashboard/CareCircle.tsx` — read durable values with request fallback.
