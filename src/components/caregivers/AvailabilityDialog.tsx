@@ -347,7 +347,7 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
           <DialogTitle>
             <div className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              Manage Availability - {caregiver?.first_name} {caregiver?.last_name}
+              Availability &amp; Preferences - {caregiver?.first_name} {caregiver?.last_name}
             </div>
           </DialogTitle>
         </DialogHeader>
@@ -356,7 +356,9 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
           <TabsList>
             <TabsTrigger value="weekly">Weekly pattern</TabsTrigger>
             <TabsTrigger value="exceptions">Date exceptions ({exceptions.length})</TabsTrigger>
+            <TabsTrigger value="preferences">Preferences</TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="weekly" className="space-y-3 pt-4">
             <p className="text-xs text-muted-foreground">
