@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Clock, Plus, Search, Star, UserCheck } from "lucide-react";
+import {
+  fetchCaregiverPerformance,
+  type CaregiverPerformance,
+} from "@/lib/caregiverPerformance";
 
 interface Props {
   caregivers: any[];
@@ -30,6 +34,23 @@ export const CaregiverGridView = ({
 }: Props) => {
   const [search, setSearch] = useState("");
   const [load, setLoad] = useState<"all" | "with" | "without">("all");
+  const [perf, setPerf] = useState<Map<string, CaregiverPerformance>>(new Map());
+
+  const caregiverIds = useMemo(() => caregivers.map((c) => c.id).sort().join(","), [caregivers]);
+
+  useEffect(() => {
+    if (!caregiverIds) {
+      setPerf(new Map());
+      return;
+    }
+    let cancelled = false;
+    fetchCaregiverPerformance(caregiverIds.split(",")).then((m) => {
+      if (!cancelled) setPerf(m);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [caregiverIds]);
 
   const byCaregiver = useMemo(() => {
     const map = new Map<string, any[]>();
@@ -113,11 +134,14 @@ export const CaregiverGridView = ({
                           {caregiver.first_name} {caregiver.last_name}
                         </div>
                         <div className="text-xs text-muted-foreground flex items-center gap-2">
-                          {caregiver.performance_rating != null && (
+                          {perf.get(caregiver.id)?.avg_rating != null ? (
                             <span className="inline-flex items-center gap-1">
                               <Star className="h-3 w-3 fill-warning text-warning" />
-                              {Number(caregiver.performance_rating).toFixed(1)}
+                              {perf.get(caregiver.id)!.avg_rating!.toFixed(1)} (
+                              {perf.get(caregiver.id)!.rating_count})
                             </span>
+                          ) : (
+                            <span className="text-muted-foreground/70">No ratings yet</span>
                           )}
                           <span>{caregiver.city || "—"}</span>
                         </div>

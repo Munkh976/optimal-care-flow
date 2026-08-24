@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Users, Phone, Mail, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchCaregiverPerformance } from "@/lib/caregiverPerformance";
 import { toast } from "sonner";
 
 interface Caregiver {
@@ -13,7 +14,8 @@ interface Caregiver {
   email: string;
   phone: string;
   role: string;
-  performance_rating: number;
+  avg_rating?: number | null;
+  rating_count?: number;
 }
 
 interface CareTeamProps {
@@ -49,11 +51,18 @@ export const CareTeam = ({ clientId }: CareTeamProps) => {
 
         const { data: caregiversData, error: caregiversError } = await supabase
           .from("caregivers")
-          .select("id, first_name, last_name, email, phone, role, performance_rating")
+          .select("id, first_name, last_name, email, phone, role")
           .in("id", caregiverIds);
 
         if (caregiversError) throw caregiversError;
-        setCaregivers(caregiversData || []);
+        const perf = await fetchCaregiverPerformance(caregiverIds as string[]);
+        setCaregivers(
+          (caregiversData || []).map((c: any) => ({
+            ...c,
+            avg_rating: perf.get(c.id)?.avg_rating ?? null,
+            rating_count: perf.get(c.id)?.rating_count ?? 0,
+          }))
+        );
       }
     } catch (error: any) {
       toast.error("Failed to load care team");
@@ -109,10 +118,16 @@ export const CareTeam = ({ clientId }: CareTeamProps) => {
                       <Badge variant="outline" className="text-xs">
                         {caregiver.role.replace('_', ' ')}
                       </Badge>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-3 w-3 fill-primary text-primary" />
-                        <span className="text-xs">{caregiver.performance_rating?.toFixed(1) || 'N/A'}</span>
-                      </div>
+                      {caregiver.avg_rating != null ? (
+                        <div className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-primary text-primary" />
+                          <span className="text-xs">
+                            {caregiver.avg_rating.toFixed(1)} ({caregiver.rating_count})
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No ratings yet</span>
+                      )}
                     </CardDescription>
                   </div>
                 </div>

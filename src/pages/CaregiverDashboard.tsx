@@ -10,6 +10,11 @@ import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShiftDetailsDialog } from "@/components/schedule/ShiftDetailsDialog";
 import { ShiftList } from "@/components/caregivers/ShiftList";
+import { PerformanceProfile } from "@/components/caregivers/PerformanceProfile";
+import {
+  fetchOneCaregiverPerformance,
+  type CaregiverPerformance,
+} from "@/lib/caregiverPerformance";
 
 interface Assignment {
   id: string;
@@ -36,7 +41,6 @@ interface CaregiverProfile {
   id: string;
   first_name: string;
   last_name: string;
-  performance_rating: number;
   reliability_score: number;
   hourly_rate: number;
 }
@@ -52,6 +56,7 @@ const CaregiverDashboard = () => {
   const [shiftView, setShiftView] = useState<'upcoming' | 'week' | 'history'>('upcoming');
   const [selectedShift, setSelectedShift] = useState<any>(null);
   const [todayShifts, setTodayShifts] = useState<Assignment[]>([]);
+  const [performance, setPerformance] = useState<CaregiverPerformance | null>(null);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -85,6 +90,7 @@ const CaregiverDashboard = () => {
       }
       
       setProfile(caregiverData);
+      setPerformance(await fetchOneCaregiverPerformance(caregiverData.id));
 
       // Fetch all assignments with shifts
       const { data: assignmentsData, error: assignmentsError } = await supabase
@@ -256,16 +262,26 @@ const CaregiverDashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">RELIABILITY SCORE</p>
-                  <p className="text-4xl font-bold mt-2">{profile?.reliability_score}%</p>
+                  <p className="text-sm text-muted-foreground">YOUR RATING</p>
+                  <p className="text-4xl font-bold mt-2">
+                    {performance?.avg_rating != null
+                      ? performance.avg_rating.toFixed(1)
+                      : "—"}
+                  </p>
                 </div>
                 <Briefcase className="w-8 h-8 text-purple-500" />
               </div>
-              <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-                ⭐ Elite Status
-              </Badge>
+              <p className="text-xs text-muted-foreground">
+                {performance?.avg_rating != null
+                  ? `Average of ${performance.rating_count} client rating${performance.rating_count === 1 ? "" : "s"}`
+                  : "No client ratings yet"}
+              </p>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="mb-6">
+          <PerformanceProfile perf={performance} />
         </div>
 
         {/* Shifts View with Tabs */}

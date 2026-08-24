@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchCaregiverPerformance, shortRatingLabel } from "@/lib/caregiverPerformance";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import {
@@ -98,7 +99,7 @@ export const AssignShiftDialog = ({
       const [{ data: cgs }, { data: cts }] = await Promise.all([
         supabase
           .from("caregivers")
-          .select("id, first_name, last_name, performance_rating, city, state, hourly_rate")
+          .select("id, first_name, last_name, city, state, hourly_rate")
           .eq("agency_id", profile?.agency_id ?? "")
           .eq("is_active", true)
           .order("first_name"),
@@ -108,7 +109,10 @@ export const AssignShiftDialog = ({
           .eq("is_active", true)
           .order("name"),
       ]);
-      setCaregivers(cgs || []);
+      const perf = await fetchCaregiverPerformance((cgs || []).map((c: any) => c.id));
+      setCaregivers(
+        (cgs || []).map((c: any) => ({ ...c, performance: perf.get(c.id) ?? null }))
+      );
       setCareTypes(cts || []);
       setLoading(false);
     };
@@ -255,7 +259,7 @@ export const AssignShiftDialog = ({
                   filteredCaregivers.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.first_name} {c.last_name}
-                      {c.performance_rating ? ` • ★ ${c.performance_rating}` : ""}
+                      {` • ${shortRatingLabel(c.performance)}`}
                     </SelectItem>
                   ))
                 )}
