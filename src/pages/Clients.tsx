@@ -1213,7 +1213,7 @@ const Clients = () => {
         familyId={familyDialogId}
         open={!!familyDialogId}
         onOpenChange={(open) => !open && setFamilyDialogId(null)}
-        onChanged={() => agencyId && fetchClients(agencyId)}
+        onChanged={() => profile?.agency_id && fetchClients(profile.agency_id)}
       />
       </div>
 
