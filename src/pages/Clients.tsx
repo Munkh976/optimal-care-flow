@@ -820,6 +820,15 @@ const Clients = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                title="Scheduling preferences & flexibility"
+                                onClick={() => setSchedulingClient(client)}
+                              >
+                                <CalendarClock className="h-4 w-4" />
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => handleOpenEditDialog(client)}
                               >
                                 <Edit className="h-4 w-4" />
