@@ -505,6 +505,84 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
               Add exception
             </Button>
           </TabsContent>
+
+          <TabsContent value="preferences" className="space-y-4 pt-4">
+            <p className="text-xs text-muted-foreground">
+              Stated intent only — shown to schedulers. No automatic matching acts on these values yet.
+            </p>
+
+            <div className="space-y-2">
+              <Label>Flexibility stance</Label>
+              <Select
+                value={prefs.flexibility}
+                onValueChange={(v) => setPrefs((p) => ({ ...p, flexibility: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FLEXIBILITY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label} — {o.hint}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { key: "desired_weekly_hours", label: "Desired weekly hours" },
+                { key: "min_weekly_hours", label: "Min weekly hours" },
+                { key: "max_weekly_hours", label: "Max weekly hours" },
+                { key: "desired_hourly_rate", label: "Desired hourly rate" },
+                { key: "max_travel_minutes", label: "Max travel (min)" },
+                { key: "max_travel_miles", label: "Max travel (miles)" },
+              ].map((f) => (
+                <div key={f.key} className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">{f.label}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={(prefs as any)[f.key]}
+                    onChange={(e) => setPrefs((p) => ({ ...p, [f.key]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-6">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={prefs.willing_to_travel_outside_area}
+                  onChange={(e) =>
+                    setPrefs((p) => ({ ...p, willing_to_travel_outside_area: e.target.checked }))
+                  }
+                />
+                Willing to travel outside preferred area
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={prefs.open_to_short_notice}
+                  onChange={(e) => setPrefs((p) => ({ ...p, open_to_short_notice: e.target.checked }))}
+                />
+                Open to short-notice shifts
+              </label>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Notes</Label>
+              <Textarea
+                rows={2}
+                value={prefs.notes}
+                onChange={(e) => setPrefs((p) => ({ ...p, notes: e.target.value }))}
+              />
+            </div>
+          </TabsContent>
         </Tabs>
 
         <DialogFooter>
@@ -512,8 +590,9 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={loading}>
-            {loading ? "Saving..." : "Save Availability"}
+            {loading ? "Saving..." : "Save changes"}
           </Button>
+
         </DialogFooter>
       </DialogContent>
     </Dialog>
