@@ -1684,6 +1684,66 @@ export type Database = {
           },
         ]
       }
+      events: {
+        Row: {
+          actor_id: string | null
+          actor_type: string
+          agency_id: string
+          created_at: string
+          event_type: string
+          id: string
+          is_demo: boolean
+          occurred_at: string
+          payload: Json
+          subject_id: string | null
+          subject_type: string
+          virtual_office_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_type?: string
+          agency_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          is_demo?: boolean
+          occurred_at?: string
+          payload?: Json
+          subject_id?: string | null
+          subject_type: string
+          virtual_office_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_type?: string
+          agency_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          is_demo?: boolean
+          occurred_at?: string
+          payload?: Json
+          subject_id?: string | null
+          subject_type?: string
+          virtual_office_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_virtual_office_id_fkey"
+            columns: ["virtual_office_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_office"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       families: {
         Row: {
           agency_id: string
@@ -2991,6 +3051,8 @@ export type Database = {
       current_agency_id: { Args: never; Returns: string }
       derived_shift_caregiver: { Args: { _shift_id: string }; Returns: string }
       discard_flow_draft: { Args: { p_draft_id: string }; Returns: undefined }
+      event_actor_type: { Args: never; Returns: string }
+      event_default_agency_id: { Args: never; Returns: string }
       family_agency_id: { Args: { _family_id: string }; Returns: string }
       flow_session_complete: {
         Args: {
@@ -3098,6 +3160,20 @@ export type Database = {
       is_published_public_agency: {
         Args: { _agency_id: string }
         Returns: boolean
+      }
+      log_event: {
+        Args: {
+          _actor_id?: string
+          _actor_type?: string
+          _agency_id: string
+          _event_type: string
+          _is_demo?: boolean
+          _payload?: Json
+          _subject_id?: string
+          _subject_type?: string
+          _virtual_office_id?: string
+        }
+        Returns: undefined
       }
       my_caregiver_ids: { Args: never; Returns: string[] }
       my_client_ids: { Args: never; Returns: string[] }
