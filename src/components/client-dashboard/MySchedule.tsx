@@ -40,7 +40,7 @@ export const MySchedule = ({ clientProfile }: MyScheduleProps) => {
       .from("shifts")
       .select(`
         *,
-        caregivers(id, first_name, last_name, performance_rating, role)
+        caregivers(id, first_name, last_name, role)
       `)
       .eq("client_id", clientProfile.id)
       .order("shift_date", { ascending: true })

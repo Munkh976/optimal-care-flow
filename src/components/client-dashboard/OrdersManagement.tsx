@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calendar, Plus, Package, CheckCircle2, Clock, Users, Star, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchCaregiverPerformance } from "@/lib/caregiverPerformance";
 
 interface CareType {
   id: string;
@@ -38,7 +39,8 @@ interface Caregiver {
   first_name: string;
   last_name: string;
   hourly_rate: number;
-  performance_rating: number;
+  avg_rating?: number | null;
+  rating_count?: number;
   caregiver_availability?: {
     day_of_week: number;
     start_time: string;
@@ -196,7 +198,6 @@ export const OrdersManagement = ({
           first_name,
           last_name,
           hourly_rate,
-          performance_rating,
           service_zipcodes,
           caregiver_availability(
             day_of_week,
@@ -219,9 +220,25 @@ export const OrdersManagement = ({
           );
           return !!daySlot;
         })
-        .sort((a, b) => (b.performance_rating || 0) - (a.performance_rating || 0));
+        );
 
-      setAvailableCaregivers(filteredCaregivers);
+      const perf = await fetchCaregiverPerformance(filteredCaregivers.map((c: any) => c.id));
+      const withRatings = filteredCaregivers
+        .map((c: any) => ({
+          ...c,
+          avg_rating: perf.get(c.id)?.avg_rating ?? null,
+          rating_count: perf.get(c.id)?.rating_count ?? 0,
+        }))
+        // Unrated caregivers are neutral, not zero: they sort after rated ones
+        // but ahead of anyone actually rated below average.
+        .sort((a: any, b: any) => {
+          if (a.avg_rating == null && b.avg_rating == null) return 0;
+          if (a.avg_rating == null) return 1;
+          if (b.avg_rating == null) return -1;
+          return b.avg_rating - a.avg_rating;
+        });
+
+      setAvailableCaregivers(withRatings);
 
       if (filteredCaregivers.length === 0) {
         toast.info(`No caregivers available on ${dayNames[bookingData.day]}`);
@@ -741,8 +758,17 @@ export const OrdersManagement = ({
                                   <div className="flex-1">
                                     <h4 className="font-semibold">{caregiver.first_name} {caregiver.last_name}</h4>
                                     <div className="flex items-center gap-2 text-sm">
-                                      <Star className="h-4 w-4 fill-warning text-warning" />
-                                      <span>{caregiver.performance_rating.toFixed(1)} rating</span>
+                                      {caregiver.avg_rating != null ? (
+                                        <>
+                                          <Star className="h-4 w-4 fill-warning text-warning" />
+                                          <span>
+                                            {caregiver.avg_rating.toFixed(1)} rating (
+                                            {caregiver.rating_count})
+                                          </span>
+                                        </>
+                                      ) : (
+                                        <span className="text-muted-foreground">No ratings yet</span>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
