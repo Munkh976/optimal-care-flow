@@ -31,6 +31,8 @@ const Clients = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [familyDialogId, setFamilyDialogId] = useState<string | null>(null);
+  const [schedulingClient, setSchedulingClient] = useState<any>(null);
+
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
