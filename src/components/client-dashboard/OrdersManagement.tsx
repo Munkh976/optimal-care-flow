@@ -219,8 +219,8 @@ export const OrdersManagement = ({
             (slot: any) => slot.day_of_week === bookingData.day && slot.is_available
           );
           return !!daySlot;
-        })
-        );
+        });
+
 
       const perf = await fetchCaregiverPerformance(filteredCaregivers.map((c: any) => c.id));
       const withRatings = filteredCaregivers
