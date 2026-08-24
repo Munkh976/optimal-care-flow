@@ -84,6 +84,7 @@ const ClientInquiries = () => {
   const [officeFilter, setOfficeFilter] = useState("all");
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [savingNote, setSavingNote] = useState<string | null>(null);
+  const [convertTarget, setConvertTarget] = useState<Inquiry | null>(null);
 
   const fetchRows = async () => {
     setLoading(true);
