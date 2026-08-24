@@ -107,14 +107,16 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
     setLoading(true);
     setRemovedExceptionIds([]);
 
-    const [weekly, exc] = await Promise.all([
+    const [weekly, exc, pref] = await Promise.all([
       supabase.from("caregiver_availability").select("*").eq("caregiver_id", caregiver.id).order("day_of_week"),
       supabase
         .from("caregiver_availability_exceptions")
         .select("*")
         .eq("caregiver_id", caregiver.id)
         .order("exception_date"),
+      supabase.from("caregiver_preferences").select("*").eq("caregiver_id", caregiver.id).maybeSingle(),
     ]);
+
 
     if (weekly.error) {
       console.error("Error fetching availability:", weekly.error);
