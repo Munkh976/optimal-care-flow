@@ -201,7 +201,7 @@ export const CareCircle = ({ clientId }: Props) => {
           <CardDescription>The care times you asked for.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <FlexibilityBadge value={flexibility} />
+          <FlexibilityBadge value={flexibility} showUnset />
           {windows.length === 0 ? (
             <p className="text-sm text-muted-foreground">No requested times on file.</p>
           ) : (
