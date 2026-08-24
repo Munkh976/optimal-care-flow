@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppLayout } from "@/components/AppLayout";
 import { 
-  Home, Package, Calendar, Users, History, Settings
+  Home, Package, Calendar, Users, History, Settings, Heart
 } from "lucide-react";
 import { Overview } from "@/components/client-dashboard/Overview";
 import { OrdersManagement } from "@/components/client-dashboard/OrdersManagement";
 import { MySchedule } from "@/components/client-dashboard/MySchedule";
 import { CareTeam } from "@/components/client-dashboard/CareTeam";
+import { CareCircle } from "@/components/client-dashboard/CareCircle";
 import { CareHistory } from "@/components/client-dashboard/CareHistory";
 import { ProfileSettings } from "@/components/client-dashboard/ProfileSettings";
 
