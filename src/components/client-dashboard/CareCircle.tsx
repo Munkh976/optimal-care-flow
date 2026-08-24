@@ -5,6 +5,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Heart, Users, CalendarClock, Phone, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { FlexibilityBadge } from "@/components/common/FlexibilityBadge";
+import { resolveClientFlexibility } from "@/lib/flexibility";
+
 
 interface Caregiver {
   id: string;
