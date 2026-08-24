@@ -1118,6 +1118,72 @@ export type Database = {
           },
         ]
       }
+      client_time_windows: {
+        Row: {
+          agency_id: string
+          client_id: string
+          created_at: string
+          day_of_week: number
+          earliest_start: string | null
+          id: string
+          is_demo: boolean
+          latest_end: string | null
+          min_duration_hours: number | null
+          notes: string | null
+          preferred_duration_hours: number | null
+          preferred_end: string | null
+          preferred_start: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          client_id: string
+          created_at?: string
+          day_of_week: number
+          earliest_start?: string | null
+          id?: string
+          is_demo?: boolean
+          latest_end?: string | null
+          min_duration_hours?: number | null
+          notes?: string | null
+          preferred_duration_hours?: number | null
+          preferred_end?: string | null
+          preferred_start?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          client_id?: string
+          created_at?: string
+          day_of_week?: number
+          earliest_start?: string | null
+          id?: string
+          is_demo?: boolean
+          latest_end?: string | null
+          min_duration_hours?: number | null
+          notes?: string | null
+          preferred_duration_hours?: number | null
+          preferred_end?: string | null
+          preferred_start?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_time_windows_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_time_windows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string
@@ -1139,6 +1205,8 @@ export type Database = {
           notes: string | null
           phone: string
           preferred_caregiver_id: string | null
+          scheduling_flexibility: string | null
+          scheduling_notes: string | null
           state: string
           updated_at: string | null
           user_id: string | null
@@ -1165,6 +1233,8 @@ export type Database = {
           notes?: string | null
           phone: string
           preferred_caregiver_id?: string | null
+          scheduling_flexibility?: string | null
+          scheduling_notes?: string | null
           state: string
           updated_at?: string | null
           user_id?: string | null
@@ -1191,6 +1261,8 @@ export type Database = {
           notes?: string | null
           phone?: string
           preferred_caregiver_id?: string | null
+          scheduling_flexibility?: string | null
+          scheduling_notes?: string | null
           state?: string
           updated_at?: string | null
           user_id?: string | null

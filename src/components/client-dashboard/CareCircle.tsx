@@ -5,6 +5,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Heart, Users, CalendarClock, Phone, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { FlexibilityBadge } from "@/components/common/FlexibilityBadge";
+import { resolveClientFlexibility } from "@/lib/flexibility";
+
 
 interface Caregiver {
   id: string;
@@ -36,20 +38,30 @@ export const CareCircle = ({ clientId }: Props) => {
     const load = async () => {
       setLoading(true);
 
-      const [{ data: client }, { data: assignments }, { data: requests }] = await Promise.all([
-        supabase.from("clients").select("preferred_caregiver_id").eq("id", clientId).maybeSingle(),
-        supabase
-          .from("shift_assignments")
-          .select("caregiver_id, status, shifts!inner ( client_id )")
-          .neq("status", "cancelled")
-          .eq("shifts.client_id", clientId),
-        supabase
-          .from("care_requests")
-          .select("id, flexibility, created_at")
-          .eq("client_id", clientId)
-          .order("created_at", { ascending: false })
-          .limit(1),
-      ]);
+      const [{ data: client }, { data: assignments }, { data: requests }, { data: clientWindows }] =
+        await Promise.all([
+          supabase
+            .from("clients")
+            .select("preferred_caregiver_id, scheduling_flexibility")
+            .eq("id", clientId)
+            .maybeSingle(),
+          supabase
+            .from("shift_assignments")
+            .select("caregiver_id, status, shifts!inner ( client_id )")
+            .neq("status", "cancelled")
+            .eq("shifts.client_id", clientId),
+          supabase
+            .from("care_requests")
+            .select("id, flexibility, created_at")
+            .eq("client_id", clientId)
+            .order("created_at", { ascending: false })
+            .limit(1),
+          supabase
+            .from("client_time_windows")
+            .select("day_of_week, preferred_start, preferred_end, earliest_start, latest_end")
+            .eq("client_id", clientId)
+            .order("day_of_week"),
+        ]);
 
       const counts = new Map<string, number>();
       ((assignments as any[]) ?? []).forEach((a) => {
@@ -76,23 +88,33 @@ export const CareCircle = ({ clientId }: Props) => {
       setPrimary(chosen);
       setBackups(sorted.filter((p) => p.id !== chosen?.id));
 
+      // Single shared resolution rule: durable client value -> latest care request -> unset.
       const request = ((requests as any[]) ?? [])[0];
-      setFlexibility(request?.flexibility ?? null);
+      let requestWindows: any[] = [];
       if (request?.id) {
         const { data: tw } = await supabase
           .from("care_request_time_windows")
-          .select("day_of_week, preferred_start, preferred_end, flexibility")
+          .select("day_of_week, preferred_start, preferred_end, earliest_start, latest_end")
           .eq("care_request_id", request.id)
           .order("day_of_week");
-        setWindows((tw as any[]) ?? []);
-      } else {
-        setWindows([]);
+        requestWindows = (tw as any[]) ?? [];
       }
+
+      const effective = resolveClientFlexibility({
+        clientFlexibility: (client as any)?.scheduling_flexibility ?? null,
+        clientWindows: (clientWindows as any[]) ?? [],
+        requestFlexibility: request?.flexibility ?? null,
+        requestWindows,
+      });
+
+      setFlexibility(effective.flexibility);
+      setWindows(effective.windows);
 
       setLoading(false);
     };
     load();
   }, [clientId]);
+
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading your care circle...</p>;
@@ -179,7 +201,7 @@ export const CareCircle = ({ clientId }: Props) => {
           <CardDescription>The care times you asked for.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <FlexibilityBadge value={flexibility} />
+          <FlexibilityBadge value={flexibility} showUnset />
           {windows.length === 0 ? (
             <p className="text-sm text-muted-foreground">No requested times on file.</p>
           ) : (

@@ -7,7 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { FLEXIBILITY_OPTIONS } from "@/lib/flexibility";
 import { Clock, Plus, Trash2 } from "lucide-react";
+
 
 interface AvailabilityDialogProps {
   caregiver: any;
@@ -46,11 +49,42 @@ const emptySlot = (day: number, available = false): TimeSlot => ({
   is_available: available,
 });
 
+interface PrefsRow {
+  id?: string;
+  flexibility: string;
+  desired_weekly_hours: string;
+  min_weekly_hours: string;
+  max_weekly_hours: string;
+  desired_hourly_rate: string;
+  max_travel_minutes: string;
+  max_travel_miles: string;
+  willing_to_travel_outside_area: boolean;
+  open_to_short_notice: boolean;
+  notes: string;
+}
+
+const emptyPrefs = (): PrefsRow => ({
+  flexibility: "balanced",
+  desired_weekly_hours: "",
+  min_weekly_hours: "",
+  max_weekly_hours: "",
+  desired_hourly_rate: "",
+  max_travel_minutes: "",
+  max_travel_miles: "",
+  willing_to_travel_outside_area: false,
+  open_to_short_notice: false,
+  notes: "",
+});
+
+const num = (v: string) => (v.trim() === "" ? null : Number(v));
+
 export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityDialogProps) => {
   const [availability, setAvailability] = useState<TimeSlot[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionRow[]>([]);
   const [removedExceptionIds, setRemovedExceptionIds] = useState<string[]>([]);
+  const [prefs, setPrefs] = useState<PrefsRow>(emptyPrefs());
   const [loading, setLoading] = useState(false);
+
 
   const daysOfWeek = [
     { value: 1, label: "Monday" },
@@ -76,14 +110,16 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
     setLoading(true);
     setRemovedExceptionIds([]);
 
-    const [weekly, exc] = await Promise.all([
+    const [weekly, exc, pref] = await Promise.all([
       supabase.from("caregiver_availability").select("*").eq("caregiver_id", caregiver.id).order("day_of_week"),
       supabase
         .from("caregiver_availability_exceptions")
         .select("*")
         .eq("caregiver_id", caregiver.id)
         .order("exception_date"),
+      supabase.from("caregiver_preferences").select("*").eq("caregiver_id", caregiver.id).maybeSingle(),
     ]);
+
 
     if (weekly.error) {
       console.error("Error fetching availability:", weekly.error);
@@ -119,8 +155,29 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
       );
     }
 
+    const p = (pref as any)?.data;
+    setPrefs(
+      p
+        ? {
+            id: p.id,
+            flexibility: p.flexibility ?? "balanced",
+            desired_weekly_hours: p.desired_weekly_hours?.toString() ?? "",
+            min_weekly_hours: p.min_weekly_hours?.toString() ?? "",
+            max_weekly_hours: p.max_weekly_hours?.toString() ?? "",
+            desired_hourly_rate: p.desired_hourly_rate?.toString() ?? "",
+            max_travel_minutes: p.max_travel_minutes?.toString() ?? "",
+            max_travel_miles: p.max_travel_miles?.toString() ?? "",
+            willing_to_travel_outside_area: !!p.willing_to_travel_outside_area,
+            open_to_short_notice: !!p.open_to_short_notice,
+            notes: p.notes ?? "",
+          }
+        : emptyPrefs()
+    );
+
     setLoading(false);
   };
+
+
 
   const handleToggleDay = (dayValue: number) => {
     setAvailability((prev) => {
@@ -219,9 +276,35 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
       }
     }
 
-    toast.success("Availability updated successfully");
+    // --- Preferences (one row per caregiver) ---
+    const prefPayload = {
+      caregiver_id: caregiver.id,
+      agency_id: caregiver.agency_id,
+      flexibility: prefs.flexibility,
+      desired_weekly_hours: num(prefs.desired_weekly_hours),
+      min_weekly_hours: num(prefs.min_weekly_hours),
+      max_weekly_hours: num(prefs.max_weekly_hours),
+      desired_hourly_rate: num(prefs.desired_hourly_rate),
+      max_travel_minutes: num(prefs.max_travel_minutes),
+      max_travel_miles: num(prefs.max_travel_miles),
+      willing_to_travel_outside_area: prefs.willing_to_travel_outside_area,
+      open_to_short_notice: prefs.open_to_short_notice,
+      notes: prefs.notes.trim() || null,
+    };
+    const { error: prefError } = prefs.id
+      ? await supabase.from("caregiver_preferences").update(prefPayload as any).eq("id", prefs.id)
+      : await supabase.from("caregiver_preferences").insert(prefPayload as any);
+    if (prefError) {
+      console.error("Error saving preferences:", prefError);
+      toast.error("Failed to save preferences");
+      setLoading(false);
+      return;
+    }
+
+    toast.success("Availability and preferences updated");
     setLoading(false);
     onClose();
+
   };
 
   const timeOptions = (() => {
@@ -267,7 +350,7 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
           <DialogTitle>
             <div className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              Manage Availability - {caregiver?.first_name} {caregiver?.last_name}
+              Availability &amp; Preferences - {caregiver?.first_name} {caregiver?.last_name}
             </div>
           </DialogTitle>
         </DialogHeader>
@@ -276,7 +359,9 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
           <TabsList>
             <TabsTrigger value="weekly">Weekly pattern</TabsTrigger>
             <TabsTrigger value="exceptions">Date exceptions ({exceptions.length})</TabsTrigger>
+            <TabsTrigger value="preferences">Preferences</TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="weekly" className="space-y-3 pt-4">
             <p className="text-xs text-muted-foreground">
@@ -423,6 +508,84 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
               Add exception
             </Button>
           </TabsContent>
+
+          <TabsContent value="preferences" className="space-y-4 pt-4">
+            <p className="text-xs text-muted-foreground">
+              Stated intent only — shown to schedulers. No automatic matching acts on these values yet.
+            </p>
+
+            <div className="space-y-2">
+              <Label>Flexibility stance</Label>
+              <Select
+                value={prefs.flexibility}
+                onValueChange={(v) => setPrefs((p) => ({ ...p, flexibility: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FLEXIBILITY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label} — {o.hint}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { key: "desired_weekly_hours", label: "Desired weekly hours" },
+                { key: "min_weekly_hours", label: "Min weekly hours" },
+                { key: "max_weekly_hours", label: "Max weekly hours" },
+                { key: "desired_hourly_rate", label: "Desired hourly rate" },
+                { key: "max_travel_minutes", label: "Max travel (min)" },
+                { key: "max_travel_miles", label: "Max travel (miles)" },
+              ].map((f) => (
+                <div key={f.key} className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">{f.label}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={(prefs as any)[f.key]}
+                    onChange={(e) => setPrefs((p) => ({ ...p, [f.key]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-6">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={prefs.willing_to_travel_outside_area}
+                  onChange={(e) =>
+                    setPrefs((p) => ({ ...p, willing_to_travel_outside_area: e.target.checked }))
+                  }
+                />
+                Willing to travel outside preferred area
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={prefs.open_to_short_notice}
+                  onChange={(e) => setPrefs((p) => ({ ...p, open_to_short_notice: e.target.checked }))}
+                />
+                Open to short-notice shifts
+              </label>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Notes</Label>
+              <Textarea
+                rows={2}
+                value={prefs.notes}
+                onChange={(e) => setPrefs((p) => ({ ...p, notes: e.target.value }))}
+              />
+            </div>
+          </TabsContent>
         </Tabs>
 
         <DialogFooter>
@@ -430,8 +593,9 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={loading}>
-            {loading ? "Saving..." : "Save Availability"}
+            {loading ? "Saving..." : "Save changes"}
           </Button>
+
         </DialogFooter>
       </DialogContent>
     </Dialog>

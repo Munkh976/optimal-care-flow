@@ -20,6 +20,9 @@ import { AppLayout } from "@/components/AppLayout";
 import { useCareServices } from "@/hooks/useCareServices";
 import { clientFormSchema, passwordResetSchema } from "@/lib/validation";
 import { FamilyDialog } from "@/components/families/FamilyDialog";
+import { ClientSchedulingDialog } from "@/components/clients/ClientSchedulingDialog";
+import { CalendarClock } from "lucide-react";
+
 
 const Clients = () => {
   const navigate = useNavigate();
@@ -28,6 +31,8 @@ const Clients = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [familyDialogId, setFamilyDialogId] = useState<string | null>(null);
+  const [schedulingClient, setSchedulingClient] = useState<any>(null);
+
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
@@ -815,6 +820,15 @@ const Clients = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                title="Scheduling preferences & flexibility"
+                                onClick={() => setSchedulingClient(client)}
+                              >
+                                <CalendarClock className="h-4 w-4" />
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => handleOpenEditDialog(client)}
                               >
                                 <Edit className="h-4 w-4" />
@@ -1216,6 +1230,14 @@ const Clients = () => {
         onOpenChange={(open) => !open && setFamilyDialogId(null)}
         onChanged={() => profile?.agency_id && fetchClients(profile.agency_id)}
       />
+
+      <ClientSchedulingDialog
+        client={schedulingClient}
+        open={!!schedulingClient}
+        onOpenChange={(open) => !open && setSchedulingClient(null)}
+        onSaved={() => profile?.agency_id && fetchClients(profile.agency_id)}
+      />
+
       </div>
 
     </AppLayout>
