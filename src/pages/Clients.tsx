@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
 import { useCareServices } from "@/hooks/useCareServices";
 import { clientFormSchema, passwordResetSchema } from "@/lib/validation";
+import { FamilyDialog } from "@/components/families/FamilyDialog";
 
 const Clients = () => {
   const navigate = useNavigate();
