@@ -380,6 +380,16 @@ const ClientInquiries = () => {
           })}
         </div>
       </div>
+
+      <ConvertToClientDialog
+        request={convertTarget as ConvertRequest | null}
+        open={!!convertTarget}
+        onOpenChange={(open) => !open && setConvertTarget(null)}
+        onConverted={() => {
+          setConvertTarget(null);
+          fetchRows();
+        }}
+      />
     </AppLayout>
   );
 };
