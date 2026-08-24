@@ -1,0 +1,9 @@
+REVOKE ALL ON FUNCTION public.event_actor_type() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.event_default_agency_id() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tg_event_caregiver_registration() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tg_event_care_request() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tg_event_shift() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tg_event_shift_rating() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tg_event_time_entry() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tg_event_earnings_line() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.log_event(uuid,text,text,uuid,text,uuid,jsonb,uuid,boolean) FROM PUBLIC, anon, authenticated;
