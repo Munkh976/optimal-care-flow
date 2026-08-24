@@ -1,0 +1,2 @@
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.events FROM authenticated;
+REVOKE ALL ON public.events FROM anon;
