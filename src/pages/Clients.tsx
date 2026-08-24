@@ -1208,7 +1208,15 @@ const Clients = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <FamilyDialog
+        familyId={familyDialogId}
+        open={!!familyDialogId}
+        onOpenChange={(open) => !open && setFamilyDialogId(null)}
+        onChanged={() => agencyId && fetchClients(agencyId)}
+      />
       </div>
+
     </AppLayout>
   );
 };
