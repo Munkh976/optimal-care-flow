@@ -100,19 +100,28 @@ export const SmartAssignSheet = ({ open, onOpenChange, shift, onAssigned }: Prop
                             {match.caregiver?.first_name} {match.caregiver?.last_name}
                           </p>
                           <div className="flex items-center gap-1 mt-0.5">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`w-3.5 h-3.5 ${
-                                  i < Math.floor(match.caregiver?.performance_rating || 0)
-                                    ? "fill-warning text-warning"
-                                    : "text-muted-foreground/40"
-                                }`}
-                              />
-                            ))}
-                            <span className="text-xs text-muted-foreground ml-1">
-                              {match.caregiver?.performance_rating?.toFixed?.(1) ?? "—"}
-                            </span>
+                            {match.caregiver?.avg_rating != null ? (
+                              <>
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`w-3.5 h-3.5 ${
+                                      i < Math.floor(match.caregiver.avg_rating)
+                                        ? "fill-warning text-warning"
+                                        : "text-muted-foreground/40"
+                                    }`}
+                                  />
+                                ))}
+                                <span className="text-xs text-muted-foreground ml-1">
+                                  {Number(match.caregiver.avg_rating).toFixed(1)} (
+                                  {match.caregiver.rating_count})
+                                </span>
+                              </>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] font-normal">
+                                New — no ratings yet
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>
