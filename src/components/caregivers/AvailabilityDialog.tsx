@@ -46,11 +46,42 @@ const emptySlot = (day: number, available = false): TimeSlot => ({
   is_available: available,
 });
 
+interface PrefsRow {
+  id?: string;
+  flexibility: string;
+  desired_weekly_hours: string;
+  min_weekly_hours: string;
+  max_weekly_hours: string;
+  desired_hourly_rate: string;
+  max_travel_minutes: string;
+  max_travel_miles: string;
+  willing_to_travel_outside_area: boolean;
+  open_to_short_notice: boolean;
+  notes: string;
+}
+
+const emptyPrefs = (): PrefsRow => ({
+  flexibility: "balanced",
+  desired_weekly_hours: "",
+  min_weekly_hours: "",
+  max_weekly_hours: "",
+  desired_hourly_rate: "",
+  max_travel_minutes: "",
+  max_travel_miles: "",
+  willing_to_travel_outside_area: false,
+  open_to_short_notice: false,
+  notes: "",
+});
+
+const num = (v: string) => (v.trim() === "" ? null : Number(v));
+
 export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityDialogProps) => {
   const [availability, setAvailability] = useState<TimeSlot[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionRow[]>([]);
   const [removedExceptionIds, setRemovedExceptionIds] = useState<string[]>([]);
+  const [prefs, setPrefs] = useState<PrefsRow>(emptyPrefs());
   const [loading, setLoading] = useState(false);
+
 
   const daysOfWeek = [
     { value: 1, label: "Monday" },
