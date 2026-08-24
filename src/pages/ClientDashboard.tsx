@@ -276,9 +276,14 @@ const ClientDashboard = () => {
             <MySchedule clientProfile={clientProfile} />
           </TabsContent>
 
+          <TabsContent value="circle">
+            <CareCircle clientId={clientProfile?.id || null} />
+          </TabsContent>
+
           <TabsContent value="team">
             <CareTeam clientId={clientProfile?.id || null} />
           </TabsContent>
+
 
           <TabsContent value="history">
             <CareHistory clientId={clientProfile?.id || null} />
