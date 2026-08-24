@@ -1,43 +1,63 @@
-# Staff-Editable Flexibility & Preferences — Step 1: Inspection & Proposal
+# Phase 4 — Performance consolidation: one source of truth for ratings
 
-Display + edit only. No engine, no LLM, no optimizer. Nothing in 2A RLS, 2B triggers, 2.5 eligibility, anon grants, the public page, or Phase A/B/C behaviour changes except adding staff-editing surfaces and one durable client attribute.
+## a. What `caregiver_performance` computes today
 
-## a. Caregiver side — what exists today
+It is a view, `security_invoker = true` (so 2A RLS on `caregivers`, `shift_assignments`, `shifts`, `shift_ratings` applies to the caller — no cross-tenant leak). Granted to `authenticated` and `service_role` only, no `anon`.
 
-Editable surfaces found:
-- `AvailabilityDialog` (weekly pattern with preferred/acceptable windows + flex minutes, and date exceptions) is already mounted in **both** the caregiver's own settings (`CaregiverProfileSettings`) and the **staff Caregivers management page** (`src/pages/Caregivers.tsx`, row action "Manage Availability"). So structured availability is already staff-editable.
-- **Gap:** `caregiver_preferences` (flexibility stance, desired/min/max weekly hours, desired rate/earnings, travel limits, preferred days/areas, short-notice, notes) has **no UI at all** — neither staff nor caregiver. The table is populated only by intake defaults.
+Columns per caregiver: `caregiver_id`, `agency_id`, `lifetime_completed`, `lifetime_no_shows`, `shifts_last_30d`, `hours_last_30d`, `lifetime_hours`, `completion_rate`, `on_time_rate`, `avg_rating` (= `ROUND(AVG(shift_ratings.rating),2)`, NULL when unrated), `rating_count`.
 
-RLS check (no changes needed):
-- `caregiver_availability` — "Agency users can manage caregiver availability" (ALL, agency match via profiles) + caregiver-self policy. Staff can already write.
-- `caregiver_availability_exceptions` — `cae_*` policies allow system admin, the caregiver themself, or agency staff scoped to `current_agency_id()`.
-- `caregiver_preferences` — `select`/`update` allow system admin, own caregiver, or agency staff in the same agency; `insert`/`delete` are staff/admin only. Agency-scoped, already correct.
+So yes — it already produces the authoritative rating: `avg_rating` + `rating_count`. No new engine needed. One gap: it has no "recent window" rating. Proposal: add `avg_rating_90d` / `rating_count_90d` (ratings joined to shift date) so the profile can show recent vs lifetime.
 
-Proposal: add a **"Preferences" tab inside the existing `AvailabilityDialog`** (renamed header to "Availability & Preferences"). It upserts one `caregiver_preferences` row keyed by `caregiver_id`, with `agency_id` taken from the caregiver. Fields: flexibility stance (continuity / balanced / flexible), desired / min / max weekly hours, desired hourly rate, max travel minutes & miles, willing-to-travel-outside-area, open-to-short-notice, notes. Because the dialog is shared, the same tab appears in the caregiver's own settings — which their own RLS already permits.
+Current data: 25 ratings across 6 caregivers; 8 caregivers carry a stored `performance_rating`. The two disagree today.
 
-## b. Client side — the durability question
+## b. Retiring `caregivers.performance_rating`
 
-Today flexibility is **only historical**: it lives on `care_requests.flexibility` and `care_request_time_windows` (day-of-week preferred/earliest/latest + per-window flexibility). `clients` and `families` have **no flexibility column** (verified: zero matching columns). `CareCircle` currently reads the client's most recent care request — so once a request is converted and archived, or if the family's needs change, there is no editable ongoing stance.
+Recommendation: **option (ii) — stop reading it entirely**, matching the 2B `shifts.caregiver_id` discipline but stricter (2B needed a trigger because legacy queries filtered on it; nothing here needs a stored column). A trigger-sync would keep a second copy that can drift on every unrated caregiver and on rating deletes.
 
-Proposed durable model (additive):
-1. `clients.scheduling_flexibility text not null default 'balanced'` with a check constraint matching the caregiver side (`continuity` | `balanced` | `flexible`), plus `clients.scheduling_notes text`.
-2. New table `public.client_time_windows` mirroring the request-window shape: `client_id`, `agency_id`, `day_of_week`, `preferred_start/end`, `earliest_start`, `latest_end`, `min_duration_hours`, `preferred_duration_hours`, `notes`, `is_demo`, timestamps. Staff-only + client-read RLS, agency-scoped, with GRANTs.
-3. **History preserved:** `care_requests.flexibility` and `care_request_time_windows` are never modified or deleted. Conversion seeds the client's durable values *once* from the request (backfill for already-converted clients too); afterwards the client value is the live one and the request keeps its intake snapshot forever.
+Actions:
+- Repoint every read to `caregiver_performance`.
+- Comment the column as deprecated/derived and stop selecting it in app code.
+- Manual edit surfaces: I checked — the staff Caregivers page has **no** input for `performance_rating`; it is only set by seed/demo data. So nothing to remove in the UI. To make hand-setting impossible as truth, add a trigger that refuses client-side changes to the column (keeps it frozen), rather than dropping it (drop would break the `get_caregiver_with_profile` function and MCP tool contracts).
+- The MCP `list-caregivers` tool and `match-caregiver` edge function also read it — both get repointed to the computed rating (see c).
 
-## c. Scope, security, Care Circle
+## c. Repointing consumers
 
-- Both edit surfaces are staff-only and agency-scoped (client windows: staff write / the client themself read-only; caregiver prefs: staff write, caregiver self-edit as RLS already allows). Cross-agency writes are blocked by `current_agency_id()`.
-- Columns added: `clients.scheduling_flexibility`, `clients.scheduling_notes`, and the new `client_time_windows` table. Nothing removed or renamed.
-- Care Circle keeps the exact same layout and `FlexibilityBadge`; it just prefers the durable client value and `client_time_windows`, falling back to the latest request's values when the client has none.
+| Consumer | Change |
+|---|---|
+| `AssignShiftDialog` | Load ratings from `caregiver_performance`; show `★ 4.6 (12)` or `no ratings` |
+| `CaregiverGridView` | Same badge, unrated shows nothing/`no ratings` |
+| `CaregiverDashboard` | Own performance card reads the view (own row only, via RLS) |
+| `SmartAssignSheet` | Displays computed rating + count; ranking uses computed rating |
+| `match-caregiver` edge fn | Prompt receives `avg_rating (n ratings)` or `not yet rated`, never a fake 5.0 |
+| `client-dashboard/CareTeam`, `OrdersManagement`, `MySchedule` | Also read the stored column; repointed for consistency |
 
-## d. Confirmation
+Unrated handling: unrated caregivers are never treated as 0. They are ranked on the other factors (skills, availability, proximity, hours) with the rating factor **omitted** — i.e. neutral, not penalised — and labelled `New — no ratings yet`. The UI shows `—`, never `0.0` stars.
 
-Display + edit only. No scheduler, matcher, or eligibility rule reads these new fields — `check_assignment_eligibility` and `shiftEligibility.ts` stay untouched (they continue to use availability windows and exceptions, which already existed). Optimizing on flexibility remains V1.5.
+## d. Transparent performance profile
 
-## Files to touch (implementation step)
+Real, backed by data today:
+- Average rating + rating count (lifetime, plus new 90-day window)
+- Completion rate, lifetime completed count
+- On-time rate (from `clock_in_time` vs shift start — 23 assignments have clock-ins)
+- Activity: shifts and hours in last 30 days vs lifetime
 
-- `supabase` migration: client columns + `client_time_windows` + RLS/GRANTs + one-time backfill from converted requests.
-- `src/components/caregivers/AvailabilityDialog.tsx` — add Preferences tab.
-- `src/components/clients/ClientSchedulingDialog.tsx` (new) — flexibility stance + weekly time windows.
-- `src/pages/Clients.tsx` — row action to open it.
-- `src/components/client-dashboard/CareCircle.tsx` — read durable values with request fallback.
+Not reliably available: **no-show and cancellation rates**. The column exists (`lifetime_no_shows`) but there are currently **0 no-show and 0 cancelled assignments** recorded, so the metric renders as "not enough data" rather than a flattering 100%. No invented metrics.
+
+Surfaced as a small reusable `PerformanceProfile` block (used on caregiver detail and the caregiver's own dashboard) showing the pieces, not one opaque score.
+
+## e. Security
+
+- View is `security_invoker` → caregiver sees own row, staff see own agency, cross-agency denied by the underlying 2A policies. No `anon` grant. Verified at implementation time with actual signed-in/cross-agency queries.
+- The added 90-day columns reuse the same base tables — no policy change needed.
+
+## f. Scope
+
+Additive/consolidation only. Changes: one migration (add 90-day rating columns to the view + freeze-trigger and deprecation comment on `performance_rating`), plus read-path edits in the components listed above and the two backend readers. `Reports.tsx` already aggregates `shift_ratings` directly and is untouched — the performance tab keeps working unchanged. No eligibility, RLS, trigger (2B), or public-page changes.
+
+## Test plan (actual, reported with results)
+1. A caregiver's displayed rating equals `AVG(shift_ratings)`, not the old stored value.
+2. Insert a rating → displayed and ranked value moves; roll back.
+3. Unrated caregiver shows "no ratings" and still ranks on other factors.
+4. Attempt to hand-set `performance_rating` → rejected.
+5. Caregiver sees own performance; staff see own agency; cross-agency returns nothing.
+6. Reports performance tab output unchanged before/after.
