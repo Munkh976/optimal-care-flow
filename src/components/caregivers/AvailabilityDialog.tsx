@@ -152,8 +152,29 @@ export const AvailabilityDialog = ({ caregiver, isOpen, onClose }: AvailabilityD
       );
     }
 
+    const p = (pref as any)?.data;
+    setPrefs(
+      p
+        ? {
+            id: p.id,
+            flexibility: p.flexibility ?? "balanced",
+            desired_weekly_hours: p.desired_weekly_hours?.toString() ?? "",
+            min_weekly_hours: p.min_weekly_hours?.toString() ?? "",
+            max_weekly_hours: p.max_weekly_hours?.toString() ?? "",
+            desired_hourly_rate: p.desired_hourly_rate?.toString() ?? "",
+            max_travel_minutes: p.max_travel_minutes?.toString() ?? "",
+            max_travel_miles: p.max_travel_miles?.toString() ?? "",
+            willing_to_travel_outside_area: !!p.willing_to_travel_outside_area,
+            open_to_short_notice: !!p.open_to_short_notice,
+            notes: p.notes ?? "",
+          }
+        : emptyPrefs()
+    );
+
     setLoading(false);
   };
+
+
 
   const handleToggleDay = (dayValue: number) => {
     setAvailability((prev) => {
