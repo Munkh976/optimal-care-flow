@@ -303,7 +303,8 @@ const ClientInquiries = () => {
                       </Badge>
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FlexibilityBadge value={row.flexibility} />
                     <Badge variant={row.status === "new" ? "default" : "secondary"}>
                       {STATUS_LABELS[row.status] ?? row.status}
                     </Badge>
@@ -319,7 +320,18 @@ const ClientInquiries = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    {row.client_id ? (
+                      <Badge variant="outline" className="gap-1.5">
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Client: {row.converted_client_name ?? "linked"}
+                      </Badge>
+                    ) : (
+                      <Button size="sm" className="gap-2" onClick={() => setConvertTarget(row)}>
+                        <UserPlus className="h-4 w-4" /> Convert to client
+                      </Button>
+                    )}
                   </div>
+
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <dl className="grid gap-2 sm:grid-cols-2">
