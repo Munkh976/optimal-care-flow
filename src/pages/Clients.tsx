@@ -20,6 +20,9 @@ import { AppLayout } from "@/components/AppLayout";
 import { useCareServices } from "@/hooks/useCareServices";
 import { clientFormSchema, passwordResetSchema } from "@/lib/validation";
 import { FamilyDialog } from "@/components/families/FamilyDialog";
+import { ClientSchedulingDialog } from "@/components/clients/ClientSchedulingDialog";
+import { CalendarClock } from "lucide-react";
+
 
 const Clients = () => {
   const navigate = useNavigate();
