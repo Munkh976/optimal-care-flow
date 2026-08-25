@@ -19,6 +19,8 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line } from "recharts";
+import { HoursDeliveredTab } from "@/components/reports/HoursDeliveredTab";
+
 
 interface ReportStats {
   totalShifts: number;
