@@ -373,10 +373,16 @@ const Reports = () => {
               <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="shifts">Shifts</TabsTrigger>
+                <TabsTrigger value="hours">Hours</TabsTrigger>
                 <TabsTrigger value="workforce">Workforce</TabsTrigger>
                 <TabsTrigger value="clients">Clients</TabsTrigger>
                 <TabsTrigger value="performance">Performance</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="hours" className="space-y-6">
+                <HoursDeliveredTab />
+              </TabsContent>
+
 
               <TabsContent value="overview" className="space-y-6">
                 <Card>
